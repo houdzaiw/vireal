@@ -38,4 +38,10 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-app.frontend("/", directory=FRONTEND_DIR)
+if FRONTEND_DIR.exists():
+    app.frontend("/", directory=FRONTEND_DIR)
+elif settings.FASTAPI_ENV != "development":
+    raise RuntimeError(
+        f"Frontend directory '{FRONTEND_DIR}' does not exist. "
+        "Run `bun run build` before starting the production backend."
+    )
