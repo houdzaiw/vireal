@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vireal H5 AI 创作端 PRD v1.0</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ef;
+        --paper: #fffdf9;
+        --ink: #1c1b19;
+        --muted: #6d675f;
+        --line: #ddd6ca;
+        --brand: #0f766e;
+        --brand-soft: #d8f3ee;
+        --accent: #e35d4f;
+        --accent-soft: #ffe1dc;
+        --gold: #9a6a16;
+        --gold-soft: #fff2cc;
+        --shadow: 0 20px 60px rgba(50, 42, 31, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.68;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, rgba(15, 118, 110, 0.09), transparent 280px),
+          var(--bg);
+      }
+
+      a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 28px;
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .toc {
+        position: sticky;
+        top: 24px;
+        align-self: start;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(255, 253, 249, 0.86);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .toc h2 {
+        margin: 0 0 12px;
+        font-size: 14px;
+        letter-spacing: 0;
+      }
+
+      .toc a {
+        display: block;
+        padding: 8px 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .paper {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      header {
+        padding: 38px 42px 30px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(135deg, rgba(216, 243, 238, 0.92), transparent 56%),
+          var(--paper);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 52px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      section {
+        padding: 34px 42px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      section:last-child {
+        border-bottom: 0;
+      }
+
+      h2 {
+        margin: 0 0 18px;
+        font-size: 24px;
+        line-height: 1.28;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 24px 0 12px;
+        font-size: 18px;
+        line-height: 1.35;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      .meta-grid,
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .meta,
+      .note,
+      .module {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        background: #fffaf2;
+      }
+
+      .meta strong,
+      .note strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: var(--brand-soft);
+        color: #0b4d49;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.alt {
+        background: var(--accent-soft);
+        color: #9a2f25;
+      }
+
+      .tag.gold {
+        background: var(--gold-soft);
+        color: var(--gold);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+
+      th {
+        background: #f0ece4;
+        color: #454039;
+        font-size: 13px;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin-bottom: 8px;
+      }
+
+      .priority {
+        display: inline-block;
+        min-width: 34px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .p0 {
+        background: #ffe1dc;
+        color: #9a2f25;
+      }
+
+      .p1 {
+        background: #fff2cc;
+        color: #76500f;
+      }
+
+      .p2 {
+        background: #e7eef8;
+        color: #375071;
+      }
+
+      .placeholder {
+        border: 1px dashed #b8aea0;
+        border-radius: 12px;
+        padding: 16px;
+        background: #fbf6ed;
+        color: var(--muted);
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .step {
+        min-height: 92px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--brand);
+      }
+
+      .version-select {
+        float: right;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      @media (max-width: 960px) {
+        .layout {
+          display: block;
+          padding: 0;
+        }
+
+        .toc {
+          position: static;
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .paper {
+          border-left: 0;
+          border-right: 0;
+          border-radius: 0;
+        }
+
+        header,
+        section {
+          padding: 28px 20px;
+        }
+
+        .meta-grid,
+        .card-grid,
+        .flow {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="toc">
+        <h2>目录</h2>
+        <a href="#info">项目信息</a>
+        <a href="#background">一、需求背景</a>
+        <a href="#goals">二、需求目标</a>
+        <a href="#users">三、用户与场景</a>
+        <a href="#journey">四、用户旅程</a>
+        <a href="#features">五、功能清单</a>
+        <a href="#logic">六、基础逻辑</a>
+        <a href="#data">七、数据与接口依赖</a>
+        <a href="#risks">八、异常与边界</a>
+        <a href="#next">九、后续待确认</a>
+      </aside>
+
+      <main class="paper">
+        <header>
+          <select class="version-select" aria-label="版本切换">
+            <option>v1.0 初稿</option>
+          </select>
+          <p class="eyebrow">Vireal H5 Product Requirement</p>
+          <h1>AI 视频 / AI 图片 / 作品 H5 创作端</h1>
+          <p class="subtitle">
+            面向普通手机浏览器用户，提供低门槛的娱乐化 AI 创作体验。用户可先浏览和填写生成内容，点击生成时再通过 Apple 或 Google 登录，视频由 Seedance 承担，图片由 Seedream 承担，生成结果统一沉淀到作品页。
+          </p>
+          <div class="tag-row">
+            <span class="tag">普通手机浏览器</span>
+            <span class="tag">Apple / Google 登录</span>
+            <span class="tag alt">Seedance 视频</span>
+            <span class="tag alt">Seedream 图片</span>
+            <span class="tag gold">视频和图片各 2 次免费</span>
+          </div>
+        </header>
+
+        <section id="info">
+          <h2>项目信息与版本记录</h2>
+          <div class="meta-grid">
+            <div class="meta">
+              <strong>项目名称</strong>
+              Vireal H5 AI 创作端
+            </div>
+            <div class="meta">
+              <strong>当前版本</strong>
+              v1.0 初步 PRD
+            </div>
+            <div class="meta">
+              <strong>端类型</strong>
+              Mobile Web / H5
+            </div>
+            <div class="meta">
+              <strong>默认首屏</strong>
+              AI 视频 Tab
+            </div>
+            <div class="meta">
+              <strong>核心模型方向</strong>
+              Seedance 负责视频生成，Seedream 负责图片生成
+            </div>
+            <div class="meta">
+              <strong>当前状态</strong>
+              待需求方向确认，下一步进入高保真 HTML 原型
+            </div>
+          </div>
+
+          <h3>版本记录</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>版本</th>
+                <th>日期</th>
+                <th>变更说明</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>v1.0</td>
+                <td>2026-08-27</td>
+                <td>建立 H5 用户端产品方向，定义三 Tab、登录触发、生成配置、免费额度和作品管理规则。</td>
+                <td>待确认</td>
+              </tr>
+              <tr>
+                <td>v1.0 原型反馈</td>
+                <td>2026-08-27</td>
+                <td>AI 视频页调整为暗色能量创作台：顶部能量值与工具入口、中心生成卡片、双参考图上传位、5/10/15 秒时长选择、30 能量成本展示、玩法模板横滑和玻璃 TabBar。</td>
+                <td>已同步到原型</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="background">
+          <h2>一、需求背景</h2>
+          <p>
+            Vireal 当前已具备后端基础能力和后台管理能力，但面向最终用户的 H5 创作入口尚未设计。仅有 API 和后台无法完成用户获客、体验验证和内容生产闭环，因此需要补充一个手机浏览器可直接访问的 H5 前端。
+          </p>
+          <p>
+            目标用户希望用很低成本生成娱乐化内容，例如头像、写真感图片、朋友圈素材、社交平台短视频或个人形象视频。如果一进入页面就强制登录，会增加首次体验阻力；因此第一版采用“先体验配置、点击生成时登录”的策略。
+          </p>
+          <p>
+            模型侧需要明确分工：视频生成使用 Seedance，图片生成使用 Seedream。产品 UI 不直接暴露复杂模型概念，而是通过“创作意图、提示词、参考图、尺寸、时长、人物一致性”等用户能理解的配置项组织生成体验。
+          </p>
+        </section>
+
+        <section id="goals">
+          <h2>二、需求目标</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>目标类型</th>
+                <th>描述</th>
+                <th>衡量指标</th>
+                <th>目标值</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>体验目标</td>
+                <td>用户进入 H5 后无需注册即可理解产品能力，并能快速填写生成需求。</td>
+                <td>首屏到点击生成的转化率</td>
+                <td>首版目标不低于 25%</td>
+              </tr>
+              <tr>
+                <td>登录目标</td>
+                <td>只在用户有明确生成意图时触发 Apple/Google 登录，降低前置阻力。</td>
+                <td>生成触发后的登录完成率</td>
+                <td>首版目标不低于 60%</td>
+              </tr>
+              <tr>
+                <td>生成目标</td>
+                <td>视频和图片各提供 2 次免费额度，帮助用户完成首次 AI 内容产出。</td>
+                <td>登录用户首次生成成功率</td>
+                <td>首版目标不低于 70%</td>
+              </tr>
+              <tr>
+                <td>留存目标</td>
+                <td>作品统一沉淀，支持下载、删除、再次生成，让用户回到作品页管理结果。</td>
+                <td>作品页访问率</td>
+                <td>首版目标不低于生成成功用户的 80%</td>
+              </tr>
+              <tr>
+                <td>运营目标</td>
+                <td>后续可通过后台配置控制模型开关、免费额度、推荐示例和风格策略。</td>
+                <td>关键配置可运营化比例</td>
+                <td>首版至少覆盖免费额度、推荐提示词、默认规格</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="users">
+          <h2>三、用户与使用场景</h2>
+          <div class="card-grid">
+            <div class="module">
+              <h3>用户 A：社交头像玩家</h3>
+              <p>
+                希望把自拍或普通照片变成更有质感的写实头像，用在微信、微博、小红书、Discord 或其他社交平台。关注生成速度、头像好不好看、能否下载。
+              </p>
+            </div>
+            <div class="module">
+              <h3>用户 B：娱乐短视频尝鲜者</h3>
+              <p>
+                看到 AI 视频玩法后想快速试一下，用一句话或一张参考图生成短视频。关注是否简单、有趣、效果是否适合分享给朋友。
+              </p>
+            </div>
+            <div class="module">
+              <h3>用户 C：轻度内容创作者</h3>
+              <p>
+                偶尔需要生成朋友圈素材、短视频封面、人物形象视频或社媒配图。比普通用户更关注尺寸、风格和人物一致性，但仍不希望被复杂参数打断。
+              </p>
+            </div>
+            <div class="module">
+              <h3>用户 D：回访作品管理者</h3>
+              <p>
+                已经生成过内容，重新打开 H5 想找历史作品、下载结果、删除不满意内容，或基于旧作品再次生成。
+              </p>
+            </div>
+          </div>
+
+          <h3>核心场景</h3>
+          <ul>
+            <li>用户在手机浏览器打开 H5，看到 AI 视频页，浏览推荐玩法后输入一句提示词。</li>
+            <li>用户上传参考图，希望生成保持人物一致性的短视频或写实头像。</li>
+            <li>用户点击生成，系统发现未登录，弹出 Apple/Google 登录弹窗。</li>
+            <li>用户登录成功，系统继续创建生成任务，并跳转到作品页查看生成状态。</li>
+            <li>用户在作品页下载成功结果；失败作品展示原因，允许再次生成并返还额度。</li>
+          </ul>
+        </section>
+
+        <section id="journey">
+          <h2>四、用户使用场景与旅程图</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>阶段</th>
+                <th>用户触点</th>
+                <th>用户行为</th>
+                <th>痛点 / 情绪</th>
+                <th>产品机会点</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>进入</td>
+                <td>手机浏览器 H5 链接</td>
+                <td>打开页面，默认看到 AI 视频 Tab 和示例效果。</td>
+                <td>用户还不确定产品是否值得登录，警惕复杂注册流程。</td>
+                <td>不强制登录，直接展示输入框、推荐玩法和免费额度提示。</td>
+              </tr>
+              <tr>
+                <td>构思</td>
+                <td>AI 视频 / AI 图片生成页</td>
+                <td>输入提示词，选择写实风格、尺寸、时长，可能上传参考图。</td>
+                <td>不知道怎么写 prompt，担心参数太复杂。</td>
+                <td>提供推荐提示词、默认规格、折叠高级配置，降低认知压力。</td>
+              </tr>
+              <tr>
+                <td>触发登录</td>
+                <td>点击生成按钮</td>
+                <td>点击生成后看到 Apple/Google 登录弹窗。</td>
+                <td>用户已经投入了 prompt 和参考图，如果被打断会担心内容丢失。</td>
+                <td>保留当前表单，登录成功后继续本次生成，不要求重新填写。</td>
+              </tr>
+              <tr>
+                <td>生成等待</td>
+                <td>作品 Tab</td>
+                <td>系统跳到作品页，用户看到生成中卡片、进度和预计等待提示。</td>
+                <td>AI 生成可能耗时，用户担心卡住或失败。</td>
+                <td>明确展示状态、刷新机制、失败原因和重试入口。</td>
+              </tr>
+              <tr>
+                <td>结果处理</td>
+                <td>作品详情 / 作品列表</td>
+                <td>查看生成结果，下载满意内容，删除不满意内容，或再次生成。</td>
+                <td>用户希望快速保存到手机相册，再去社交平台发布。</td>
+                <td>下载作为主操作；分享第一版不做平台跳转，减少授权复杂度。</td>
+              </tr>
+              <tr>
+                <td>回访</td>
+                <td>再次打开 H5</td>
+                <td>进入作品页查看历史，或回到生成页继续创作。</td>
+                <td>担心之前作品找不到，或不清楚免费次数还剩多少。</td>
+                <td>登录态恢复后拉取作品和剩余额度，在 Tab 顶部展示清晰状态。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="features">
+          <h2>五、详细功能清单与优先级</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>模块</th>
+                <th>功能</th>
+                <th>优先级</th>
+                <th>基础说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>全局框架</td>
+                <td>三 Tab 落地页</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>底部固定 TabBar：AI 视频、AI 图片、作品。默认进入 AI 视频；切换 Tab 不丢失当前生成表单草稿。</td>
+              </tr>
+              <tr>
+                <td>登录</td>
+                <td>Apple / Google 登录弹窗</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>未登录用户点击生成时弹出登录弹窗。登录成功后拿到后端登录态，继续提交刚才的生成任务。</td>
+              </tr>
+              <tr>
+                <td>额度</td>
+                <td>视频和图片独立免费次数</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>按登录账号计算，视频免费 2 次、图片免费 2 次。提交任务前校验额度，失败返还本次额度。</td>
+              </tr>
+              <tr>
+                <td>AI 视频</td>
+                <td>一句话生成视频</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>AI 视频页采用暗色沉浸式创作台。用户输入 prompt 即可生成视频，默认写实、5 秒、9:16 竖屏，适合娱乐、社交和短视频浏览。</td>
+              </tr>
+              <tr>
+                <td>AI 视频</td>
+                <td>参考图和人物一致性</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>生成卡片顶部提供两个参考图上传位，可用于参考图和角色图。开启人物一致性后提示用户上传清晰人物图。第一版仅做普通上传提示和基础格式校验。</td>
+              </tr>
+              <tr>
+                <td>AI 视频</td>
+                <td>高级参数</td>
+                <td><span class="priority p1">P1</span></td>
+                <td>支持尺寸 9:16、1:1、16:9；时长 5 秒、10 秒、15 秒；展示人物一致性状态。视频页生成按钮展示 30 能量成本。</td>
+              </tr>
+              <tr>
+                <td>AI 视频</td>
+                <td>玩法模板横滑</td>
+                <td><span class="priority p1">P1</span></td>
+                <td>在生成卡片下方展示“连接”“浪漫时刻”等玩法分区，每个分区横向排列图片模板卡片。点击模板后回填 prompt，帮助用户快速开始。</td>
+              </tr>
+              <tr>
+                <td>AI 图片</td>
+                <td>写实图片生成</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>使用 Seedream 图片能力，支持 prompt、尺寸、参考图、人物一致性。默认风格为写实。</td>
+              </tr>
+              <tr>
+                <td>作品</td>
+                <td>历史作品列表</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>展示视频和图片作品，按创建时间倒序，支持筛选全部、生成中、成功、失败。</td>
+              </tr>
+              <tr>
+                <td>作品</td>
+                <td>下载、删除、再次生成</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>成功作品支持下载；所有非生成中作品支持删除；成功或失败作品可再次生成，复用原参数回到对应生成页。</td>
+              </tr>
+              <tr>
+                <td>状态</td>
+                <td>生成中、成功、失败</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>生成任务提交后立即创建作品占位。生成失败保留卡片，展示失败原因，允许重试并返还额度。</td>
+              </tr>
+              <tr>
+                <td>分享</td>
+                <td>下载后自行分享</td>
+                <td><span class="priority p1">P1</span></td>
+                <td>第一版不接平台分享 SDK，只提供下载到本机能力，用户自行发布到社交平台。</td>
+              </tr>
+              <tr>
+                <td>运营配置</td>
+                <td>推荐提示词和默认参数</td>
+                <td><span class="priority p2">P2</span></td>
+                <td>建议后续接入已有后台 key-value 配置，动态控制示例、额度文案、默认时长、默认尺寸和模型开关。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="logic">
+          <h2>六、核心操作主线与基础逻辑</h2>
+
+          <h3>主线 1：未登录用户生成视频</h3>
+          <div class="flow">
+            <div class="step"><strong>进入</strong>打开 H5，默认 AI 视频 Tab，看到暗色能量创作台。</div>
+            <div class="step"><strong>填写</strong>输入 prompt，或点击“连接”“浪漫时刻”模板自动回填。</div>
+            <div class="step"><strong>配置</strong>上传参考图或角色图，选择 5/10/15 秒时长。</div>
+            <div class="step"><strong>登录</strong>点击生成，弹出 Apple/Google 登录。</div>
+            <div class="step"><strong>提交</strong>登录成功后校验视频免费次数和能量成本，创建视频生成任务。</div>
+          </div>
+
+          <h3>主线 2：未登录用户生成图片</h3>
+          <div class="flow">
+            <div class="step"><strong>切换</strong>用户切到 AI 图片 Tab。</div>
+            <div class="step"><strong>填写</strong>输入写实图片 prompt，选择尺寸，可上传参考图。</div>
+            <div class="step"><strong>登录</strong>点击生成时触发登录弹窗。</div>
+            <div class="step"><strong>提交</strong>登录成功后校验图片免费次数，创建图片任务。</div>
+            <div class="step"><strong>查看</strong>跳到作品 Tab，成功后提供下载。</div>
+          </div>
+
+          <h3>主线 3：作品再次生成</h3>
+          <ul>
+            <li>用户在作品页点击“再次生成”。</li>
+            <li>系统读取该作品的原 prompt、类型、尺寸、时长、参考图和人物一致性配置。</li>
+            <li>视频作品跳回 AI 视频 Tab，图片作品跳回 AI 图片 Tab，并自动填充原参数。</li>
+            <li>用户可修改参数后再次点击生成。</li>
+            <li>再次生成需要重新校验对应类型额度；如果前一次失败并已返还额度，则重试不额外扣除返还前的失败次数。</li>
+          </ul>
+
+          <h3>额度扣减规则</h3>
+          <ul>
+            <li>视频免费额度和图片免费额度独立计算，每个登录账号各 2 次。</li>
+            <li>点击生成并成功创建生成任务后扣减 1 次对应类型额度。</li>
+            <li>任务失败时返还本次额度，并在作品页保留失败作品。</li>
+            <li>任务成功后不返还额度，用户可下载结果。</li>
+            <li>未登录状态不显示完整账号信息，但可在生成按钮旁提示“登录后可免费生成 2 次”。</li>
+          </ul>
+
+          <h3>登录触发规则</h3>
+          <ul>
+            <li>首次进入 H5 不弹登录。</li>
+            <li>填写表单、上传参考图、展开高级配置均不要求登录。</li>
+            <li>只有点击“生成视频”或“生成图片”时，如果用户未登录，才弹出登录弹窗。</li>
+            <li>登录弹窗包含 Apple 登录、Google 登录和关闭按钮。</li>
+            <li>用户关闭登录弹窗后停留在当前生成页，保留已填写内容。</li>
+            <li>登录成功后继续提交当前生成任务，并跳转作品 Tab。</li>
+          </ul>
+        </section>
+
+        <section id="data">
+          <h2>七、数据流向与接口依赖</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>能力</th>
+                <th>前端输入</th>
+                <th>后端 / 模型依赖</th>
+                <th>返回与落点</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Apple 登录</td>
+                <td>Apple 授权结果、identity token 或授权 code。</td>
+                <td>后端 Apple 登录 API，负责验证 Apple 身份并签发 H5 登录态。</td>
+                <td>返回 access token、用户信息、剩余额度。</td>
+              </tr>
+              <tr>
+                <td>Google 登录</td>
+                <td>Google 授权结果、id token 或授权 code。</td>
+                <td>后端 Google 登录 API，负责验证 Google 身份并签发 H5 登录态。</td>
+                <td>返回 access token、用户信息、剩余额度。</td>
+              </tr>
+              <tr>
+                <td>视频生成</td>
+                <td>prompt、参考图、人物一致性、尺寸、时长。</td>
+                <td>后端生成任务 API；模型侧使用 Seedance 视频能力。</td>
+                <td>返回作品 ID 和生成中状态，前端跳转作品 Tab 轮询或刷新。</td>
+              </tr>
+              <tr>
+                <td>图片生成</td>
+                <td>prompt、参考图、人物一致性、尺寸、写实风格。</td>
+                <td>后端生成任务 API；模型侧使用 Seedream 图片能力。</td>
+                <td>返回作品 ID 和生成中状态，成功后作品可下载。</td>
+              </tr>
+              <tr>
+                <td>作品管理</td>
+                <td>筛选状态、作品 ID、删除或再次生成动作。</td>
+                <td>后端作品列表、详情、删除和重新生成接口。</td>
+                <td>返回作品列表、作品状态、下载地址或失败原因。</td>
+              </tr>
+              <tr>
+                <td>运营配置</td>
+                <td>H5 启动时拉取。</td>
+                <td>已有 key-value 配置接口或新 H5 配置接口。</td>
+                <td>推荐 prompt、默认尺寸、默认时长、免费额度文案、模型开关。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>外部模型参考</h3>
+          <ul>
+            <li>Seedance 2.0：定位为音视频联合生成模型，适合作为视频生成能力来源。</li>
+            <li>Seedream：定位为图像生成模型，适合作为图片生成能力来源。</li>
+            <li>PRD 中不直接固化第三方 API 请求字段，后续以后端适配层输出的稳定接口为准。</li>
+          </ul>
+        </section>
+
+        <section id="risks">
+          <h2>八、异常与边界处理</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>场景</th>
+                <th>处理规则</th>
+                <th>用户提示</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>未登录点击生成</td>
+                <td>弹出 Apple/Google 登录弹窗，不清空当前表单。</td>
+                <td>登录后即可开始生成，当前内容已保留。</td>
+              </tr>
+              <tr>
+                <td>用户取消登录</td>
+                <td>关闭弹窗，停留当前 Tab，生成任务不提交。</td>
+                <td>已取消登录，生成前需要先登录。</td>
+              </tr>
+              <tr>
+                <td>免费额度不足</td>
+                <td>阻止任务提交，后续可引导付费或等待运营策略。</td>
+                <td>当前类型免费次数已用完。</td>
+              </tr>
+              <tr>
+                <td>参考图上传失败</td>
+                <td>提示格式、大小或网络问题；允许重新上传。</td>
+                <td>图片上传失败，请换一张清晰图片重试。</td>
+              </tr>
+              <tr>
+                <td>生成任务失败</td>
+                <td>作品页保留失败卡片，展示失败原因，返还额度，支持再次生成。</td>
+                <td>生成失败，已返还本次额度，可以再次生成。</td>
+              </tr>
+              <tr>
+                <td>作品为空</td>
+                <td>展示空状态和去生成按钮。</td>
+                <td>还没有作品，去生成你的第一张图片或第一条视频。</td>
+              </tr>
+              <tr>
+                <td>下载失败</td>
+                <td>提示重试；必要时打开新页面展示资源。</td>
+                <td>下载失败，请检查网络后重试。</td>
+              </tr>
+              <tr>
+                <td>模型服务不可用</td>
+                <td>任务标记失败或排队失败，不扣除成功额度；记录错误供后台查看。</td>
+                <td>生成服务暂时不可用，请稍后再试。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="next">
+          <h2>九、待原型确认后补充</h2>
+          <div class="placeholder">
+            <p>
+              下一步会进入高保真 HTML 原型阶段。原型确认后，本 PRD 将补充每个核心功能模块的详细方案、交互流程图和 iframe 沙盒切片。
+            </p>
+            <ul>
+              <li>AI 视频 Tab 的具体布局、默认态、上传态、生成中反馈。</li>
+              <li>AI 图片 Tab 的 prompt 输入、高级配置和参考图交互。</li>
+              <li>登录弹窗的 Apple/Google 按钮、失败提示和关闭行为。</li>
+              <li>作品 Tab 的生成中、成功、失败、空状态和操作菜单。</li>
+              <li>断网、额度不足、登录取消、下载失败等异常态的画面表达。</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

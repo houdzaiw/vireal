@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vireal H5 Prototype v1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: #171717;
+        background:
+          linear-gradient(180deg, #f4f1ea 0, #eef6f4 44%, #f7f3ec 100%);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .app-shell {
+        width: min(100vw, 430px);
+        min-height: 100vh;
+        margin: 0 auto;
+        background: #fffaf2;
+        box-shadow: 0 24px 80px rgba(24, 24, 24, 0.18);
+      }
+
+      @media (min-width: 720px) {
+        .app-shell {
+          min-height: 900px;
+          margin-top: 28px;
+          margin-bottom: 28px;
+          border: 1px solid rgba(38, 38, 38, 0.08);
+          border-radius: 30px;
+          overflow: hidden;
+        }
+      }
+
+      .scrollbar-none::-webkit-scrollbar {
+        display: none;
+      }
+
+      .scrollbar-none {
+        scrollbar-width: none;
+      }
+
+      .focus-muted {
+        pointer-events: none;
+        opacity: 0.34;
+        filter: grayscale(0.4);
+      }
+
+      .safe-bottom {
+        padding-bottom: max(96px, calc(96px + env(safe-area-inset-bottom)));
+      }
+
+      .tabbar {
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+      }
+
+      .video-page {
+        background:
+          radial-gradient(circle at 20% 0, rgba(103, 232, 249, 0.12), transparent 28%),
+          radial-gradient(circle at 92% 18%, rgba(255, 255, 255, 0.07), transparent 24%),
+          linear-gradient(180deg, #101312 0, #070908 38%, #020303 100%);
+      }
+
+      .video-creator {
+        border: 1px solid rgba(214, 244, 249, 0.14);
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent 34%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+          #111514;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+          0 28px 68px rgba(0, 0, 0, 0.36);
+      }
+
+      .video-template-card {
+        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+      }
+
+      .preview-video {
+        background-image:
+          linear-gradient(180deg, rgba(20, 20, 20, 0.08), rgba(20, 20, 20, 0.72)),
+          url("https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=84");
+      }
+
+      .preview-image {
+        background-image:
+          linear-gradient(180deg, rgba(20, 20, 20, 0.02), rgba(20, 20, 20, 0.56)),
+          url("https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=84");
+      }
+
+      .sample-one {
+        background-image:
+          linear-gradient(180deg, rgba(20, 20, 20, 0.02), rgba(20, 20, 20, 0.58)),
+          url("https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=84");
+      }
+
+      .sample-two {
+        background-image:
+          linear-gradient(180deg, rgba(20, 20, 20, 0.02), rgba(20, 20, 20, 0.58)),
+          url("https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=84");
+      }
+
+      .sample-three {
+        background-image:
+          linear-gradient(180deg, rgba(20, 20, 20, 0.02), rgba(20, 20, 20, 0.58)),
+          url("https://images.unsplash.com/photo-1520813792240-56fc4a3765a7?auto=format&fit=crop&w=900&q=84");
+      }
+
+      .seg-active {
+        background: #111827;
+        color: #fff;
+        border-color: #111827;
+      }
+
+      .toast-enter {
+        animation: toast-in 180ms ease-out;
+      }
+
+      @keyframes toast-in {
+        from {
+          transform: translateY(-8px);
+          opacity: 0;
+        }
+
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app" class="app-shell relative overflow-hidden"></div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const focusMode = params.get("focus");
+      const validTabs = ["video", "image", "works"];
+
+      const imagePool = [
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=84",
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=84",
+        "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=84",
+        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=84",
+      ];
+
+      const state = {
+        tab: resolveInitialTab(),
+        loggedIn: false,
+        loginModal: false,
+        quotaModal: null,
+        toast: "",
+        pendingGenerate: null,
+        videoPromptText: "",
+        imagePromptText: "",
+        uploadName: "",
+        imageUploadName: "",
+        videoAdvanced: false,
+        imageAdvanced: false,
+        videoRatio: "9:16",
+        imageRatio: "1:1",
+        videoDuration: "5s",
+        videoConsistency: true,
+        imageConsistency: false,
+        filter: "all",
+        works: [
+          {
+            id: "work-1",
+            type: "video",
+            title: "写实城市夜行短片",
+            prompt: "夜晚街头，一位年轻人穿过霓虹灯下的雨后街道",
+            status: "success",
+            ratio: "9:16",
+            duration: "5s",
+            image: imagePool[2],
+            createdAt: "刚刚",
+          },
+          {
+            id: "work-2",
+            type: "image",
+            title: "社交头像写真",
+            prompt: "自然光写实头像，干净背景，电影质感",
+            status: "success",
+            ratio: "1:1",
+            image: imagePool[0],
+            createdAt: "12 分钟前",
+          },
+          {
+            id: "work-3",
+            type: "image",
+            title: "参考图不清晰",
+            prompt: "写实头像，浅色背景",
+            status: "failed",
+            ratio: "1:1",
+            image: imagePool[1],
+            error: "人物主体不够清晰，本次额度已返还",
+            createdAt: "28 分钟前",
+          },
+        ],
+        quotas: {
+          video: 2,
+          image: 2,
+        },
+      };
+
+      function resolveInitialTab() {
+        if (["video", "image", "works"].includes(focusMode)) {
+          return focusMode;
+        }
+
+        if (focusMode === "failure") {
+          return "works";
+        }
+
+        const hash = window.location.hash.replace("#", "");
+        return validTabs.includes(hash) ? hash : "video";
+      }
+
+      function render() {
+        const app = document.querySelector("#app");
+        const isVideo = state.tab === "video";
+        app.innerHTML = `
+          <div class="min-h-screen ${isVideo ? "video-page text-[#e8fbff]" : "bg-[#fffaf2] text-[#171717]"}">
+            ${renderTopBar()}
+            <main class="safe-bottom ${isVideo ? "px-4 pt-5" : "px-4 pt-3"}">
+              <section data-focus-section="video" class="${state.tab === "video" ? "" : "hidden"}">
+                ${renderVideoTab()}
+              </section>
+              <section data-focus-section="image" class="${state.tab === "image" ? "" : "hidden"}">
+                ${renderImageTab()}
+              </section>
+              <section data-focus-section="works" class="${state.tab === "works" ? "" : "hidden"}">
+                ${renderWorksTab()}
+              </section>
+            </main>
+            ${state.loginModal || state.quotaModal ? "" : renderTabbar()}
+            ${state.loginModal ? renderLoginModal() : ""}
+            ${state.quotaModal ? renderQuotaModal(state.quotaModal) : ""}
+            ${state.toast ? renderToast() : ""}
+          </div>
+        `;
+        bindEvents();
+        applyFocusMode();
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      function renderTopBar() {
+        if (state.tab === "video") {
+          return renderVideoTopBar();
+        }
+
+        const userLabel = state.loggedIn ? "Liqihui" : "未登录";
+        const avatarClass = state.loggedIn
+          ? "bg-[#0f766e] text-white"
+          : "bg-[#eee6d8] text-[#5f574e]";
+        return `
+          <header class="sticky top-0 z-30 border-b border-black/5 bg-[#fffaf2]/92 px-4 pb-3 pt-4 backdrop-blur">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-[12px] font-semibold text-[#0f766e]">Vireal</p>
+                <h1 class="mt-0.5 text-[22px] font-black leading-tight tracking-normal">AI 创作</h1>
+              </div>
+              <button class="login-entry flex items-center gap-2 rounded-full border border-black/8 bg-white px-2.5 py-2 shadow-sm" title="账号">
+                <span class="${avatarClass} grid h-7 w-7 place-items-center rounded-full text-[12px] font-bold">${state.loggedIn ? "L" : ""}</span>
+                <span class="max-w-[88px] truncate text-[13px] font-semibold">${userLabel}</span>
+              </button>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              ${renderQuotaPill("video", "视频")}
+              ${renderQuotaPill("image", "图片")}
+            </div>
+          </header>
+        `;
+      }
+
+      function renderVideoTopBar() {
+        return `
+          <header class="sticky top-0 z-30 border-b border-white/8 bg-[#0d1110]/95 px-7 pb-7 pt-8 text-[#e8fbff] backdrop-blur" data-focus-section="video">
+            <div class="flex items-center justify-between">
+              <button class="login-entry flex h-[44px] min-w-[98px] items-center justify-center gap-3 rounded-full border border-white/12 bg-white/8 px-5 text-[20px] font-black text-[#c8f6ff] shadow-inner" title="账号与能量">
+                <span>${state.loggedIn ? "80" : "80"}</span>
+                <i data-lucide="zap" class="h-5 w-5 fill-[#c8f6ff] text-[#c8f6ff]"></i>
+              </button>
+              <div class="flex items-center gap-4">
+                <button class="video-help grid h-[54px] w-[54px] place-items-center rounded-full bg-white/7 text-[#cbd5df]" title="提示">
+                  <i data-lucide="octagon-alert" class="h-7 w-7"></i>
+                </button>
+                <button class="video-settings grid h-[54px] w-[54px] place-items-center rounded-full bg-white/7 text-[#cbd5df]" title="设置">
+                  <i data-lucide="settings" class="h-7 w-7"></i>
+                </button>
+              </div>
+            </div>
+          </header>
+        `;
+      }
+
+      function renderQuotaPill(type, label) {
+        const color =
+          type === "video"
+            ? "bg-[#e6f5f2] text-[#0f5f59]"
+            : "bg-[#fff0dc] text-[#8a4b18]";
+        return `
+          <div class="${color} flex min-h-[38px] items-center justify-between rounded-[10px] px-3">
+            <span class="text-[12px] font-bold">${label}免费</span>
+            <span class="text-[14px] font-black">${state.quotas[type]}/2</span>
+          </div>
+        `;
+      }
+
+      function renderVideoTab() {
+        return `
+          <div class="space-y-8 pb-2">
+            <div class="video-creator rounded-[32px] p-6">
+              <div class="flex gap-4">
+                ${videoUploadSlot("videoUpload", state.uploadName || "参考图")}
+                ${videoUploadSlot("videoUploadExtra", state.uploadName ? "已添加" : "角色图")}
+              </div>
+              <textarea id="videoPrompt" class="mt-5 min-h-[132px] w-full resize-none border-0 bg-transparent text-[24px] font-semibold leading-snug text-[#eefcff] outline-none placeholder:text-[#5b6565]" placeholder="描述你的创意...">${state.videoPromptText || ""}</textarea>
+              <div class="mt-4 grid grid-cols-3 gap-2">
+                ${darkMiniControl("比例", state.videoRatio)}
+                ${darkMiniControl("风格", "写实")}
+                ${darkMiniControl("一致性", state.videoConsistency ? "开启" : "关闭")}
+              </div>
+              <div class="mt-7 flex items-center gap-4">
+                <span class="shrink-0 text-[18px] font-black text-[#d6e7eb]">时长</span>
+                <div class="flex gap-3">
+                  ${videoDurationChip("5s", "5秒")}
+                  ${videoDurationChip("10s", "10秒")}
+                  ${videoDurationChip("15s", "15秒")}
+                </div>
+              </div>
+              <button class="generate-video mt-7 flex h-[58px] w-full items-center justify-center rounded-[20px] bg-white/10 text-[#687171] shadow-inner" title="生成视频">
+                <span class="flex-1 text-center text-[23px] font-black">生成</span>
+                <span class="mr-7 flex items-center gap-2 text-[20px] font-semibold text-[#7c8585]">
+                  30
+                  <i data-lucide="zap" class="h-5 w-5 fill-current"></i>
+                </span>
+              </button>
+            </div>
+
+            ${renderVideoTemplateSection("连接", [
+              { title: "法式亲吻", images: [imagePool[3], imagePool[1], imagePool[0], imagePool[2]], prompt: "法式亲吻，真实情侣互动，电影感近景" },
+              { title: "爱的触碰", images: [imagePool[0], imagePool[2], imagePool[3], imagePool[1]], prompt: "爱人的轻柔触碰，写实浪漫短片，自然光" },
+              { title: "亲密合影", images: [imagePool[2], imagePool[0], imagePool[1], imagePool[3]], prompt: "亲密合影变成动态视频，微笑看向镜头" },
+            ])}
+
+            ${renderVideoTemplateSection("浪漫时刻", [
+              { title: "拥抱瞬间", images: [imagePool[0], imagePool[1], imagePool[2], imagePool[3]], prompt: "两个人拥抱，温暖写实，慢动作镜头" },
+              { title: "海边告白", images: [imagePool[3], imagePool[0], imagePool[2], imagePool[1]], prompt: "海边日落告白，浪漫写实，微风吹动头发" },
+              { title: "雨夜回眸", images: [imagePool[2], imagePool[3], imagePool[1], imagePool[0]], prompt: "雨夜街头回眸，霓虹灯，电影写实短片" },
+            ])}
+          </div>
+        `;
+      }
+
+      function videoUploadSlot(id, label) {
+        return `
+          <label class="grid h-[92px] w-[92px] shrink-0 cursor-pointer place-items-center rounded-[22px] border border-dashed border-[#4d5554] bg-white/[0.045] text-[#b8c6c8]">
+            <span class="flex flex-col items-center gap-1">
+              <i data-lucide="${state.uploadName ? "image-check" : "camera"}" class="h-9 w-9"></i>
+              <span class="max-w-[74px] truncate text-[11px] font-bold">${label}</span>
+            </span>
+            <input id="${id}" type="file" accept="image/*" class="hidden" />
+          </label>
+        `;
+      }
+
+      function darkMiniControl(label, value) {
+        return `
+          <button class="toggle-video-advanced min-h-[48px] rounded-[14px] border border-white/8 bg-white/[0.055] px-3 text-left" title="${label}">
+            <span class="block text-[10px] font-bold text-[#829092]">${label}</span>
+            <span class="mt-0.5 block text-[14px] font-black text-[#e2f8fb]">${value}</span>
+          </button>
+        `;
+      }
+
+      function videoDurationChip(value, label) {
+        const active = state.videoDuration === value;
+        return `
+          <button class="video-duration-chip h-[52px] min-w-[70px] rounded-full border px-5 text-[18px] font-black ${active ? "border-[#65dcf0] bg-[#65dcf0] text-[#062126]" : "border-[#3d4443] bg-white/[0.035] text-[#aab5b8]"}" data-value="${value}">
+            ${label}
+          </button>
+        `;
+      }
+
+      function renderVideoTemplateSection(title, items) {
+        return `
+          <section>
+            <div class="mb-4 flex items-end justify-between">
+              <div>
+                <h2 class="text-[28px] font-black leading-none tracking-normal text-[#edf6f7]">${title}</h2>
+                <div class="mt-4 h-1 w-12 rounded-full bg-gradient-to-r from-[#66e7f4] to-transparent"></div>
+              </div>
+              <button class="text-[15px] font-black text-[#c8f6ff]" title="查看全部">查看全部</button>
+            </div>
+            <div class="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1 scrollbar-none">
+              ${items.map((item) => renderVideoTemplateCard(item)).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderVideoTemplateCard(item) {
+        return `
+          <button class="video-template-card template-video min-w-[214px] overflow-hidden rounded-[16px] border border-white/10 bg-[#151918] text-left" data-prompt="${item.prompt}" title="${item.title}">
+            <div class="grid h-[222px] grid-cols-2 grid-rows-2 gap-[1px] bg-[#2a302f]">
+              ${item.images
+                .map(
+                  (image) => `
+                    <span class="block bg-cover bg-center" style="background-image: linear-gradient(180deg, transparent, rgba(0,0,0,.5)), url('${image}')"></span>
+                  `,
+                )
+                .join("")}
+            </div>
+            <div class="-mt-14 flex h-14 items-end bg-gradient-to-t from-black/80 to-transparent px-4 pb-4">
+              <span class="text-[20px] font-black text-white">${item.title}</span>
+            </div>
+          </button>
+        `;
+      }
+
+      function renderImageTab() {
+        return `
+          <div class="space-y-4">
+            <div class="preview-image min-h-[178px] rounded-[18px] bg-cover bg-center p-4 text-white shadow-lg">
+              <div class="flex h-full min-h-[146px] flex-col justify-between">
+                <div class="flex items-center justify-between">
+                  <span class="rounded-full bg-white/18 px-3 py-1 text-[12px] font-bold backdrop-blur">Seedream 图片</span>
+                  <span class="rounded-full bg-black/28 px-3 py-1 text-[12px] font-semibold backdrop-blur">写实头像</span>
+                </div>
+                <div>
+                  <h2 class="text-[25px] font-black leading-tight tracking-normal">生成一张能直接用的头像</h2>
+                  <p class="mt-2 max-w-[300px] text-[13px] leading-5 text-white/88">默认写实风格，可加参考图保持人物特征。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-[18px] border border-black/6 bg-white p-4 shadow-sm">
+              <label class="text-[13px] font-black text-[#2b2a28]" for="imagePrompt">图片描述</label>
+              <textarea id="imagePrompt" class="mt-2 min-h-[112px] w-full resize-none rounded-[14px] border border-[#ded7cc] bg-[#fffaf2] p-3 text-[15px] leading-6 outline-none focus:border-[#0f766e]" placeholder="例如：自然光写实头像，干净背景，精致但真实"></textarea>
+              <div class="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                ${promptChip("imagePrompt", "自然光写实头像，干净背景")}
+                ${promptChip("imagePrompt", "胶片感半身写真，温暖色调")}
+                ${promptChip("imagePrompt", "职业头像，真实肤色，浅灰背景")}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              ${styleCard("写实", "bg-[#e6f5f2] text-[#0f5f59] border-[#b8ddd7]", true)}
+              ${styleCard("写真", "bg-[#fff0dc] text-[#8a4b18] border-[#efd2a4]", false)}
+              ${styleCard("电影感", "bg-[#eef2f7] text-[#3f5067] border-[#d4dce8]", false)}
+            </div>
+
+            <div class="rounded-[18px] border border-black/6 bg-white p-4 shadow-sm">
+              <label class="flex min-h-[84px] cursor-pointer items-center gap-3 rounded-[14px] border border-dashed border-[#cfc5b6] bg-[#fffaf2] p-3">
+                <span class="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] bg-[#fff0dc] text-[#8a4b18]">
+                  <i data-lucide="user-round-plus" class="h-5 w-5"></i>
+                </span>
+                <span class="min-w-0">
+                  <span class="block text-[14px] font-bold">${state.imageUploadName || "上传头像参考图"}</span>
+                  <span class="block text-[12px] text-[#756d64]">图片越清晰，人物越稳定</span>
+                </span>
+                <input id="imageUpload" type="file" accept="image/*" class="hidden" />
+              </label>
+            </div>
+
+            <div class="rounded-[18px] border border-black/6 bg-white p-4 shadow-sm">
+              <button class="toggle-image-advanced flex w-full items-center justify-between text-left">
+                <span class="text-[15px] font-black">高级配置</span>
+                <i data-lucide="${state.imageAdvanced ? "chevron-up" : "chevron-down"}" class="h-5 w-5 text-[#5f574e]"></i>
+              </button>
+              <div class="${state.imageAdvanced ? "block" : "hidden"} mt-4 space-y-4">
+                ${renderSegment("imageRatio", "图片尺寸", ["1:1", "3:4", "9:16"], state.imageRatio)}
+                ${renderToggle("imageConsistency", "人物一致性", "开启后优先保留参考图人物特征", state.imageConsistency)}
+              </div>
+            </div>
+
+            <button class="generate-image flex h-14 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0f766e] text-[16px] font-black text-white shadow-lg shadow-[#0f766e]/20" title="生成图片">
+              <i data-lucide="sparkles" class="h-5 w-5"></i>
+              生成图片
+            </button>
+          </div>
+        `;
+      }
+
+      function renderWorksTab() {
+        const filteredWorks =
+          state.filter === "all"
+            ? state.works
+            : state.works.filter((work) => work.status === state.filter);
+        return `
+          <div class="space-y-4">
+            <div class="rounded-[18px] border border-black/6 bg-white p-4 shadow-sm">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-[24px] font-black leading-tight tracking-normal">作品</h2>
+                  <p class="mt-1 text-[13px] text-[#70675d]">${state.loggedIn ? "最近生成的图片和视频" : "登录后同步历史作品"}</p>
+                </div>
+                <button class="login-entry rounded-full border border-black/8 bg-[#fffaf2] px-3 py-2 text-[13px] font-bold">
+                  ${state.loggedIn ? "已登录" : "登录"}
+                </button>
+              </div>
+              <div class="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                ${filterChip("all", "全部")}
+                ${filterChip("generating", "生成中")}
+                ${filterChip("success", "成功")}
+                ${filterChip("failed", "失败")}
+              </div>
+            </div>
+
+            ${
+              filteredWorks.length
+                ? `<div class="space-y-3">${filteredWorks.map(renderWorkCard).join("")}</div>`
+                : renderEmptyWorks()
+            }
+          </div>
+        `;
+      }
+
+      function renderWorkCard(work) {
+        const status = {
+          generating: ["生成中", "bg-[#e6f5f2] text-[#0f5f59]"],
+          success: ["已完成", "bg-[#ecfdf3] text-[#13703a]"],
+          failed: ["失败", "bg-[#ffe1dc] text-[#9a2f25]"],
+        }[work.status];
+
+        return `
+          <article class="overflow-hidden rounded-[18px] border border-black/6 bg-white shadow-sm" data-work-id="${work.id}">
+            <div class="relative h-[190px] bg-cover bg-center" style="background-image: linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.52)), url('${work.image}')">
+              <div class="absolute left-3 top-3 flex gap-2">
+                <span class="rounded-full bg-black/42 px-2.5 py-1 text-[12px] font-bold text-white backdrop-blur">${work.type === "video" ? "视频" : "图片"}</span>
+                <span class="${status[1]} rounded-full px-2.5 py-1 text-[12px] font-bold">${status[0]}</span>
+              </div>
+              ${work.type === "video" ? `<div class="absolute inset-0 grid place-items-center"><span class="grid h-12 w-12 place-items-center rounded-full bg-white/88 text-[#111827]"><i data-lucide="play" class="h-5 w-5 fill-current"></i></span></div>` : ""}
+              ${work.status === "generating" ? renderProgressOverlay() : ""}
+            </div>
+            <div class="p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="truncate text-[16px] font-black tracking-normal">${work.title}</h3>
+                  <p class="mt-1 line-clamp-2 text-[13px] leading-5 text-[#70675d]">${work.prompt}</p>
+                  <p class="mt-2 text-[12px] text-[#92897d]">${work.ratio}${work.duration ? ` · ${work.duration}` : ""} · ${work.createdAt}</p>
+                </div>
+              </div>
+              ${work.status === "failed" ? `<p class="mt-3 rounded-[10px] bg-[#fff0ec] px-3 py-2 text-[12px] font-semibold text-[#9a2f25]">${work.error}</p>` : ""}
+              <div class="mt-4 grid grid-cols-3 gap-2">
+                ${work.status === "success" ? actionButton("download-work", work.id, "download", "下载") : actionButton("retry-work", work.id, "refresh-cw", "重试")}
+                ${work.status !== "generating" ? actionButton("remix-work", work.id, "wand-sparkles", "再生成") : actionButton("disabled", work.id, "timer", "等待")}
+                ${work.status !== "generating" ? actionButton("delete-work", work.id, "trash-2", "删除") : actionButton("disabled", work.id, "loader", "处理中")}
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      function renderProgressOverlay() {
+        return `
+          <div class="absolute inset-x-4 bottom-4 rounded-[12px] bg-white/92 p-3 backdrop-blur">
+            <div class="flex items-center justify-between text-[12px] font-bold text-[#111827]">
+              <span>生成中</span>
+              <span>68%</span>
+            </div>
+            <div class="mt-2 h-2 overflow-hidden rounded-full bg-[#ddd6ca]">
+              <div class="h-full w-[68%] rounded-full bg-[#0f766e]"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderEmptyWorks() {
+        return `
+          <div class="rounded-[18px] border border-dashed border-[#cfc5b6] bg-white p-8 text-center">
+            <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#e6f5f2] text-[#0f766e]">
+              <i data-lucide="images" class="h-6 w-6"></i>
+            </div>
+            <h3 class="mt-4 text-[17px] font-black tracking-normal">还没有作品</h3>
+            <p class="mt-1 text-[13px] text-[#70675d]">生成完成后会在这里展示。</p>
+            <button class="go-video mt-4 rounded-[12px] bg-[#111827] px-4 py-3 text-[14px] font-black text-white">去生成视频</button>
+          </div>
+        `;
+      }
+
+      function renderTabbar() {
+        if (state.tab === "video") {
+          return `
+            <nav class="tabbar fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 px-5 pb-4 pt-2">
+              <div class="rounded-[34px] border border-white/14 bg-[#232826]/78 px-3 py-2 shadow-2xl shadow-black/60 backdrop-blur-xl">
+                <div class="grid grid-cols-3 gap-2">
+                  ${tabButton("video", "video", "AI 视频")}
+                  ${tabButton("image", "image", "AI 图片")}
+                  ${tabButton("works", "images", "作品")}
+                </div>
+              </div>
+            </nav>
+          `;
+        }
+
+        return `
+          <nav class="tabbar fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-black/8 bg-[#fffaf2]/95 px-3 pt-2 backdrop-blur">
+            <div class="grid grid-cols-3 gap-2">
+              ${tabButton("video", "video", "AI 视频")}
+              ${tabButton("image", "image", "AI 图片")}
+              ${tabButton("works", "images", "作品")}
+            </div>
+          </nav>
+        `;
+      }
+
+      function renderLoginModal() {
+        return `
+          <div class="fixed inset-0 z-50 grid place-items-end bg-black/48 px-4 pb-4" data-focus-section="login">
+            <div class="w-full max-w-[398px] rounded-[24px] bg-white p-5 shadow-2xl">
+              <div class="mx-auto mb-4 h-1.5 w-10 rounded-full bg-[#ddd6ca]"></div>
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-[22px] font-black leading-tight tracking-normal">登录后开始生成</h2>
+                  <p class="mt-2 text-[13px] leading-5 text-[#70675d]">当前填写内容会保留，登录成功后继续提交。</p>
+                </div>
+                <button class="close-login grid h-9 w-9 place-items-center rounded-full bg-[#f4f1ea]" title="关闭">
+                  <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+              </div>
+              <div class="mt-5 space-y-3">
+                <button class="oauth-apple flex h-13 min-h-[52px] w-full items-center justify-center gap-3 rounded-[14px] bg-[#111827] text-[15px] font-black text-white" title="Apple 登录">
+                  <i data-lucide="apple" class="h-5 w-5"></i>
+                  使用 Apple 登录
+                </button>
+                <button class="oauth-google flex h-13 min-h-[52px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#ded7cc] bg-white text-[15px] font-black text-[#1f2937]" title="Google 登录">
+                  <i data-lucide="chrome" class="h-5 w-5"></i>
+                  使用 Google 登录
+                </button>
+              </div>
+              <p class="mt-4 text-center text-[12px] leading-5 text-[#8b8176]">登录即代表同意服务条款和隐私政策。</p>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderQuotaModal(type) {
+        const label = type === "video" ? "视频" : "图片";
+        return `
+          <div class="fixed inset-0 z-50 grid place-items-center bg-black/48 px-5" data-focus-section="quota">
+            <div class="w-full max-w-[360px] rounded-[22px] bg-white p-5 text-center shadow-2xl">
+              <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#fff0dc] text-[#8a4b18]">
+                <i data-lucide="ticket-x" class="h-6 w-6"></i>
+              </div>
+              <h2 class="mt-4 text-[21px] font-black tracking-normal">${label}免费次数已用完</h2>
+              <p class="mt-2 text-[13px] leading-5 text-[#70675d]">第一版先拦截提交，后续可接入会员或支付。</p>
+              <button class="close-quota mt-5 h-12 w-full rounded-[14px] bg-[#111827] text-[15px] font-black text-white">知道了</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderToast() {
+        return `
+          <div class="toast-enter fixed left-1/2 top-4 z-[60] w-[calc(100%-32px)] max-w-[398px] -translate-x-1/2 rounded-[14px] bg-[#111827] px-4 py-3 text-[13px] font-bold text-white shadow-xl">
+            ${state.toast}
+          </div>
+        `;
+      }
+
+      function promptChip(targetId, text) {
+        return `<button class="prompt-chip shrink-0 rounded-full border border-[#ded7cc] bg-white px-3 py-2 text-[12px] font-bold text-[#4f4a43]" data-target="${targetId}" data-value="${text}">${text}</button>`;
+      }
+
+      function styleCard(label, classes, active) {
+        return `
+          <button class="${classes} ${active ? "ring-2 ring-[#111827]" : ""} min-h-[70px] rounded-[14px] border p-3 text-left">
+            <span class="block text-[13px] font-black">${label}</span>
+            <span class="mt-1 block text-[11px] opacity-75">风格</span>
+          </button>
+        `;
+      }
+
+      function renderSegment(key, label, options, selected) {
+        return `
+          <div>
+            <p class="mb-2 text-[13px] font-black text-[#2b2a28]">${label}</p>
+            <div class="grid grid-cols-${options.length} gap-2">
+              ${options
+                .map(
+                  (option) => `
+                    <button class="seg-button ${selected === option ? "seg-active" : "border-[#ded7cc] bg-[#fffaf2] text-[#4f4a43]"} min-h-[42px] rounded-[12px] border text-[13px] font-black" data-key="${key}" data-value="${option}">
+                      ${option}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderToggle(key, title, text, checked) {
+        return `
+          <button class="toggle-setting flex w-full items-center justify-between gap-4 rounded-[14px] bg-[#fffaf2] p-3 text-left" data-key="${key}">
+            <span>
+              <span class="block text-[14px] font-black">${title}</span>
+              <span class="mt-0.5 block text-[12px] text-[#70675d]">${text}</span>
+            </span>
+            <span class="${checked ? "bg-[#0f766e]" : "bg-[#cfc5b6]"} relative h-7 w-12 shrink-0 rounded-full transition">
+              <span class="${checked ? "translate-x-5" : "translate-x-1"} absolute top-1 h-5 w-5 rounded-full bg-white transition"></span>
+            </span>
+          </button>
+        `;
+      }
+
+      function tabButton(tab, icon, label) {
+        const active = state.tab === tab;
+        if (state.tab === "video") {
+          return `
+            <button class="tab-button flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-[26px] ${active ? "bg-[#1f2625] text-[#cff8ff]" : "text-[#7b8282]"}" data-tab="${tab}" title="${label}">
+              <i data-lucide="${icon}" class="h-6 w-6 ${active ? "fill-[#cff8ff]" : ""}"></i>
+              <span class="text-[14px] font-black">${label}</span>
+            </button>
+          `;
+        }
+
+        return `
+          <button class="tab-button flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[14px] ${active ? "bg-[#111827] text-white" : "text-[#70675d]"}" data-tab="${tab}" title="${label}">
+            <i data-lucide="${icon}" class="h-5 w-5"></i>
+            <span class="text-[12px] font-black">${label}</span>
+          </button>
+        `;
+      }
+
+      function filterChip(filter, label) {
+        const active = state.filter === filter;
+        return `<button class="filter-chip shrink-0 rounded-full px-3 py-2 text-[12px] font-black ${active ? "bg-[#111827] text-white" : "bg-[#fffaf2] text-[#70675d]"}" data-filter="${filter}">${label}</button>`;
+      }
+
+      function actionButton(className, id, icon, label) {
+        const disabled = className === "disabled";
+        return `
+          <button class="${className} flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] ${disabled ? "bg-[#f4f1ea] text-[#9b9186]" : "bg-[#fffaf2] text-[#292724]"} text-[12px] font-black" data-id="${id}" ${disabled ? "disabled" : ""} title="${label}">
+            <i data-lucide="${icon}" class="h-4 w-4"></i>${label}
+          </button>
+        `;
+      }
+
+      function bindEvents() {
+        document.querySelectorAll(".tab-button").forEach((button) => {
+          button.addEventListener("click", () => setTab(button.dataset.tab));
+        });
+
+        document.querySelectorAll(".login-entry").forEach((button) => {
+          button.addEventListener("click", () => {
+            if (state.loggedIn) {
+              showToast("当前已登录");
+              return;
+            }
+            state.loginModal = true;
+            render();
+          });
+        });
+
+        document.querySelector(".generate-video")?.addEventListener("click", () => startGenerate("video"));
+        document.querySelector(".generate-image")?.addEventListener("click", () => startGenerate("image"));
+        document.querySelector(".toggle-video-advanced")?.addEventListener("click", () => {
+          state.videoAdvanced = !state.videoAdvanced;
+          render();
+        });
+        document.querySelector(".toggle-image-advanced")?.addEventListener("click", () => {
+          state.imageAdvanced = !state.imageAdvanced;
+          render();
+        });
+        document.querySelector("#videoUpload")?.addEventListener("change", (event) => {
+          state.uploadName = event.target.files?.[0]?.name || "已选择参考图";
+          showToast("参考图已添加");
+          render();
+        });
+        document.querySelector("#videoUploadExtra")?.addEventListener("change", (event) => {
+          state.uploadName = event.target.files?.[0]?.name || "已选择角色图";
+          showToast("角色图已添加");
+          render();
+        });
+        document.querySelector("#imageUpload")?.addEventListener("change", (event) => {
+          state.imageUploadName = event.target.files?.[0]?.name || "已选择头像参考图";
+          showToast("头像参考图已添加");
+          render();
+        });
+        document.querySelector("#videoPrompt")?.addEventListener("input", (event) => {
+          state.videoPromptText = event.target.value;
+        });
+        document.querySelector("#imagePrompt")?.addEventListener("input", (event) => {
+          state.imagePromptText = event.target.value;
+        });
+        document.querySelectorAll(".prompt-chip").forEach((button) => {
+          button.addEventListener("click", () => {
+            const input = document.querySelector(`#${button.dataset.target}`);
+            if (input) input.value = button.dataset.value;
+            if (button.dataset.target === "videoPrompt") state.videoPromptText = button.dataset.value;
+            if (button.dataset.target === "imagePrompt") state.imagePromptText = button.dataset.value;
+          });
+        });
+        document.querySelectorAll(".video-duration-chip").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.videoDuration = button.dataset.value;
+            render();
+          });
+        });
+        document.querySelectorAll(".template-video").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.videoPromptText = button.dataset.prompt;
+            showToast("已套用玩法");
+            render();
+          });
+        });
+        document.querySelector(".video-help")?.addEventListener("click", () => {
+          showToast("上传参考图后，人物一致性效果更稳定");
+        });
+        document.querySelector(".video-settings")?.addEventListener("click", () => {
+          state.videoAdvanced = !state.videoAdvanced;
+          state.videoConsistency = !state.videoConsistency;
+          showToast(state.videoConsistency ? "人物一致性已开启" : "人物一致性已关闭");
+          render();
+        });
+        document.querySelectorAll(".seg-button").forEach((button) => {
+          button.addEventListener("click", () => {
+            state[button.dataset.key] = button.dataset.value;
+            render();
+          });
+        });
+        document.querySelectorAll(".toggle-setting").forEach((button) => {
+          button.addEventListener("click", () => {
+            state[button.dataset.key] = !state[button.dataset.key];
+            render();
+          });
+        });
+        document.querySelectorAll(".filter-chip").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.filter = button.dataset.filter;
+            render();
+          });
+        });
+        document.querySelector(".close-login")?.addEventListener("click", () => {
+          state.loginModal = false;
+          state.pendingGenerate = null;
+          showToast("已取消登录，内容已保留");
+          render();
+        });
+        document.querySelector(".oauth-apple")?.addEventListener("click", () => completeLogin("Apple"));
+        document.querySelector(".oauth-google")?.addEventListener("click", () => completeLogin("Google"));
+        document.querySelector(".close-quota")?.addEventListener("click", () => {
+          state.quotaModal = null;
+          render();
+        });
+        document.querySelector(".go-video")?.addEventListener("click", () => setTab("video"));
+        document.querySelectorAll(".download-work").forEach((button) => {
+          button.addEventListener("click", () => showToast("已开始下载"));
+        });
+        document.querySelectorAll(".delete-work").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.works = state.works.filter((work) => work.id !== button.dataset.id);
+            showToast("作品已删除");
+            render();
+          });
+        });
+        document.querySelectorAll(".remix-work").forEach((button) => {
+          button.addEventListener("click", () => remixWork(button.dataset.id));
+        });
+        document.querySelectorAll(".retry-work").forEach((button) => {
+          button.addEventListener("click", () => retryWork(button.dataset.id));
+        });
+      }
+
+      function setTab(tab) {
+        if (focusMode && ["video", "image", "works"].includes(focusMode) && tab !== focusMode) {
+          return;
+        }
+        state.tab = tab;
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${tab}`);
+        render();
+      }
+
+      function startGenerate(type) {
+        if (!state.loggedIn) {
+          state.pendingGenerate = type;
+          state.loginModal = true;
+          render();
+          return;
+        }
+
+        submitGeneration(type);
+      }
+
+      function completeLogin(provider) {
+        state.loggedIn = true;
+        state.loginModal = false;
+        const pending = state.pendingGenerate;
+        state.pendingGenerate = null;
+        showToast(`${provider} 登录成功`);
+        if (pending) {
+          submitGeneration(pending);
+        } else {
+          render();
+        }
+      }
+
+      function submitGeneration(type) {
+        if (state.quotas[type] <= 0) {
+          state.quotaModal = type;
+          render();
+          return;
+        }
+
+        state.quotas[type] -= 1;
+        const isVideo = type === "video";
+        const prompt =
+          (isVideo ? state.videoPromptText : state.imagePromptText) ||
+          document.querySelector(isVideo ? "#videoPrompt" : "#imagePrompt")?.value ||
+          (isVideo ? "写实人物短视频" : "写实社交头像");
+        const newWork = {
+          id: `work-${Date.now()}`,
+          type,
+          title: isVideo ? "新视频生成任务" : "新图片生成任务",
+          prompt,
+          status: "generating",
+          ratio: isVideo ? state.videoRatio : state.imageRatio,
+          duration: isVideo ? state.videoDuration : "",
+          image: imagePool[Math.floor(Math.random() * imagePool.length)],
+          createdAt: "刚刚",
+        };
+        state.works.unshift(newWork);
+        state.tab = "works";
+        state.filter = "all";
+        showToast("任务已提交");
+        render();
+
+        window.setTimeout(() => {
+          const work = state.works.find((item) => item.id === newWork.id);
+          if (!work) return;
+          work.status = "success";
+          work.title = isVideo ? "写实人物短视频" : "写实头像作品";
+          showToast("生成完成");
+          render();
+        }, 2800);
+      }
+
+      function retryWork(id) {
+        const work = state.works.find((item) => item.id === id);
+        if (!work || work.status === "generating") return;
+        work.status = "generating";
+        work.error = "";
+        showToast("已重新提交");
+        render();
+        window.setTimeout(() => {
+          const target = state.works.find((item) => item.id === id);
+          if (!target) return;
+          target.status = "success";
+          target.title = target.type === "video" ? "重试成功视频" : "重试成功图片";
+          showToast("重试生成完成");
+          render();
+        }, 2200);
+      }
+
+      function remixWork(id) {
+        const work = state.works.find((item) => item.id === id);
+        if (!work) return;
+        state.tab = work.type === "video" ? "video" : "image";
+        showToast("已带入原参数");
+        render();
+        window.setTimeout(() => {
+          const input = document.querySelector(work.type === "video" ? "#videoPrompt" : "#imagePrompt");
+          if (work.type === "video") state.videoPromptText = work.prompt;
+          if (work.type === "image") state.imagePromptText = work.prompt;
+          if (input) input.value = work.prompt;
+        }, 0);
+      }
+
+      function showToast(message) {
+        state.toast = message;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => {
+          state.toast = "";
+          render();
+        }, 1800);
+      }
+
+      function applyFocusMode() {
+        if (!focusMode) return;
+
+        const sections = document.querySelectorAll("[data-focus-section]");
+        sections.forEach((section) => {
+          const name = section.dataset.focusSection;
+          const allowed =
+            name === focusMode ||
+            name === "login" ||
+            name === "quota" ||
+            (focusMode === "failure" && name === "works");
+          if (!allowed) {
+            section.classList.add("focus-muted");
+          }
+        });
+
+        if (focusMode === "login" && !state.loginModal) {
+          state.loginModal = true;
+          window.setTimeout(render, 0);
+        }
+
+        if (focusMode === "failure") {
+          state.filter = "failed";
+        }
+      }
+
+      if (focusMode === "login") {
+        state.loginModal = true;
+      }
+
+      if (focusMode === "failure") {
+        state.tab = "works";
+        state.filter = "failed";
+      }
+
+      render();
+    </script>
+  </body>
+</html>

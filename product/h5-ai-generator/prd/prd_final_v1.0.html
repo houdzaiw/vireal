@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vireal H5 AI 创作端最终 PRD v1.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f1ea;
+        --paper: #fffdf8;
+        --ink: #171717;
+        --muted: #6f665d;
+        --line: #ddd4c7;
+        --brand: #0f766e;
+        --brand-soft: #e3f5f1;
+        --accent: #ec6a5c;
+        --accent-soft: #ffe9e4;
+        --dark: #101312;
+        --gold: #8f5f14;
+        --gold-soft: #fff1d6;
+        --shadow: 0 20px 58px rgba(54, 45, 34, 0.09);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, rgba(15, 118, 110, 0.1), transparent 320px),
+          var(--bg);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.68;
+      }
+
+      a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 270px minmax(0, 1fr);
+        gap: 26px;
+        max-width: 1360px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .toc {
+        position: sticky;
+        top: 22px;
+        align-self: start;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        background: rgba(255, 253, 248, 0.9);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .toc h2 {
+        margin: 0 0 12px;
+        font-size: 14px;
+        letter-spacing: 0;
+      }
+
+      .toc a {
+        display: block;
+        border-radius: 8px;
+        padding: 7px 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .toc a:hover {
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .paper {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      header {
+        padding: 40px 44px 34px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(135deg, rgba(227, 245, 241, 0.95), transparent 58%),
+          linear-gradient(180deg, #fffdf8, #fff8ef);
+      }
+
+      .version-select {
+        float: right;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 840px;
+        font-size: clamp(32px, 4.6vw, 58px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        max-width: 840px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      section {
+        padding: 34px 44px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      section:last-child {
+        border-bottom: 0;
+      }
+
+      h2 {
+        margin: 0 0 18px;
+        font-size: 25px;
+        line-height: 1.28;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 24px 0 12px;
+        font-size: 19px;
+        line-height: 1.34;
+        letter-spacing: 0;
+      }
+
+      h4 {
+        margin: 18px 0 10px;
+        font-size: 15px;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+
+      th {
+        background: #eee8de;
+        color: #3e3932;
+        font-size: 13px;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin-bottom: 8px;
+      }
+
+      .meta-grid,
+      .goal-grid,
+      .persona-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .meta,
+      .persona,
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        background: #fff8ef;
+      }
+
+      .meta strong,
+      .note strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        border-radius: 999px;
+        padding: 4px 11px;
+        background: var(--brand-soft);
+        color: #0b514d;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tag.alt {
+        background: var(--accent-soft);
+        color: #9e3329;
+      }
+
+      .tag.gold {
+        background: var(--gold-soft);
+        color: var(--gold);
+      }
+
+      .priority {
+        display: inline-block;
+        min-width: 34px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .p0 {
+        background: var(--accent-soft);
+        color: #9e3329;
+      }
+
+      .p1 {
+        background: var(--gold-soft);
+        color: var(--gold);
+      }
+
+      .p2 {
+        background: #e7eef8;
+        color: #38516d;
+      }
+
+      .feature-module {
+        margin-top: 24px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fffaf2;
+        overflow: hidden;
+      }
+
+      .feature-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+        background: #fffdf8;
+      }
+
+      .feature-head h3 {
+        margin: 0;
+      }
+
+      .feature-head p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .feature-content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 390px;
+        gap: 20px;
+        padding: 20px;
+      }
+
+      .logic-rules {
+        min-width: 0;
+      }
+
+      .mermaid-wrap {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fff;
+        overflow-x: auto;
+      }
+
+      .mermaid {
+        min-width: 340px;
+      }
+
+      .rules {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .rule {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+
+      .rule strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--brand);
+        font-size: 13px;
+      }
+
+      .rule span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .sandbox-preview {
+        align-self: start;
+        border-radius: 24px;
+        padding: 14px;
+        background:
+          linear-gradient(180deg, #1a1d1c, #070908);
+        box-shadow: 0 20px 54px rgba(0, 0, 0, 0.2);
+      }
+
+      .sandbox-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        color: #dff9ff;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      iframe.mobile-frame {
+        display: block;
+        width: 375px;
+        height: 812px;
+        border: 0;
+        border-radius: 20px;
+        background: transparent;
+      }
+
+      .wide-flow-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .roadmap {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .roadmap-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        background: #fff;
+      }
+
+      .roadmap-item strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--brand);
+      }
+
+      @media (max-width: 1120px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .toc {
+          position: static;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .feature-content,
+        .wide-flow-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .sandbox-preview {
+          max-width: 407px;
+          margin: 0 auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .layout {
+          padding: 0;
+        }
+
+        .toc {
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .paper {
+          border-left: 0;
+          border-right: 0;
+          border-radius: 0;
+        }
+
+        header,
+        section {
+          padding: 28px 20px;
+        }
+
+        .meta-grid,
+        .goal-grid,
+        .persona-grid,
+        .rules,
+        .roadmap {
+          grid-template-columns: 1fr;
+        }
+
+        iframe.mobile-frame {
+          width: 100%;
+          max-width: 375px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="layout">
+      <aside class="toc">
+        <h2>目录</h2>
+        <a href="#info">项目信息</a>
+        <a href="#background">一、需求背景</a>
+        <a href="#goals">二、需求目标</a>
+        <a href="#users">三、用户与场景</a>
+        <a href="#features">四、功能清单</a>
+        <a href="#details">五、详细方案</a>
+        <a href="#flows">六、业务流程图</a>
+        <a href="#exceptions">七、异常与边界</a>
+        <a href="#tracking">八、数据追踪</a>
+        <a href="#roadmap">九、未来规划</a>
+        <a href="#annex">十、附件</a>
+      </aside>
+
+      <main class="paper">
+        <header>
+          <select class="version-select" aria-label="版本切换">
+            <option>v1.0 最终版</option>
+            <option>v1.0 初稿</option>
+          </select>
+          <p class="eyebrow">Final Product Requirement Document</p>
+          <h1>Vireal H5 AI 视频与图片创作端</h1>
+          <p class="subtitle">
+            本文档定义 Vireal 面向普通手机浏览器用户的 H5 创作端。产品采用三 Tab：AI 视频、AI 图片、作品。用户默认进入 AI 视频页，可先填写创意、上传参考图和选择参数，点击生成时再触发 Apple 或 Google 登录；视频由 Seedance 承担，图片由 Seedream 承担，结果统一进入作品页管理。
+          </p>
+          <div class="tag-row">
+            <span class="tag">Mobile H5</span>
+            <span class="tag">Apple / Google 登录</span>
+            <span class="tag alt">Seedance 视频</span>
+            <span class="tag alt">Seedream 图片</span>
+            <span class="tag gold">视频与图片各 2 次免费</span>
+            <span class="tag gold">暗色能量创作台</span>
+          </div>
+        </header>
+
+        <section id="info">
+          <h2>项目信息与版本记录</h2>
+          <div class="meta-grid">
+            <div class="meta"><strong>项目名称</strong>Vireal H5 AI 创作端</div>
+            <div class="meta"><strong>版本</strong>v1.0 最终 PRD</div>
+            <div class="meta"><strong>端类型</strong>普通手机浏览器 H5</div>
+            <div class="meta"><strong>默认首屏</strong>AI 视频 Tab</div>
+            <div class="meta"><strong>模型分工</strong>Seedance 负责视频，Seedream 负责图片</div>
+            <div class="meta"><strong>原型文件</strong><a href="../prototype/prototype_v1.0.html">prototype_v1.0.html</a></div>
+          </div>
+
+          <h3>版本记录</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>版本</th>
+                <th>日期</th>
+                <th>变更内容</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>v1.0 初稿</td>
+                <td>2026-08-27</td>
+                <td>明确 H5 三 Tab、登录触发、生成配置、作品管理、免费额度和失败返还规则。</td>
+                <td>已完成</td>
+              </tr>
+              <tr>
+                <td>v1.0 原型</td>
+                <td>2026-08-27</td>
+                <td>产出高保真 HTML 原型，AI 视频页按参考截图调整为暗色能量创作台。</td>
+                <td>已完成</td>
+              </tr>
+              <tr>
+                <td>v1.0 最终 PRD</td>
+                <td>2026-08-27</td>
+                <td>嵌入原型沙盒切片和 Mermaid 流程图，补齐详细方案、异常边界、埋点和 Roadmap。</td>
+                <td>当前版本</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="background">
+          <h2>一、需求背景</h2>
+          <p>
+            Vireal 已具备后端基础能力和后台管理能力，但面向普通用户的 H5 创作入口仍需要独立设计。用户需要在手机浏览器里快速完成 AI 视频和 AI 图片创作，而不是直接面对 API 或后台页面。
+          </p>
+          <p>
+            目标用户以娱乐和社交头像场景为主，他们关注低门槛、好看、可下载和可再次生成。前置强登录会降低首次尝试意愿，因此产品策略是默认开放浏览与填写，仅在用户点击生成时弹出 Apple 或 Google 登录。
+          </p>
+          <p>
+            原型评审后，AI 视频页采用暗色沉浸式能量创作台：顶部能量值、中心生成面板、参考图上传、时长选择、玩法模板横滑和玻璃 TabBar。这种布局更接近娱乐工具的第一感受，能强化“即刻创作”的氛围。
+          </p>
+        </section>
+
+        <section id="goals">
+          <h2>二、需求目标</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>目标类型</th>
+                <th>描述</th>
+                <th>衡量指标</th>
+                <th>目标值</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>体验目标</td>
+                <td>用户无需登录即可看到核心创作入口，并能快速填写创意描述。</td>
+                <td>首屏到点击生成转化率</td>
+                <td>首版不低于 25%</td>
+              </tr>
+              <tr>
+                <td>登录目标</td>
+                <td>用户有生成意图后再触发登录，减少前置流失。</td>
+                <td>生成触发后的登录完成率</td>
+                <td>首版不低于 60%</td>
+              </tr>
+              <tr>
+                <td>生成目标</td>
+                <td>视频和图片各提供 2 次免费额度，帮助用户完成首次结果产出。</td>
+                <td>登录用户首次生成成功率</td>
+                <td>首版不低于 70%</td>
+              </tr>
+              <tr>
+                <td>作品目标</td>
+                <td>生成结果统一沉淀到作品页，支持下载、删除、再次生成和失败重试。</td>
+                <td>生成成功用户访问作品页比例</td>
+                <td>首版不低于 80%</td>
+              </tr>
+              <tr>
+                <td>运营目标</td>
+                <td>推荐玩法、默认参数、额度文案和模型开关后续可通过后台配置。</td>
+                <td>可运营配置覆盖率</td>
+                <td>首版至少覆盖核心文案与默认参数</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="users">
+          <h2>三、用户与使用场景</h2>
+          <div class="persona-grid">
+            <div class="persona">
+              <h3>社交头像玩家</h3>
+              <p>上传自拍或头像，生成写实头像、写真感图片，用于社交平台头像或朋友圈内容。</p>
+            </div>
+            <div class="persona">
+              <h3>娱乐短视频尝鲜者</h3>
+              <p>通过一句话或参考图生成短视频，偏好浪漫、连接、亲密互动、电影感等轻娱乐玩法。</p>
+            </div>
+            <div class="persona">
+              <h3>轻度内容创作者</h3>
+              <p>需要快速生成封面、短视频素材、人物形象视频或社媒配图，关注尺寸和人物一致性。</p>
+            </div>
+            <div class="persona">
+              <h3>回访作品管理者</h3>
+              <p>再次进入 H5 查看历史作品，下载满意结果，删除不满意内容，或复用旧参数再次生成。</p>
+            </div>
+          </div>
+
+          <h3>用户旅程图</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>阶段</th>
+                <th>用户触点</th>
+                <th>用户行为</th>
+                <th>痛点 / 情绪</th>
+                <th>产品机会点</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>进入</td>
+                <td>手机浏览器 H5</td>
+                <td>默认进入 AI 视频页，看到暗色能量创作台和玩法模板。</td>
+                <td>还不确定是否值得登录。</td>
+                <td>不强制登录，先展示创作能力和免费次数。</td>
+              </tr>
+              <tr>
+                <td>构思</td>
+                <td>AI 视频 / AI 图片页</td>
+                <td>输入 prompt，上传参考图，选择尺寸、时长、人物一致性。</td>
+                <td>不知道如何写描述，担心参数太多。</td>
+                <td>提供玩法模板和默认配置，高级项保持可见但不压迫。</td>
+              </tr>
+              <tr>
+                <td>登录</td>
+                <td>生成按钮</td>
+                <td>点击生成后才看到 Apple / Google 登录弹窗。</td>
+                <td>担心刚填的内容丢失。</td>
+                <td>保留表单，登录成功后自动继续提交。</td>
+              </tr>
+              <tr>
+                <td>等待</td>
+                <td>作品 Tab</td>
+                <td>查看生成中卡片、进度和状态。</td>
+                <td>担心生成失败或等待过久。</td>
+                <td>明确状态，失败显示原因并返还额度。</td>
+              </tr>
+              <tr>
+                <td>处理结果</td>
+                <td>作品列表</td>
+                <td>下载、删除、再次生成或重试失败作品。</td>
+                <td>希望快速保存到手机并自行发布。</td>
+                <td>下载作为主操作，不接复杂分享 SDK。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="features">
+          <h2>四、需求功能清单</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>模块</th>
+                <th>功能</th>
+                <th>优先级</th>
+                <th>规则摘要</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>全局框架</td>
+                <td>三 Tab H5</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>底部 TabBar：AI 视频、AI 图片、作品；默认 AI 视频。</td>
+              </tr>
+              <tr>
+                <td>登录</td>
+                <td>Apple / Google 登录</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>点击生成时触发；关闭弹窗后保留当前表单。</td>
+              </tr>
+              <tr>
+                <td>AI 视频</td>
+                <td>Seedance 视频生成</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>支持 prompt、参考图、角色图、人物一致性、尺寸、5/10/15 秒时长。</td>
+              </tr>
+              <tr>
+                <td>AI 图片</td>
+                <td>Seedream 图片生成</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>默认写实风格，支持 prompt、参考图、尺寸、人物一致性。</td>
+              </tr>
+              <tr>
+                <td>作品</td>
+                <td>历史作品管理</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>生成中、成功、失败状态；下载、删除、再次生成、失败重试。</td>
+              </tr>
+              <tr>
+                <td>额度</td>
+                <td>免费次数与返还</td>
+                <td><span class="priority p0">P0</span></td>
+                <td>视频和图片各 2 次免费，按登录账号计算；失败返还。</td>
+              </tr>
+              <tr>
+                <td>运营</td>
+                <td>推荐玩法和默认参数</td>
+                <td><span class="priority p1">P1</span></td>
+                <td>玩法模板、默认尺寸、默认时长、模型开关后续接后台配置。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="details">
+          <h2>五、详细方案</h2>
+
+          <article class="feature-module" id="detail-tabs">
+            <div class="feature-head">
+              <div>
+                <h3>功能 1：H5 入口与三 Tab 框架</h3>
+                <p>用户进入普通手机浏览器 H5，默认落到 AI 视频页，可切换到 AI 图片和作品。</p>
+              </div>
+              <span class="tag">Prototype Slice</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["用户打开 H5 链接"] --> B["进入 AI 视频 Tab"]
+  B --> C["查看暗色能量创作台"]
+  C --> D{"用户选择入口"}
+  D --> E["继续配置 AI 视频"]
+  D --> F["切换 AI 图片"]
+  D --> G["切换作品"]
+  E --> H["保留视频表单草稿"]
+  F --> I["展示 Seedream 图片创作页"]
+  G --> J{"是否已登录"}
+  J --> K["拉取历史作品和额度"]
+  J --> L["展示登录提示和本地示例作品"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>触发条件</strong><span>用户打开 H5 链接或刷新页面。</span></div>
+                  <div class="rule"><strong>默认落点</strong><span>默认进入 AI 视频 Tab，展示暗色能量创作台。</span></div>
+                  <div class="rule"><strong>表单保留</strong><span>Tab 切换不清空 prompt、参考图和高级配置。</span></div>
+                  <div class="rule"><strong>异常处理</strong><span>作品未登录时不强制弹窗，只提示登录后同步历史作品。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>AI 视频入口切片</span><span>375 x 812</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=video#video" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-module" id="detail-login">
+            <div class="feature-head">
+              <div>
+                <h3>功能 2：Apple / Google 登录闸口</h3>
+                <p>不在首屏强制登录，只在用户点击生成时弹出登录弹窗。</p>
+              </div>
+              <span class="tag">Login Gate</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["用户点击生成按钮"] --> B{"是否已登录"}
+  B --> C["校验对应类型免费额度"]
+  B --> D["弹出登录弹窗"]
+  D --> E{"用户选择登录方式"}
+  E --> F["Apple 登录"]
+  E --> G["Google 登录"]
+  E --> H["关闭弹窗"]
+  F --> I{"后端验证身份是否成功"}
+  G --> I
+  I --> J["签发 H5 登录态"]
+  I --> K["展示登录失败提示"]
+  H --> L["回到当前生成页"]
+  L --> M["保留 prompt 和参考图"]
+  J --> N["继续提交刚才的生成任务"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>触发条件</strong><span>未登录用户点击生成视频或生成图片。</span></div>
+                  <div class="rule"><strong>登录方式</strong><span>第一版提供 Apple 登录和 Google 登录。</span></div>
+                  <div class="rule"><strong>保留内容</strong><span>关闭弹窗、登录失败或网络失败都不清空当前表单。</span></div>
+                  <div class="rule"><strong>成功回调</strong><span>后端验证身份后返回登录态、用户信息和剩余额度。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>登录弹窗切片</span><span>点击生成触发</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=login#video" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-module" id="detail-video">
+            <div class="feature-head">
+              <div>
+                <h3>功能 3：Seedance AI 视频生成</h3>
+                <p>AI 视频页采用暗色能量创作台，强化娱乐感和快速生成路径。</p>
+              </div>
+              <span class="tag alt">Seedance</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["AI 视频页"] --> B["暗色能量创作台"]
+  B --> C["输入创意描述"]
+  B --> D["上传参考图或角色图"]
+  B --> E["选择时长"]
+  B --> F["选择尺寸和人物一致性"]
+  B --> G["点击玩法模板"]
+  G --> C
+  C --> H["点击生成"]
+  D --> H
+  E --> H
+  F --> H
+  H --> I["进入登录闸口"]
+  I --> J{"额度和能量是否足够"}
+  J --> K["创建视频生成任务"]
+  J --> L["展示额度不足提示"]
+  K --> M["后端适配 Seedance"]
+  M --> N["跳转作品 Tab"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>默认参数</strong><span>写实风格、9:16、5 秒、人物一致性开启。</span></div>
+                  <div class="rule"><strong>时长选择</strong><span>支持 5 秒、10 秒、15 秒，默认 5 秒。</span></div>
+                  <div class="rule"><strong>参考图</strong><span>提供参考图和角色图两个上传位，第一版做普通上传提示。</span></div>
+                  <div class="rule"><strong>玩法模板</strong><span>连接、浪漫时刻等横滑模板，点击后回填 prompt。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>Seedance 视频切片</span><span>暗色创作台</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=video#video" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-module" id="detail-image">
+            <div class="feature-head">
+              <div>
+                <h3>功能 4：Seedream AI 图片生成</h3>
+                <p>AI 图片页服务于写实头像和社交图片生成，默认低参数门槛。</p>
+              </div>
+              <span class="tag alt">Seedream</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["AI 图片页"] --> B["输入图片描述"]
+  A --> C["选择写实风格"]
+  A --> D["上传头像参考图"]
+  A --> E["选择图片尺寸"]
+  A --> F["设置人物一致性"]
+  B --> G["点击生成图片"]
+  C --> G
+  D --> G
+  E --> G
+  F --> G
+  G --> H["进入登录闸口"]
+  H --> I{"图片免费次数是否足够"}
+  I --> J["创建图片生成任务"]
+  J --> K["后端适配 Seedream"]
+  K --> L["跳转作品 Tab"]
+  I --> M["展示额度不足提示"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>默认风格</strong><span>写实，适合社交头像、写真和朋友圈素材。</span></div>
+                  <div class="rule"><strong>尺寸</strong><span>支持 1:1、3:4、9:16，默认 1:1。</span></div>
+                  <div class="rule"><strong>参考图</strong><span>上传头像参考图后可开启人物一致性。</span></div>
+                  <div class="rule"><strong>结果落点</strong><span>提交后统一进入作品 Tab 查看状态。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>Seedream 图片切片</span><span>写实头像</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=image#image" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-module" id="detail-works">
+            <div class="feature-head">
+              <div>
+                <h3>功能 5：作品管理</h3>
+                <p>视频和图片结果统一沉淀到作品页，用户在这里查看状态和处理结果。</p>
+              </div>
+              <span class="tag">Works</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["进入作品 Tab"] --> B{"是否已登录"}
+  B --> C["拉取账号历史作品"]
+  B --> D["展示登录提示和示例作品"]
+  C --> E{"作品列表是否为空"}
+  E --> F["展示空状态"]
+  E --> G["按时间倒序展示作品"]
+  G --> H{"作品状态"}
+  H --> I["生成中"]
+  H --> J["成功"]
+  H --> K["失败"]
+  I --> L["展示进度和等待提示"]
+  J --> M["下载"]
+  J --> N["再次生成"]
+  J --> O["删除"]
+  K --> P["展示失败原因"]
+  K --> Q["重试"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>排序</strong><span>按创建时间倒序展示，最新任务在顶部。</span></div>
+                  <div class="rule"><strong>状态</strong><span>生成中、成功、失败三类状态，支持筛选。</span></div>
+                  <div class="rule"><strong>下载</strong><span>成功作品支持下载到本地，用户自行发布到社交平台。</span></div>
+                  <div class="rule"><strong>再次生成</strong><span>复用原 prompt 和参数，跳回对应生成页。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>作品页切片</span><span>状态管理</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=works#works" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+
+          <article class="feature-module" id="detail-quota">
+            <div class="feature-head">
+              <div>
+                <h3>功能 6：额度、失败返还与重试</h3>
+                <p>视频和图片免费次数独立计算，失败时返还本次额度并允许用户重试。</p>
+              </div>
+              <span class="tag gold">Quota</span>
+            </div>
+            <div class="feature-content">
+              <div class="logic-rules">
+                <h4>交互流程图</h4>
+                <div class="mermaid-wrap">
+                  <pre class="mermaid">
+flowchart TD
+  A["提交生成任务"] --> B{"任务类型"}
+  B --> C["视频任务"]
+  B --> D["图片任务"]
+  C --> E{"视频免费次数是否大于零"}
+  D --> F{"图片免费次数是否大于零"}
+  E --> G["扣减视频免费次数"]
+  F --> H["扣减图片免费次数"]
+  E --> I["提示视频免费次数用完"]
+  F --> J["提示图片免费次数用完"]
+  G --> K["创建生成中作品"]
+  H --> K
+  K --> L{"模型任务结果"}
+  L --> M["成功并保持扣减"]
+  L --> N["失败并返还额度"]
+  N --> O["保留失败作品"]
+  O --> P["展示失败原因"]
+  O --> Q["允许重试"]
+                  </pre>
+                </div>
+                <div class="rules">
+                  <div class="rule"><strong>额度维度</strong><span>按登录账号计算，视频 2 次、图片 2 次。</span></div>
+                  <div class="rule"><strong>扣减时机</strong><span>任务成功创建后扣减对应类型额度。</span></div>
+                  <div class="rule"><strong>失败返还</strong><span>模型失败、任务失败或排队失败时返还本次额度。</span></div>
+                  <div class="rule"><strong>失败作品</strong><span>保留失败卡片，展示原因，支持一键重试。</span></div>
+                </div>
+              </div>
+              <div class="sandbox-preview">
+                <div class="sandbox-label"><span>失败状态切片</span><span>返还与重试</span></div>
+                <iframe class="mobile-frame" src="../prototype/prototype_v1.0.html?focus=failure#works" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section id="flows">
+          <h2>六、业务流程图</h2>
+          <p>以下为 v1.0 核心流程汇总，独立源码位于 <a href="../flowcharts/flowcharts_v1.0.md">flowcharts_v1.0.md</a>，可浏览版本位于 <a href="../flowcharts/flowcharts_v1.0.html">flowcharts_v1.0.html</a>。</p>
+          <div class="wide-flow-grid">
+            <div class="note"><strong>入口和登录</strong>覆盖打开 H5、Tab 切换、点击生成、Apple/Google 登录、登录失败和取消登录。</div>
+            <div class="note"><strong>生成和作品</strong>覆盖 Seedance 视频、Seedream 图片、作品状态、下载、删除、再次生成、失败返还。</div>
+          </div>
+        </section>
+
+        <section id="exceptions">
+          <h2>七、异常与边界处理</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>场景</th>
+                <th>处理规则</th>
+                <th>用户提示</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>未登录点击生成</td>
+                <td>弹出 Apple/Google 登录弹窗，保留当前 prompt、上传图和参数。</td>
+                <td>登录后即可开始生成，当前内容已保留。</td>
+              </tr>
+              <tr>
+                <td>用户取消登录</td>
+                <td>关闭弹窗，停留当前生成页，任务不提交。</td>
+                <td>已取消登录，生成前需要先登录。</td>
+              </tr>
+              <tr>
+                <td>登录失败</td>
+                <td>保留登录弹窗，允许重试 Apple 或 Google。</td>
+                <td>登录失败，请重新尝试。</td>
+              </tr>
+              <tr>
+                <td>额度不足</td>
+                <td>阻止任务提交，展示对应类型免费次数已用完。</td>
+                <td>当前类型免费次数已用完。</td>
+              </tr>
+              <tr>
+                <td>参考图上传失败</td>
+                <td>提示格式、大小或网络问题，允许重新上传。</td>
+                <td>图片上传失败，请换一张清晰图片重试。</td>
+              </tr>
+              <tr>
+                <td>生成失败</td>
+                <td>作品页保留失败卡片，展示失败原因，返还额度，支持重试。</td>
+                <td>生成失败，已返还本次额度，可以再次生成。</td>
+              </tr>
+              <tr>
+                <td>作品为空</td>
+                <td>展示空状态和去生成按钮。</td>
+                <td>还没有作品，去生成你的第一条视频或第一张图片。</td>
+              </tr>
+              <tr>
+                <td>下载失败</td>
+                <td>提示重试；必要时打开资源地址。</td>
+                <td>下载失败，请检查网络后重试。</td>
+              </tr>
+              <tr>
+                <td>模型服务不可用</td>
+                <td>任务标记失败，返还额度，后台记录错误。</td>
+                <td>生成服务暂时不可用，请稍后再试。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="tracking">
+          <h2>八、数据追踪与埋点</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>事件</th>
+                <th>触发时机</th>
+                <th>关键属性</th>
+                <th>用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>h5_view</td>
+                <td>用户打开 H5</td>
+                <td>source、tab、is_logged_in</td>
+                <td>分析入口流量和默认 Tab 表现。</td>
+              </tr>
+              <tr>
+                <td>tab_switch</td>
+                <td>用户切换底部 Tab</td>
+                <td>from_tab、to_tab</td>
+                <td>判断 AI 视频、AI 图片、作品的兴趣分布。</td>
+              </tr>
+              <tr>
+                <td>template_apply</td>
+                <td>点击视频玩法模板</td>
+                <td>template_id、template_name、category</td>
+                <td>评估“连接”“浪漫时刻”等模板效果。</td>
+              </tr>
+              <tr>
+                <td>generate_click</td>
+                <td>点击生成按钮</td>
+                <td>type、ratio、duration、has_reference_image、is_logged_in</td>
+                <td>分析生成意图和参数偏好。</td>
+              </tr>
+              <tr>
+                <td>login_result</td>
+                <td>Apple/Google 登录结束</td>
+                <td>provider、success、error_code</td>
+                <td>分析登录转化和失败原因。</td>
+              </tr>
+              <tr>
+                <td>generation_result</td>
+                <td>模型任务完成或失败</td>
+                <td>type、model、status、error_code、duration_seconds</td>
+                <td>衡量生成成功率、耗时和模型稳定性。</td>
+              </tr>
+              <tr>
+                <td>work_action</td>
+                <td>作品下载、删除、重试、再次生成</td>
+                <td>action、type、status</td>
+                <td>判断作品价值和后续迭代方向。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="roadmap">
+          <h2>九、未来演进规划</h2>
+          <div class="roadmap">
+            <div class="roadmap-item">
+              <strong>v1.1：真实接口接入</strong>
+              <p>对接后端 Apple/Google 登录、上传、生成任务、作品列表和下载接口。</p>
+            </div>
+            <div class="roadmap-item">
+              <strong>v1.2：额度和支付</strong>
+              <p>补充能量体系、会员或 IAP 支付入口，细化不同模型的成本规则。</p>
+            </div>
+            <div class="roadmap-item">
+              <strong>v1.3：模板运营</strong>
+              <p>将玩法模板、推荐 prompt、默认参数和模型开关接入后台运营配置。</p>
+            </div>
+            <div class="roadmap-item">
+              <strong>v1.4：内容安全</strong>
+              <p>补充图片上传审核、prompt 风险词、生成结果审核和申诉流程。</p>
+            </div>
+            <div class="roadmap-item">
+              <strong>v1.5：作品增强</strong>
+              <p>增加收藏、批量下载、作品详情页、复制参数和更细作品筛选。</p>
+            </div>
+            <div class="roadmap-item">
+              <strong>v1.6：增长实验</strong>
+              <p>测试首屏文案、模板排序、登录弹窗文案和免费额度展示策略。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="annex">
+          <h2>十、附件</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>附件</th>
+                <th>路径</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>初步 PRD</td>
+                <td><a href="./prd_v1.0.html">prd_v1.0.html</a></td>
+                <td>需求采集后生成的第一版详细 PRD。</td>
+              </tr>
+              <tr>
+                <td>高保真原型</td>
+                <td><a href="../prototype/prototype_v1.0.html">prototype_v1.0.html</a></td>
+                <td>单文件 H5 原型，支持 Focus Mode 沙盒切片。</td>
+              </tr>
+              <tr>
+                <td>流程图汇总</td>
+                <td><a href="../flowcharts/flowcharts_v1.0.html">flowcharts_v1.0.html</a></td>
+                <td>6 张 Mermaid 业务流程图的可浏览版本。</td>
+              </tr>
+              <tr>
+                <td>模型参考</td>
+                <td>Seedance / Seedream 官方模型页</td>
+                <td>视频生成使用 Seedance，图片生成使用 Seedream。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e3f5f1",
+          primaryTextColor: "#171717",
+          primaryBorderColor: "#0f766e",
+          lineColor: "#7d7268",
+          secondaryColor: "#fff1d6",
+          tertiaryColor: "#fffdf8",
+          fontFamily: "Inter, system-ui, sans-serif",
+        },
+      });
+    </script>
+  </body>
+</html>
