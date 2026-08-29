@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/h5")({
   component: H5AiGenerator,
+  errorComponent: H5ErrorRecovery,
   head: () => ({
     meta: [
       {
@@ -162,7 +163,7 @@ const imageTemplates = [
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const rawValue = localStorage.getItem(key)
+    const rawValue = readStorage(key)
     return rawValue ? (JSON.parse(rawValue) as T) : fallback
   } catch {
     return fallback
@@ -170,7 +171,40 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeStorage(key, JSON.stringify(value))
+}
+
+function getStorage() {
+  if (typeof window === "undefined") return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function readStorage(key: string) {
+  try {
+    return getStorage()?.getItem(key) ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeStorage(key: string, value: string) {
+  try {
+    getStorage()?.setItem(key, value)
+  } catch {
+    // H5 can continue with an in-memory session if browser storage is blocked.
+  }
+}
+
+function removeStorage(key: string) {
+  try {
+    getStorage()?.removeItem(key)
+  } catch {
+    // Ignore storage failures so recovery UI remains usable.
+  }
 }
 
 function createId() {
@@ -179,10 +213,10 @@ function createId() {
 
 function getOrCreateDeviceUuid(provider: LoginProvider) {
   const storageKey = `${DEVICE_UUID_KEY}_${provider}`
-  const existing = localStorage.getItem(storageKey)
+  const existing = readStorage(storageKey)
   if (existing) return existing
   const nextValue = createId()
-  localStorage.setItem(storageKey, nextValue)
+  writeStorage(storageKey, nextValue)
   return nextValue
 }
 
@@ -194,24 +228,84 @@ function getMediaUrl(url?: string | null) {
 }
 
 function readStoredSession(): StoredSession | null {
-  const token = localStorage.getItem(APP_TOKEN_KEY)
+  const token = readStorage(APP_TOKEN_KEY)
   const user = readJson<AppUserPublic | null>(APP_USER_KEY, null)
-  const provider =
-    (localStorage.getItem(APP_PROVIDER_KEY) as LoginProvider | null) ?? "apple"
+  const rawProvider = readStorage(APP_PROVIDER_KEY)
+  const provider: LoginProvider = rawProvider === "google" ? "google" : "apple"
   if (!token || !user) return null
   return { token, user, provider }
 }
 
 function saveSession(session: StoredSession) {
-  localStorage.setItem(APP_TOKEN_KEY, session.token)
-  localStorage.setItem(APP_PROVIDER_KEY, session.provider)
+  writeStorage(APP_TOKEN_KEY, session.token)
+  writeStorage(APP_PROVIDER_KEY, session.provider)
   writeJson(APP_USER_KEY, session.user)
 }
 
 function clearSession() {
-  localStorage.removeItem(APP_TOKEN_KEY)
-  localStorage.removeItem(APP_PROVIDER_KEY)
-  localStorage.removeItem(APP_USER_KEY)
+  removeStorage(APP_TOKEN_KEY)
+  removeStorage(APP_PROVIDER_KEY)
+  removeStorage(APP_USER_KEY)
+}
+
+function clearH5LocalState() {
+  clearSession()
+  removeStorage(`${DEVICE_UUID_KEY}_apple`)
+  removeStorage(`${DEVICE_UUID_KEY}_google`)
+}
+
+function H5ErrorRecovery() {
+  const [resetDone, setResetDone] = useState(false)
+
+  function handleReload() {
+    window.location.reload()
+  }
+
+  function handleReset() {
+    clearH5LocalState()
+    setResetDone(true)
+    window.setTimeout(() => window.location.assign("/h5"), 250)
+  }
+
+  return (
+    <div className="min-h-svh bg-[#090b0a] px-5 py-10 text-stone-50">
+      <div className="mx-auto flex min-h-[calc(100svh-5rem)] w-full max-w-[430px] flex-col justify-center">
+        <div className="rounded-[8px] border border-white/10 bg-[#0f1514] p-6 shadow-2xl shadow-black/30">
+          <div className="grid size-12 place-items-center rounded-[8px] bg-rose-400/15 text-rose-200">
+            <AlertCircle className="size-6" />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold leading-tight">
+            页面状态异常
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-stone-300">
+            请刷新页面重试；如果仍然异常，可以清理 H5 登录状态后重新进入。
+          </p>
+          <div className="mt-6 grid gap-3">
+            <Button
+              className="h-12 rounded-[8px] bg-cyan-200 text-stone-950 hover:bg-cyan-100"
+              onClick={handleReload}
+              type="button"
+            >
+              <RefreshCw className="size-4" />
+              刷新页面
+            </Button>
+            <Button
+              className="h-12 rounded-[8px] border-white/15 text-stone-100 hover:bg-white/10"
+              onClick={handleReset}
+              type="button"
+              variant="outline"
+            >
+              <Trash2 className="size-4" />
+              清理登录状态
+            </Button>
+          </div>
+          {resetDone ? (
+            <p className="mt-4 text-xs text-cyan-100">已清理，正在重新进入。</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function fileToPreviewUrl(file: File) {
