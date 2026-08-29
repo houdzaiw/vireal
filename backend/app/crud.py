@@ -232,6 +232,7 @@ def create_app_generation(
     app_user: AppUser,
     generation_in: AppGenerationCreate,
     model: str,
+    provider: str,
     output_url: str | None = None,
     status: str = "processing",
 ) -> AppGeneration:
@@ -241,6 +242,7 @@ def create_app_generation(
         update={
             "app_user_id": app_user.id,
             "model": model,
+            "provider": provider,
             "status": status,
             "output_url": output_url,
             "completed_at": now if status in {"succeeded", "failed"} else None,
@@ -260,6 +262,7 @@ def update_app_generation_result(
     status: str,
     output_url: str | None = None,
     error_message: str | None = None,
+    provider_task_id: str | None = None,
 ) -> AppGeneration | None:
     generation = session.get(AppGeneration, generation_id)
     if not generation:
@@ -269,6 +272,7 @@ def update_app_generation_result(
     generation.status = status
     generation.output_url = output_url
     generation.error_message = error_message
+    generation.provider_task_id = provider_task_id
     generation.completed_at = now
     generation.updated_at = now
     session.add(generation)

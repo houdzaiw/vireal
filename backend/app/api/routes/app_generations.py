@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app import crud
 from app.api.deps import CurrentAppUser, SessionDep
+from app.core.config import settings
 from app.models import (
     AppGeneration,
     AppGenerationCreate,
@@ -146,6 +147,7 @@ def create_generation(
         app_user=current_app_user,
         generation_in=normalized_generation,
         model=GENERATION_MODELS[normalized_generation.kind],
+        provider=settings.APP_GENERATION_PROVIDER,
     )
     ai_generation.enqueue_generation(generation.id)
     return _serialize_generation(generation)

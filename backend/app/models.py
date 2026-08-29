@@ -237,6 +237,8 @@ class AppGeneration(SQLModel, table=True):
     )
     kind: str = Field(max_length=20, index=True)
     model: str = Field(max_length=80)
+    provider: str = Field(default="local", max_length=40, index=True)
+    provider_task_id: str | None = Field(default=None, max_length=200, index=True)
     status: str = Field(default="processing", max_length=20, index=True)
     prompt: str = Field(max_length=2000)
     style: str = Field(default="写实", max_length=50)
@@ -277,6 +279,8 @@ class AppGenerationPublic(SQLModel):
     app_user_id: uuid.UUID
     kind: str
     model: str
+    provider: str
+    provider_task_id: str | None = None
     status: str
     prompt: str
     style: str

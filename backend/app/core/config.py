@@ -28,7 +28,16 @@ class Settings(BaseSettings):
     APP_IMAGE_STORAGE_BACKEND: Literal["local"] = "local"
     LOCAL_UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_IMAGE_BYTES: int = 5 * 1024 * 1024
+    APP_GENERATION_PROVIDER: Literal["local", "ark"] = "local"
     APP_GENERATION_LOCAL_DELAY_SECONDS: float = 1.5
+    APP_PUBLIC_BASE_URL: str | None = None
+    ARK_API_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
+    ARK_API_KEY: str | None = None
+    ARK_SEEDANCE_MODEL: str = "doubao-seedance-2-0-260128"
+    ARK_SEEDREAM_MODEL: str = "doubao-seedream-5-0-260128"
+    ARK_VIDEO_RESOLUTION: str = "720p"
+    ARK_VIDEO_POLL_INTERVAL_SECONDS: float = 5.0
+    ARK_VIDEO_POLL_TIMEOUT_SECONDS: float = 600.0
     PAYMENT_WEBHOOK_VERIFICATION_MODE: Literal["local", "shared_secret"] = "local"
     PAYMENT_WEBHOOK_SHARED_SECRET: str | None = None
     FRONTEND_HOST: str = "http://localhost:5173"

@@ -23,6 +23,7 @@ class ImmediateProvider:
         return ai_generation.AIGenerationResult(
             output_url=generation.reference_image_url
             or generation.character_image_url,
+            provider_task_id="provider-task-1",
         )
 
 
@@ -46,6 +47,8 @@ def test_create_video_generation_and_read_quota(client: TestClient) -> None:
     generation = create_response.json()
     assert generation["kind"] == "video"
     assert generation["model"] == "Seedance 2.0"
+    assert generation["provider"] == "local"
+    assert generation["provider_task_id"] is None
     assert generation["status"] == "processing"
     assert generation["prompt"] == "写实社交头像短片"
     assert generation["duration_seconds"] == 10
@@ -91,6 +94,7 @@ def test_generation_worker_marks_task_succeeded(client: TestClient) -> None:
     generation = detail_response.json()
     assert generation["status"] == "succeeded"
     assert generation["output_url"] == "/uploads/images/user/file.png"
+    assert generation["provider_task_id"] == "provider-task-1"
 
 
 def test_image_and_video_generation_quota_are_separate(client: TestClient) -> None:

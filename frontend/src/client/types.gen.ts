@@ -402,6 +402,14 @@ export type AppGenerationPublic = {
      */
     model: string;
     /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Provider Task Id
+     */
+    provider_task_id?: string | null;
+    /**
      * Status
      */
     status: string;
