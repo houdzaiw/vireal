@@ -494,9 +494,9 @@
 
       <main class="paper">
         <header>
-          <select class="version-select" aria-label="版本切换">
-            <option>v1.0 最终版</option>
-            <option>v1.0 初稿</option>
+          <select class="version-select" aria-label="版本切换" data-version-select>
+            <option value="./prd_final_v1.0.html" selected>v1.0 最终版</option>
+            <option value="./prd_v1.0.html">v1.0 初稿</option>
           </select>
           <p class="eyebrow">Final Product Requirement Document</p>
           <h1>Vireal H5 AI 视频与图片创作端</h1>
@@ -1205,6 +1205,16 @@ flowchart TD
                 <td>6 张 Mermaid 业务流程图的可浏览版本。</td>
               </tr>
               <tr>
+                <td>版本基线清单</td>
+                <td><a href="../annex/version_manifest_v1.0.md">version_manifest_v1.0.md</a></td>
+                <td>记录 v1.0 交付物、文件摘要、版本命名和升级规则。</td>
+              </tr>
+              <tr>
+                <td>版本迭代检查表</td>
+                <td><a href="../templates/version_iteration_checklist.md">version_iteration_checklist.md</a></td>
+                <td>用于从 v1.0 复制到 v1.1 或后续版本时逐项核对。</td>
+              </tr>
+              <tr>
                 <td>模型参考</td>
                 <td>Seedance / Seedream 官方模型页</td>
                 <td>视频生成使用 Seedance，图片生成使用 Seedream。</td>
@@ -1228,6 +1238,15 @@ flowchart TD
           tertiaryColor: "#fffdf8",
           fontFamily: "Inter, system-ui, sans-serif",
         },
+      });
+
+      const versionSelect = document.querySelector("[data-version-select]");
+      versionSelect?.addEventListener("change", () => {
+        const target = versionSelect.value;
+        if (!target) return;
+        const targetUrl = new URL(target, window.location.href);
+        targetUrl.hash = window.location.hash;
+        window.location.href = targetUrl.href;
       });
     </script>
   </body>
