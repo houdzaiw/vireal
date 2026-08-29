@@ -344,6 +344,162 @@ export type AppDeviceLoginResponse = {
 };
 
 /**
+ * AppGenerationCreate
+ */
+export type AppGenerationCreate = {
+    /**
+     * Kind
+     */
+    kind: 'video' | 'image';
+    /**
+     * Prompt
+     */
+    prompt: string;
+    /**
+     * Style
+     */
+    style?: string;
+    /**
+     * Aspect Ratio
+     */
+    aspect_ratio?: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds?: number | null;
+    /**
+     * Consistency
+     */
+    consistency?: boolean;
+    /**
+     * Reference Image Url
+     */
+    reference_image_url?: string | null;
+    /**
+     * Character Image Url
+     */
+    character_image_url?: string | null;
+};
+
+/**
+ * AppGenerationPublic
+ */
+export type AppGenerationPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Prompt
+     */
+    prompt: string;
+    /**
+     * Style
+     */
+    style: string;
+    /**
+     * Aspect Ratio
+     */
+    aspect_ratio: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds?: number | null;
+    /**
+     * Consistency
+     */
+    consistency: boolean;
+    /**
+     * Reference Image Url
+     */
+    reference_image_url?: string | null;
+    /**
+     * Character Image Url
+     */
+    character_image_url?: string | null;
+    /**
+     * Output Url
+     */
+    output_url?: string | null;
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+    /**
+     * Completed At
+     */
+    completed_at?: string | null;
+};
+
+/**
+ * AppGenerationQuotaPublic
+ */
+export type AppGenerationQuotaPublic = {
+    /**
+     * Video Total
+     */
+    video_total: number;
+    /**
+     * Video Used
+     */
+    video_used: number;
+    /**
+     * Video Remaining
+     */
+    video_remaining: number;
+    /**
+     * Image Total
+     */
+    image_total: number;
+    /**
+     * Image Used
+     */
+    image_used: number;
+    /**
+     * Image Remaining
+     */
+    image_remaining: number;
+};
+
+/**
+ * AppGenerationsPublic
+ */
+export type AppGenerationsPublic = {
+    /**
+     * Data
+     */
+    data: Array<AppGenerationPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * AppOrderCreate
  */
 export type AppOrderCreate = {
@@ -1771,6 +1927,145 @@ export type appContentsReadContentResponses = {
 };
 
 export type appContentsReadContentResponse = appContentsReadContentResponses[keyof appContentsReadContentResponses];
+
+export type appGenerationsReadGenerationQuotaData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/generations/quota';
+};
+
+export type appGenerationsReadGenerationQuotaResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationQuotaPublic;
+};
+
+export type appGenerationsReadGenerationQuotaResponse = appGenerationsReadGenerationQuotaResponses[keyof appGenerationsReadGenerationQuotaResponses];
+
+export type appGenerationsReadGenerationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Kind
+         */
+        kind?: 'video' | 'image' | null;
+    };
+    url: '/api/v1/app/generations/';
+};
+
+export type appGenerationsReadGenerationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appGenerationsReadGenerationsError = appGenerationsReadGenerationsErrors[keyof appGenerationsReadGenerationsErrors];
+
+export type appGenerationsReadGenerationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationsPublic;
+};
+
+export type appGenerationsReadGenerationsResponse = appGenerationsReadGenerationsResponses[keyof appGenerationsReadGenerationsResponses];
+
+export type appGenerationsCreateGenerationData = {
+    body: AppGenerationCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/generations/';
+};
+
+export type appGenerationsCreateGenerationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appGenerationsCreateGenerationError = appGenerationsCreateGenerationErrors[keyof appGenerationsCreateGenerationErrors];
+
+export type appGenerationsCreateGenerationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationPublic;
+};
+
+export type appGenerationsCreateGenerationResponse = appGenerationsCreateGenerationResponses[keyof appGenerationsCreateGenerationResponses];
+
+export type appGenerationsDeleteGenerationData = {
+    body?: never;
+    path: {
+        /**
+         * Generation Id
+         */
+        generation_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/generations/{generation_id}';
+};
+
+export type appGenerationsDeleteGenerationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appGenerationsDeleteGenerationError = appGenerationsDeleteGenerationErrors[keyof appGenerationsDeleteGenerationErrors];
+
+export type appGenerationsDeleteGenerationResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type appGenerationsDeleteGenerationResponse = appGenerationsDeleteGenerationResponses[keyof appGenerationsDeleteGenerationResponses];
+
+export type appGenerationsReadGenerationData = {
+    body?: never;
+    path: {
+        /**
+         * Generation Id
+         */
+        generation_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/generations/{generation_id}';
+};
+
+export type appGenerationsReadGenerationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appGenerationsReadGenerationError = appGenerationsReadGenerationErrors[keyof appGenerationsReadGenerationErrors];
+
+export type appGenerationsReadGenerationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationPublic;
+};
+
+export type appGenerationsReadGenerationResponse = appGenerationsReadGenerationResponses[keyof appGenerationsReadGenerationResponses];
 
 export type appConfigsReadAppConfigsData = {
     body?: never;

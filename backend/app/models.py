@@ -99,6 +99,9 @@ class AppUser(AppUserBase, table=True):
     orders: list[AppOrder] = Relationship(
         back_populates="app_user", cascade_delete=True
     )
+    generations: list[AppGeneration] = Relationship(
+        back_populates="app_user", cascade_delete=True
+    )
 
 
 class AppDevice(SQLModel, table=True):
@@ -223,6 +226,84 @@ class AppContentPublic(SQLModel):
 class AppContentsPublic(SQLModel):
     data: list[AppContentPublic]
     count: int
+
+
+class AppGeneration(SQLModel, table=True):
+    __tablename__ = "app_generation"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    kind: str = Field(max_length=20, index=True)
+    model: str = Field(max_length=80)
+    status: str = Field(default="succeeded", max_length=20, index=True)
+    prompt: str = Field(max_length=2000)
+    style: str = Field(default="写实", max_length=50)
+    aspect_ratio: str = Field(default="9:16", max_length=20)
+    duration_seconds: int | None = Field(default=None, ge=1, le=60)
+    consistency: bool = Field(default=True)
+    reference_image_url: str | None = Field(default=None, max_length=2048)
+    character_image_url: str | None = Field(default=None, max_length=2048)
+    output_url: str | None = Field(default=None, max_length=2048)
+    error_message: str | None = Field(default=None, max_length=500)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    completed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    deleted_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    app_user: AppUser | None = Relationship(back_populates="generations")
+
+
+class AppGenerationCreate(SQLModel):
+    kind: Literal["video", "image"]
+    prompt: str = Field(min_length=1, max_length=2000)
+    style: str = Field(default="写实", min_length=1, max_length=50)
+    aspect_ratio: str = Field(default="9:16", min_length=1, max_length=20)
+    duration_seconds: int | None = Field(default=None, ge=1, le=60)
+    consistency: bool = True
+    reference_image_url: str | None = Field(default=None, max_length=2048)
+    character_image_url: str | None = Field(default=None, max_length=2048)
+
+
+class AppGenerationPublic(SQLModel):
+    id: uuid.UUID
+    app_user_id: uuid.UUID
+    kind: str
+    model: str
+    status: str
+    prompt: str
+    style: str
+    aspect_ratio: str
+    duration_seconds: int | None = None
+    consistency: bool
+    reference_image_url: str | None = None
+    character_image_url: str | None = None
+    output_url: str | None = None
+    error_message: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class AppGenerationsPublic(SQLModel):
+    data: list[AppGenerationPublic]
+    count: int
+
+
+class AppGenerationQuotaPublic(SQLModel):
+    video_total: int
+    video_used: int
+    video_remaining: int
+    image_total: int
+    image_used: int
+    image_remaining: int
 
 
 class AppUserAdminPublic(AppUserPublic):

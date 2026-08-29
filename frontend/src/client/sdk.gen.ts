@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -36,7 +36,7 @@ export class LoginService {
             }
         });
     }
-    
+
     /**
      * Test Token
      *
@@ -50,7 +50,7 @@ export class LoginService {
             ...options
         });
     }
-    
+
     /**
      * Recover Password
      *
@@ -63,7 +63,7 @@ export class LoginService {
             ...options
         });
     }
-    
+
     /**
      * Reset Password
      *
@@ -80,7 +80,7 @@ export class LoginService {
             }
         });
     }
-    
+
     /**
      * Recover Password Html Content
      *
@@ -110,7 +110,7 @@ export class UsersService {
             ...options
         });
     }
-    
+
     /**
      * Create User
      *
@@ -128,7 +128,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Delete User Me
      *
@@ -142,7 +142,7 @@ export class UsersService {
             ...options
         });
     }
-    
+
     /**
      * Read User Me
      *
@@ -156,7 +156,7 @@ export class UsersService {
             ...options
         });
     }
-    
+
     /**
      * Update User Me
      *
@@ -174,7 +174,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Update Password Me
      *
@@ -192,7 +192,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Register User
      *
@@ -209,7 +209,7 @@ export class UsersService {
             }
         });
     }
-    
+
     /**
      * Delete User
      *
@@ -223,7 +223,7 @@ export class UsersService {
             ...options
         });
     }
-    
+
     /**
      * Read User By Id
      *
@@ -237,7 +237,7 @@ export class UsersService {
             ...options
         });
     }
-    
+
     /**
      * Update User
      *
@@ -271,7 +271,7 @@ export class UtilsService {
             ...options
         });
     }
-    
+
     /**
      * Health Check
      */
@@ -298,7 +298,7 @@ export class ItemsService {
             ...options
         });
     }
-    
+
     /**
      * Create Item
      *
@@ -316,7 +316,7 @@ export class ItemsService {
             }
         });
     }
-    
+
     /**
      * Delete Item
      *
@@ -330,7 +330,7 @@ export class ItemsService {
             ...options
         });
     }
-    
+
     /**
      * Read Item
      *
@@ -344,7 +344,7 @@ export class ItemsService {
             ...options
         });
     }
-    
+
     /**
      * Update Item
      *
@@ -381,7 +381,7 @@ export class AppAuthService {
             }
         });
     }
-    
+
     /**
      * Test App Token
      *
@@ -411,7 +411,7 @@ export class AppUsersService {
             ...options
         });
     }
-    
+
     /**
      * Update App User Me
      *
@@ -435,7 +435,7 @@ export class AppUploadsService {
     /**
      * Upload App Image
      *
-     * Store an App image locally and return a public relative URL.
+     * Store an App image and return a public URL.
      */
     public static uploadAppImage<ThrowOnError extends boolean = true>(options: Options<appUploadsUploadAppImageData, ThrowOnError>) {
         return (options.client ?? client).post<appUploadsUploadAppImageResponses, appUploadsUploadAppImageErrors, ThrowOnError>({
@@ -470,7 +470,7 @@ export class AppContentsService {
             }
         });
     }
-    
+
     /**
      * Read Content Feed
      *
@@ -484,7 +484,7 @@ export class AppContentsService {
             ...options
         });
     }
-    
+
     /**
      * Read Content
      *
@@ -495,6 +495,86 @@ export class AppContentsService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/app/contents/{content_id}',
+            ...options
+        });
+    }
+}
+
+export class AppGenerationsService {
+    /**
+     * Read Generation Quota
+     *
+     * Return the current App user's free generation quota.
+     */
+    public static readGenerationQuota<ThrowOnError extends boolean = true>(options?: Options<appGenerationsReadGenerationQuotaData, ThrowOnError>) {
+        return (options?.client ?? client).get<appGenerationsReadGenerationQuotaResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/generations/quota',
+            ...options
+        });
+    }
+
+    /**
+     * Read Generations
+     *
+     * Retrieve the current App user's visible generation works.
+     */
+    public static readGenerations<ThrowOnError extends boolean = true>(options?: Options<appGenerationsReadGenerationsData, ThrowOnError>) {
+        return (options?.client ?? client).get<appGenerationsReadGenerationsResponses, appGenerationsReadGenerationsErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/generations/',
+            ...options
+        });
+    }
+
+    /**
+     * Create Generation
+     *
+     * Create a Seedance or Seedream generation task.
+     *
+     * The first local MVP records the task and marks it succeeded immediately. The
+     * provider call can replace this local completion step without changing the
+     * public API contract.
+     */
+    public static createGeneration<ThrowOnError extends boolean = true>(options: Options<appGenerationsCreateGenerationData, ThrowOnError>) {
+        return (options.client ?? client).post<appGenerationsCreateGenerationResponses, appGenerationsCreateGenerationErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/generations/',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Delete Generation
+     *
+     * Hide a generation work from the current App user's works list.
+     */
+    public static deleteGeneration<ThrowOnError extends boolean = true>(options: Options<appGenerationsDeleteGenerationData, ThrowOnError>) {
+        return (options.client ?? client).delete<appGenerationsDeleteGenerationResponses, appGenerationsDeleteGenerationErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/generations/{generation_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Read Generation
+     *
+     * Get one visible generation work for the current App user.
+     */
+    public static readGeneration<ThrowOnError extends boolean = true>(options: Options<appGenerationsReadGenerationData, ThrowOnError>) {
+        return (options.client ?? client).get<appGenerationsReadGenerationResponses, appGenerationsReadGenerationErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/generations/{generation_id}',
             ...options
         });
     }
@@ -530,7 +610,7 @@ export class AppOrdersService {
             ...options
         });
     }
-    
+
     /**
      * Create Order
      *
@@ -548,7 +628,7 @@ export class AppOrdersService {
             }
         });
     }
-    
+
     /**
      * Read Order
      *
@@ -578,7 +658,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Update App User Status
      *
@@ -596,7 +676,7 @@ export class AdminAppService {
             }
         });
     }
-    
+
     /**
      * Delete App User
      *
@@ -610,7 +690,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Contents
      *
@@ -624,7 +704,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Delete App Content
      *
@@ -638,7 +718,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Orders
      *
@@ -652,7 +732,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Order
      *
@@ -666,7 +746,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Order Events
      *
@@ -680,7 +760,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Admin Operation Logs
      *
@@ -694,7 +774,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Read App Configs
      *
@@ -708,7 +788,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Create App Config
      *
@@ -726,7 +806,7 @@ export class AdminAppService {
             }
         });
     }
-    
+
     /**
      * Read App Config
      *
@@ -740,7 +820,7 @@ export class AdminAppService {
             ...options
         });
     }
-    
+
     /**
      * Update App Config
      *
@@ -777,7 +857,7 @@ export class PaymentWebhooksService {
             }
         });
     }
-    
+
     /**
      * Receive Google Play Callback
      *

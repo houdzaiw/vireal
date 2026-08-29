@@ -31,6 +31,7 @@ import {
   type ReactNode,
   type SetStateAction,
   type SVGProps,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -41,6 +42,8 @@ import {
   AppAuthService,
   AppConfigsService,
   AppContentsService,
+  type AppGenerationPublic,
+  AppGenerationsService,
   AppUploadsService,
   type AppUserPublic,
 } from "@/client"
@@ -85,7 +88,7 @@ interface GenerationDraft {
 interface WorkItem {
   id: string
   kind: GenerationKind
-  model: "Seedance 2.0" | "Seedream"
+  model: string
   status: WorkStatus
   prompt: string
   style: string
@@ -115,8 +118,6 @@ const APP_TOKEN_KEY = "vireal_h5_app_token"
 const APP_USER_KEY = "vireal_h5_app_user"
 const APP_PROVIDER_KEY = "vireal_h5_login_provider"
 const DEVICE_UUID_KEY = "vireal_h5_device_uuid"
-const WORKS_KEY = "vireal_h5_works"
-const QUOTA_KEY = "vireal_h5_free_quota"
 
 const defaultQuota: FreeQuota = {
   video: 2,
@@ -217,14 +218,6 @@ function fileToPreviewUrl(file: File) {
   return URL.createObjectURL(file)
 }
 
-function restoreWorks() {
-  return readJson<WorkItem[]>(WORKS_KEY, [])
-}
-
-function restoreQuota() {
-  return readJson<FreeQuota>(QUOTA_KEY, defaultQuota)
-}
-
 function tabLabel(tab: CreativeTab) {
   if (tab === "video") return "AI 视频"
   if (tab === "image") return "AI 图片"
@@ -248,14 +241,57 @@ function isQuotaEnough(quota: FreeQuota, kind: GenerationKind) {
   return quota[kind] > 0
 }
 
+function generationStatus(status: string): WorkStatus {
+  if (status === "succeeded") return "done"
+  if (status === "failed") return "failed"
+  return "processing"
+}
+
+function generationKind(kind: string): GenerationKind {
+  return kind === "image" ? "image" : "video"
+}
+
+function generationToWork(generation: AppGenerationPublic): WorkItem {
+  const imageUrl =
+    generation.output_url ||
+    generation.reference_image_url ||
+    generation.character_image_url ||
+    undefined
+
+  return {
+    id: generation.id,
+    kind: generationKind(generation.kind),
+    model: generation.model,
+    status: generationStatus(generation.status),
+    prompt: generation.prompt,
+    style: generation.style,
+    aspectRatio: generation.aspect_ratio,
+    durationSeconds: generation.duration_seconds ?? undefined,
+    consistency: generation.consistency,
+    createdAt: generation.created_at ?? new Date().toISOString(),
+    outputUrl: imageUrl ? getMediaUrl(imageUrl) : undefined,
+    previewUrl: imageUrl ? getMediaUrl(imageUrl) : undefined,
+    uploadedImageUrls: [
+      generation.reference_image_url,
+      generation.character_image_url,
+    ].filter(Boolean) as string[],
+  }
+}
+
+function getErrorDetail(error: unknown) {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })
+    .response?.data?.detail
+  return typeof detail === "string" ? detail : null
+}
+
 function H5AiGenerator() {
   const [activeTab, setActiveTab] = useState<CreativeTab>("video")
   const [videoDraft, setVideoDraft] =
     useState<GenerationDraft>(defaultVideoDraft)
   const [imageDraft, setImageDraft] =
     useState<GenerationDraft>(defaultImageDraft)
-  const [works, setWorks] = useState<WorkItem[]>(restoreWorks)
-  const [quota, setQuota] = useState<FreeQuota>(restoreQuota)
+  const [works, setWorks] = useState<WorkItem[]>([])
+  const [quota, setQuota] = useState<FreeQuota>(defaultQuota)
   const [session, setSession] = useState<StoredSession | null>(
     readStoredSession,
   )
@@ -266,30 +302,21 @@ function H5AiGenerator() {
   const [isGenerating, setIsGenerating] = useState<GenerationKind | null>(null)
   const [configStatus, setConfigStatus] = useState("默认配置")
 
-  useEffect(() => {
-    writeJson(WORKS_KEY, works)
-  }, [works])
-
-  useEffect(() => {
-    writeJson(QUOTA_KEY, quota)
-  }, [quota])
-
-  useEffect(() => {
-    if (!session?.token) return
-    void refreshAppBootstrap(session.token)
-  }, [session?.token])
-
-  const currentDraft = activeTab === "image" ? imageDraft : videoDraft
-  const setCurrentDraft = activeTab === "image" ? setImageDraft : setVideoDraft
-  const doneWorks = works.filter((work) => work.status === "done").length
-  const processingWorks = works.filter((work) => work.status === "processing")
-    .length
-
-  async function refreshAppBootstrap(token: string) {
+  const refreshAppState = useCallback(async (token: string) => {
     try {
-      const [profileResponse, configResponse] = await Promise.all([
+      const [
+        profileResponse,
+        configResponse,
+        quotaResponse,
+        generationsResponse,
+      ] = await Promise.all([
         AppAuthService.testAppToken({ auth: () => token }),
         AppConfigsService.readAppConfigs({ auth: () => token }),
+        AppGenerationsService.readGenerationQuota({ auth: () => token }),
+        AppGenerationsService.readGenerations({
+          auth: () => token,
+          query: { skip: 0, limit: 100 },
+        }),
       ])
       setSession((current) => {
         if (!current) return current
@@ -301,12 +328,35 @@ function H5AiGenerator() {
         return nextSession
       })
       setConfigStatus(`配置 ${configResponse.data.count}`)
+      setQuota({
+        video: quotaResponse.data.video_remaining,
+        image: quotaResponse.data.image_remaining,
+      })
+      setWorks(generationsResponse.data.data.map(generationToWork))
     } catch {
       clearSession()
       setSession(null)
       setConfigStatus("默认配置")
+      setQuota(defaultQuota)
+      setWorks([])
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!session?.token) {
+      setQuota(defaultQuota)
+      setWorks([])
+      return
+    }
+    void refreshAppState(session.token)
+  }, [session?.token, refreshAppState])
+
+  const currentDraft = activeTab === "image" ? imageDraft : videoDraft
+  const setCurrentDraft = activeTab === "image" ? setImageDraft : setVideoDraft
+  const doneWorks = works.filter((work) => work.status === "done").length
+  const processingWorks = works.filter(
+    (work) => work.status === "processing",
+  ).length
 
   async function loginWithProvider(provider: LoginProvider) {
     if (loginLoading) return
@@ -403,43 +453,36 @@ function H5AiGenerator() {
     setIsGenerating(kind)
     try {
       const uploadedImageUrls = await uploadDraftImages(draft, token)
-      const firstUploadedUrl = uploadedImageUrls[0]
-      const nextWork: WorkItem = {
-        id: createId(),
-        kind,
-        model: kind === "video" ? "Seedance 2.0" : "Seedream",
-        status: "processing",
-        prompt,
-        style: draft.style,
-        aspectRatio: draft.aspectRatio,
-        durationSeconds: kind === "video" ? draft.durationSeconds : undefined,
-        consistency: draft.consistency,
-        createdAt: new Date().toISOString(),
-        outputUrl: firstUploadedUrl ? getMediaUrl(firstUploadedUrl) : undefined,
-        previewUrl:
-          draft.referencePreviewUrl ||
-          draft.characterPreviewUrl ||
-          (firstUploadedUrl ? getMediaUrl(firstUploadedUrl) : undefined),
-        uploadedImageUrls,
-      }
+      const generationResponse = await AppGenerationsService.createGeneration({
+        auth: () => token,
+        body: {
+          kind,
+          prompt,
+          style: draft.style,
+          aspect_ratio: draft.aspectRatio,
+          duration_seconds: kind === "video" ? draft.durationSeconds : null,
+          consistency: draft.consistency,
+          reference_image_url: uploadedImageUrls[0] ?? null,
+          character_image_url: uploadedImageUrls[1] ?? null,
+        },
+      })
+      const nextWork = generationToWork(generationResponse.data)
 
-      setWorks((currentWorks) => [nextWork, ...currentWorks])
-      setQuota((currentQuota) => ({
-        ...currentQuota,
-        [kind]: Math.max(0, currentQuota[kind] - 1),
-      }))
+      setWorks((currentWorks) => [
+        nextWork,
+        ...currentWorks.filter((work) => work.id !== nextWork.id),
+      ])
       setActiveTab("works")
       void publishWorkAsContent(nextWork, token, uploadedImageUrls)
-
-      window.setTimeout(() => {
-        setWorks((currentWorks) =>
-          currentWorks.map((work) =>
-            work.id === nextWork.id ? { ...work, status: "done" } : work,
-          ),
-        )
-      }, 1600)
-    } catch {
-      toast.error("生成提交失败，本次不扣次数")
+      void refreshAppState(token)
+    } catch (error) {
+      const detail = getErrorDetail(error)
+      if (detail === "Free generation quota exhausted") {
+        toast.error(`${kindLabel(kind)}免费次数已用完`)
+        void refreshAppState(token)
+      } else {
+        toast.error("生成提交失败，本次不扣次数")
+      }
     } finally {
       setIsGenerating(null)
     }
@@ -453,9 +496,27 @@ function H5AiGenerator() {
     void generateWork(kind)
   }
 
-  function handleDeleteWork(workId: string) {
-    setWorks((currentWorks) => currentWorks.filter((work) => work.id !== workId))
-    toast.success("作品已删除")
+  async function handleDeleteWork(workId: string) {
+    if (!session?.token) {
+      setWorks((currentWorks) =>
+        currentWorks.filter((work) => work.id !== workId),
+      )
+      toast.success("作品已删除")
+      return
+    }
+
+    try {
+      await AppGenerationsService.deleteGeneration({
+        auth: () => session.token,
+        path: { generation_id: workId },
+      })
+      setWorks((currentWorks) =>
+        currentWorks.filter((work) => work.id !== workId),
+      )
+      toast.success("作品已删除")
+    } catch {
+      toast.error("删除失败，请稍后重试")
+    }
   }
 
   async function handleShareWork(work: WorkItem) {
@@ -516,10 +577,13 @@ function H5AiGenerator() {
     clearSession()
     setSession(null)
     setConfigStatus("默认配置")
+    setQuota(defaultQuota)
+    setWorks([])
     toast.success("已退出登录")
   }
 
-  const visibleTemplates = activeTab === "image" ? imageTemplates : videoTemplates
+  const visibleTemplates =
+    activeTab === "image" ? imageTemplates : videoTemplates
 
   return (
     <div className="min-h-svh bg-[#090b0a] text-stone-50">

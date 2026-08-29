@@ -13,6 +13,7 @@ from app.models import (
     AppContent,
     AppContentImage,
     AppDevice,
+    AppGeneration,
     AppOrder,
     AppOrderEvent,
     AppUser,
@@ -35,6 +36,8 @@ def db() -> Generator[Session]:
         statement = delete(AppOrder)
         session.execute(statement)
         statement = delete(AppConfig)
+        session.execute(statement)
+        statement = delete(AppGeneration)
         session.execute(statement)
         statement = delete(AppContentImage)
         session.execute(statement)

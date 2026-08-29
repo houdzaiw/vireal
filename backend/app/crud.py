@@ -16,6 +16,8 @@ from app.models import (
     AppContentCreate,
     AppContentImage,
     AppDevice,
+    AppGeneration,
+    AppGenerationCreate,
     AppOrder,
     AppOrderCreate,
     AppOrderEvent,
@@ -207,6 +209,97 @@ def get_active_app_content(
         )
     )
     return session.exec(statement).first()
+
+
+def count_app_generations_by_kind(
+    *, session: Session, app_user: AppUser, kind: str
+) -> int:
+    statement = (
+        select(func.count())
+        .select_from(AppGeneration)
+        .where(
+            AppGeneration.app_user_id == app_user.id,
+            AppGeneration.kind == kind,
+            AppGeneration.status != "failed",
+        )
+    )
+    return session.exec(statement).one()
+
+
+def create_app_generation(
+    *,
+    session: Session,
+    app_user: AppUser,
+    generation_in: AppGenerationCreate,
+    model: str,
+    output_url: str | None = None,
+) -> AppGeneration:
+    now = datetime.now(UTC)
+    db_generation = AppGeneration.model_validate(
+        generation_in,
+        update={
+            "app_user_id": app_user.id,
+            "model": model,
+            "status": "succeeded",
+            "output_url": output_url,
+            "completed_at": now,
+            "updated_at": now,
+        },
+    )
+    session.add(db_generation)
+    session.commit()
+    session.refresh(db_generation)
+    return db_generation
+
+
+def list_app_generations_for_app(
+    *,
+    session: Session,
+    app_user: AppUser,
+    skip: int = 0,
+    limit: int = 100,
+    kind: str | None = None,
+) -> tuple[list[AppGeneration], int]:
+    filters: list[Any] = [
+        AppGeneration.app_user_id == app_user.id,
+        col(AppGeneration.deleted_at).is_(None),
+    ]
+    if kind:
+        filters.append(AppGeneration.kind == kind)
+    count_statement = select(func.count()).select_from(AppGeneration).where(*filters)
+    count = session.exec(count_statement).one()
+    statement = (
+        select(AppGeneration)
+        .where(*filters)
+        .order_by(col(AppGeneration.created_at).desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    generations = list(session.exec(statement).all())
+    return generations, count
+
+
+def get_app_generation_for_app(
+    *, session: Session, app_user: AppUser, generation_id: uuid.UUID
+) -> AppGeneration | None:
+    statement = select(AppGeneration).where(
+        AppGeneration.id == generation_id,
+        AppGeneration.app_user_id == app_user.id,
+        col(AppGeneration.deleted_at).is_(None),
+    )
+    return session.exec(statement).first()
+
+
+def soft_delete_app_generation(
+    *, session: Session, generation: AppGeneration
+) -> AppGeneration:
+    now = datetime.now(UTC)
+    generation.deleted_at = now
+    generation.updated_at = now
+    session.add(generation)
+    session.commit()
+    session.refresh(generation)
+    return generation
 
 
 def list_app_users_for_admin(
