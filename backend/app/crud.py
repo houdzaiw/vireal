@@ -331,6 +331,50 @@ def soft_delete_app_generation(
     return generation
 
 
+def list_app_generations_for_admin(
+    *,
+    session: Session,
+    skip: int = 0,
+    limit: int = 100,
+    status: str | None = None,
+    kind: str | None = None,
+    provider: str | None = None,
+) -> tuple[list[AppGeneration], int]:
+    filters: list[Any] = []
+    if status == "deleted":
+        filters.append(col(AppGeneration.deleted_at).is_not(None))
+    elif status:
+        filters.extend(
+            [
+                AppGeneration.status == status,
+                col(AppGeneration.deleted_at).is_(None),
+            ]
+        )
+    else:
+        filters.append(col(AppGeneration.deleted_at).is_(None))
+    if kind:
+        filters.append(AppGeneration.kind == kind)
+    if provider:
+        filters.append(AppGeneration.provider == provider)
+    count_statement = select(func.count()).select_from(AppGeneration).where(*filters)
+    count = session.exec(count_statement).one()
+    statement = (
+        select(AppGeneration)
+        .where(*filters)
+        .order_by(col(AppGeneration.created_at).desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    generations = list(session.exec(statement).all())
+    return generations, count
+
+
+def get_app_generation_for_admin(
+    *, session: Session, generation_id: uuid.UUID
+) -> AppGeneration | None:
+    return session.get(AppGeneration, generation_id)
+
+
 def list_app_users_for_admin(
     *,
     session: Session,

@@ -7,6 +7,7 @@ import {
   SlidersHorizontal,
   Smartphone,
   Users,
+  WandSparkles,
 } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
@@ -38,6 +39,11 @@ export function AppSidebar() {
           icon: MessageSquareText,
           title: "App Contents",
           path: "/app-contents",
+        },
+        {
+          icon: WandSparkles,
+          title: "App Generations",
+          path: "/app-generations",
         },
         { icon: ReceiptText, title: "App Orders", path: "/app-orders" },
         {

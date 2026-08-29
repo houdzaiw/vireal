@@ -310,6 +310,15 @@ class AppGenerationQuotaPublic(SQLModel):
     image_remaining: int
 
 
+class AppGenerationAdminPublic(AppGenerationPublic):
+    deleted_at: datetime | None = None
+
+
+class AppGenerationsAdminPublic(SQLModel):
+    data: list[AppGenerationAdminPublic]
+    count: int
+
+
 class AppUserAdminPublic(AppUserPublic):
     updated_at: datetime | None = None
     deleted_at: datetime | None = None

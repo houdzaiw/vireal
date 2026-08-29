@@ -19,6 +19,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutAppConfigsRouteImport } from './routes/_layout/app-configs'
 import { Route as LayoutAppContentsRouteImport } from './routes/_layout/app-contents'
+import { Route as LayoutAppGenerationsRouteImport } from './routes/_layout/app-generations'
 import { Route as LayoutAppOperationLogsRouteImport } from './routes/_layout/app-operation-logs'
 import { Route as LayoutAppOrdersRouteImport } from './routes/_layout/app-orders'
 import { Route as LayoutAppUsersRouteImport } from './routes/_layout/app-users'
@@ -74,6 +75,11 @@ const LayoutAppContentsRoute = LayoutAppContentsRouteImport.update({
   path: '/app-contents',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAppGenerationsRoute = LayoutAppGenerationsRouteImport.update({
+  id: '/app-generations',
+  path: '/app-generations',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAppOperationLogsRoute = LayoutAppOperationLogsRouteImport.update({
   id: '/app-operation-logs',
   path: '/app-operation-logs',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAdminRoute
   '/app-configs': typeof LayoutAppConfigsRoute
   '/app-contents': typeof LayoutAppContentsRoute
+  '/app-generations': typeof LayoutAppGenerationsRoute
   '/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/app-orders': typeof LayoutAppOrdersRoute
   '/app-users': typeof LayoutAppUsersRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/app-configs': typeof LayoutAppConfigsRoute
   '/app-contents': typeof LayoutAppContentsRoute
+  '/app-generations': typeof LayoutAppGenerationsRoute
   '/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/app-orders': typeof LayoutAppOrdersRoute
   '/app-users': typeof LayoutAppUsersRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/app-configs': typeof LayoutAppConfigsRoute
   '/_layout/app-contents': typeof LayoutAppContentsRoute
+  '/_layout/app-generations': typeof LayoutAppGenerationsRoute
   '/_layout/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/_layout/app-orders': typeof LayoutAppOrdersRoute
   '/_layout/app-users': typeof LayoutAppUsersRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app-configs'
     | '/app-contents'
+    | '/app-generations'
     | '/app-operation-logs'
     | '/app-orders'
     | '/app-users'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app-configs'
     | '/app-contents'
+    | '/app-generations'
     | '/app-operation-logs'
     | '/app-orders'
     | '/app-users'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/_layout/admin'
     | '/_layout/app-configs'
     | '/_layout/app-contents'
+    | '/_layout/app-generations'
     | '/_layout/app-operation-logs'
     | '/_layout/app-orders'
     | '/_layout/app-users'
@@ -283,6 +295,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAppContentsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/app-generations': {
+      id: '/_layout/app-generations'
+      path: '/app-generations'
+      fullPath: '/app-generations'
+      preLoaderRoute: typeof LayoutAppGenerationsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/app-operation-logs': {
       id: '/_layout/app-operation-logs'
       path: '/app-operation-logs'
@@ -325,6 +344,7 @@ interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutAppConfigsRoute: typeof LayoutAppConfigsRoute
   LayoutAppContentsRoute: typeof LayoutAppContentsRoute
+  LayoutAppGenerationsRoute: typeof LayoutAppGenerationsRoute
   LayoutAppOperationLogsRoute: typeof LayoutAppOperationLogsRoute
   LayoutAppOrdersRoute: typeof LayoutAppOrdersRoute
   LayoutAppUsersRoute: typeof LayoutAppUsersRoute
@@ -337,6 +357,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutAppConfigsRoute: LayoutAppConfigsRoute,
   LayoutAppContentsRoute: LayoutAppContentsRoute,
+  LayoutAppGenerationsRoute: LayoutAppGenerationsRoute,
   LayoutAppOperationLogsRoute: LayoutAppOperationLogsRoute,
   LayoutAppOrdersRoute: LayoutAppOrdersRoute,
   LayoutAppUsersRoute: LayoutAppUsersRoute,

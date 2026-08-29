@@ -18,6 +18,9 @@ from app.models import (
     AppContent,
     AppContentAdminPublic,
     AppContentsAdminPublic,
+    AppGeneration,
+    AppGenerationAdminPublic,
+    AppGenerationsAdminPublic,
     AppOrderEventPublic,
     AppOrderEventsPublic,
     AppOrderPublic,
@@ -43,6 +46,13 @@ def serialize_admin_content(content: AppContent) -> AppContentAdminPublic:
         status=content.status,
         deleted_at=content.deleted_at,
     )
+
+
+def serialize_admin_generation(generation: AppGeneration) -> AppGenerationAdminPublic:
+    app_generation = AppGenerationAdminPublic.model_validate(generation)
+    if generation.deleted_at:
+        app_generation.status = "deleted"
+    return app_generation
 
 
 def _normalize_config_create(config_in: AppConfigCreate) -> AppConfigCreate:
@@ -238,6 +248,85 @@ def delete_app_content(
         },
     )
     return Message(message="Content deleted successfully")
+
+
+@router.get("/generations", response_model=AppGenerationsAdminPublic)
+def read_app_generations(
+    session: SessionDep,
+    skip: int = 0,
+    limit: int = 100,
+    status: Literal["processing", "succeeded", "failed", "deleted"] | None = None,
+    kind: Literal["video", "image"] | None = None,
+    provider: str | None = None,
+) -> Any:
+    """
+    Retrieve App AI generation works for admin management.
+    """
+    generations, count = crud.list_app_generations_for_admin(
+        session=session,
+        skip=skip,
+        limit=limit,
+        status=status,
+        kind=kind,
+        provider=provider,
+    )
+    return AppGenerationsAdminPublic(
+        data=[
+            serialize_admin_generation(generation)
+            for generation in generations
+        ],
+        count=count,
+    )
+
+
+@router.get("/generations/{generation_id}", response_model=AppGenerationAdminPublic)
+def read_app_generation(session: SessionDep, generation_id: uuid.UUID) -> Any:
+    """
+    Get an App AI generation work by ID.
+    """
+    generation = crud.get_app_generation_for_admin(
+        session=session,
+        generation_id=generation_id,
+    )
+    if not generation:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    return serialize_admin_generation(generation)
+
+
+@router.delete("/generations/{generation_id}", response_model=Message)
+def delete_app_generation(
+    session: SessionDep,
+    generation_id: uuid.UUID,
+    current_admin: User = Depends(get_current_active_superuser),
+) -> Message:
+    """
+    Soft delete an App AI generation work.
+    """
+    generation = crud.get_app_generation_for_admin(
+        session=session,
+        generation_id=generation_id,
+    )
+    if not generation or generation.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    previous_status = generation.status
+    crud.soft_delete_app_generation(session=session, generation=generation)
+    log_admin_operation(
+        session=session,
+        current_admin=current_admin,
+        action="app_generation.delete",
+        target_type="app_generation",
+        target_id=generation_id,
+        summary="Soft deleted App generation",
+        details={
+            "previous_status": previous_status,
+            "app_user_id": str(generation.app_user_id),
+            "kind": generation.kind,
+            "provider": generation.provider,
+            "provider_task_id": generation.provider_task_id,
+            "prompt_preview": generation.prompt[:120],
+        },
+    )
+    return Message(message="Generation deleted successfully")
 
 
 @router.get("/orders", response_model=AppOrdersPublic)

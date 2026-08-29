@@ -224,3 +224,68 @@ def test_generation_rejects_non_upload_image_url(client: TestClient) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Image URL must be local upload URL"
+
+
+def test_admin_reads_and_deletes_app_generation(
+    client: TestClient,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    app_headers, _login_data = app_authentication_headers(client=client)
+    create_response = client.post(
+        f"{settings.API_V1_STR}/app/generations/",
+        headers=app_headers,
+        json={
+            "kind": "video",
+            "prompt": "后台管理测试短片",
+            "style": "写实",
+            "aspect_ratio": "9:16",
+            "duration_seconds": 5,
+            "consistency": True,
+        },
+    )
+    generation = create_response.json()
+    generation_id = generation["id"]
+
+    list_response = client.get(
+        f"{settings.API_V1_STR}/admin/app/generations",
+        headers=superuser_token_headers,
+    )
+    detail_response = client.get(
+        f"{settings.API_V1_STR}/admin/app/generations/{generation_id}",
+        headers=superuser_token_headers,
+    )
+    delete_response = client.delete(
+        f"{settings.API_V1_STR}/admin/app/generations/{generation_id}",
+        headers=superuser_token_headers,
+    )
+    hidden_for_app_response = client.get(
+        f"{settings.API_V1_STR}/app/generations/{generation_id}",
+        headers=app_headers,
+    )
+    deleted_list_response = client.get(
+        f"{settings.API_V1_STR}/admin/app/generations",
+        headers=superuser_token_headers,
+        params={"status": "deleted"},
+    )
+    logs_response = client.get(
+        f"{settings.API_V1_STR}/admin/app/operation-logs",
+        headers=superuser_token_headers,
+        params={"target_type": "app_generation"},
+    )
+
+    assert list_response.status_code == 200
+    assert any(item["id"] == generation_id for item in list_response.json()["data"])
+    assert detail_response.status_code == 200
+    assert detail_response.json()["prompt"] == "后台管理测试短片"
+    assert delete_response.status_code == 200
+    assert delete_response.json()["message"] == "Generation deleted successfully"
+    assert hidden_for_app_response.status_code == 404
+    assert any(
+        item["id"] == generation_id and item["status"] == "deleted"
+        for item in deleted_list_response.json()["data"]
+    )
+    assert any(
+        item["action"] == "app_generation.delete"
+        and item["target_id"] == generation_id
+        for item in logs_response.json()["data"]
+    )

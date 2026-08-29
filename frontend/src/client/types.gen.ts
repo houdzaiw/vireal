@@ -344,6 +344,92 @@ export type AppDeviceLoginResponse = {
 };
 
 /**
+ * AppGenerationAdminPublic
+ */
+export type AppGenerationAdminPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Provider Task Id
+     */
+    provider_task_id?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Prompt
+     */
+    prompt: string;
+    /**
+     * Style
+     */
+    style: string;
+    /**
+     * Aspect Ratio
+     */
+    aspect_ratio: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds?: number | null;
+    /**
+     * Consistency
+     */
+    consistency: boolean;
+    /**
+     * Reference Image Url
+     */
+    reference_image_url?: string | null;
+    /**
+     * Character Image Url
+     */
+    character_image_url?: string | null;
+    /**
+     * Output Url
+     */
+    output_url?: string | null;
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+    /**
+     * Completed At
+     */
+    completed_at?: string | null;
+    /**
+     * Deleted At
+     */
+    deleted_at?: string | null;
+};
+
+/**
  * AppGenerationCreate
  */
 export type AppGenerationCreate = {
@@ -491,6 +577,20 @@ export type AppGenerationQuotaPublic = {
      * Image Remaining
      */
     image_remaining: number;
+};
+
+/**
+ * AppGenerationsAdminPublic
+ */
+export type AppGenerationsAdminPublic = {
+    /**
+     * Data
+     */
+    data: Array<AppGenerationAdminPublic>;
+    /**
+     * Count
+     */
+    count: number;
 };
 
 /**
@@ -2345,6 +2445,112 @@ export type adminAppDeleteAppContentResponses = {
 };
 
 export type adminAppDeleteAppContentResponse = adminAppDeleteAppContentResponses[keyof adminAppDeleteAppContentResponses];
+
+export type adminAppReadAppGenerationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Status
+         */
+        status?: 'processing' | 'succeeded' | 'failed' | 'deleted' | null;
+        /**
+         * Kind
+         */
+        kind?: 'video' | 'image' | null;
+        /**
+         * Provider
+         */
+        provider?: string | null;
+    };
+    url: '/api/v1/admin/app/generations';
+};
+
+export type adminAppReadAppGenerationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppReadAppGenerationsError = adminAppReadAppGenerationsErrors[keyof adminAppReadAppGenerationsErrors];
+
+export type adminAppReadAppGenerationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationsAdminPublic;
+};
+
+export type adminAppReadAppGenerationsResponse = adminAppReadAppGenerationsResponses[keyof adminAppReadAppGenerationsResponses];
+
+export type adminAppDeleteAppGenerationData = {
+    body?: never;
+    path: {
+        /**
+         * Generation Id
+         */
+        generation_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/generations/{generation_id}';
+};
+
+export type adminAppDeleteAppGenerationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppDeleteAppGenerationError = adminAppDeleteAppGenerationErrors[keyof adminAppDeleteAppGenerationErrors];
+
+export type adminAppDeleteAppGenerationResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type adminAppDeleteAppGenerationResponse = adminAppDeleteAppGenerationResponses[keyof adminAppDeleteAppGenerationResponses];
+
+export type adminAppReadAppGenerationData = {
+    body?: never;
+    path: {
+        /**
+         * Generation Id
+         */
+        generation_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/generations/{generation_id}';
+};
+
+export type adminAppReadAppGenerationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppReadAppGenerationError = adminAppReadAppGenerationErrors[keyof adminAppReadAppGenerationErrors];
+
+export type adminAppReadAppGenerationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppGenerationAdminPublic;
+};
+
+export type adminAppReadAppGenerationResponse = adminAppReadAppGenerationResponses[keyof adminAppReadAppGenerationResponses];
 
 export type adminAppReadAppOrdersData = {
     body?: never;
