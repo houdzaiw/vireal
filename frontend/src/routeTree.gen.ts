@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
+import { Route as H5RouteImport } from './routes/h5'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RecoverPasswordRouteImport } from './routes/recover-password'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -26,6 +27,11 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const H5Route = H5RouteImport.update({
+  id: '/h5',
+  path: '/h5',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -96,6 +102,7 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
+  '/h5': typeof H5Route
   '/login': typeof LoginRoute
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof LayoutSettingsRoute
 }
 export interface FileRoutesByTo {
+  '/h5': typeof H5Route
   '/login': typeof LoginRoute
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -127,6 +135,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
+  '/h5': typeof H5Route
   '/login': typeof LoginRoute
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/h5'
     | '/login'
     | '/recover-password'
     | '/reset-password'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/h5'
     | '/login'
     | '/recover-password'
     | '/reset-password'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_layout'
+    | '/h5'
     | '/login'
     | '/recover-password'
     | '/reset-password'
@@ -192,6 +204,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
+  H5Route: typeof H5Route
   LoginRoute: typeof LoginRoute
   RecoverPasswordRoute: typeof RecoverPasswordRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof LayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/h5': {
+      id: '/h5'
+      path: '/h5'
+      fullPath: '/h5'
+      preLoaderRoute: typeof H5RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -330,6 +350,7 @@ const LayoutRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
+  H5Route: H5Route,
   LoginRoute: LoginRoute,
   RecoverPasswordRoute: RecoverPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
