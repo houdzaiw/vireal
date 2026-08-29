@@ -15,6 +15,7 @@ from app.models import (
     AppUser,
     Message,
 )
+from app.services import ai_generation
 from app.services.storage import is_supported_uploaded_image_url
 
 router = APIRouter(prefix="/app/generations", tags=["app generations"])
@@ -124,9 +125,9 @@ def create_generation(
     """
     Create a Seedance or Seedream generation task.
 
-    The first local MVP records the task and marks it succeeded immediately. The
-    provider call can replace this local completion step without changing the
-    public API contract.
+    The local MVP records the task as processing, then a lightweight background
+    worker marks it succeeded. A real provider adapter can replace the local
+    worker without changing the public API contract.
     """
     normalized_generation = _normalize_generation_input(generation_in)
     used_count = crud.count_app_generations_by_kind(
@@ -140,17 +141,13 @@ def create_generation(
             detail="Free generation quota exhausted",
         )
 
-    output_url = (
-        normalized_generation.reference_image_url
-        or normalized_generation.character_image_url
-    )
     generation = crud.create_app_generation(
         session=session,
         app_user=current_app_user,
         generation_in=normalized_generation,
         model=GENERATION_MODELS[normalized_generation.kind],
-        output_url=output_url,
     )
+    ai_generation.enqueue_generation(generation.id)
     return _serialize_generation(generation)
 
 

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     APP_IMAGE_STORAGE_BACKEND: Literal["local"] = "local"
     LOCAL_UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_IMAGE_BYTES: int = 5 * 1024 * 1024
+    APP_GENERATION_LOCAL_DELAY_SECONDS: float = 1.5
     PAYMENT_WEBHOOK_VERIFICATION_MODE: Literal["local", "shared_secret"] = "local"
     PAYMENT_WEBHOOK_SHARED_SECRET: str | None = None
     FRONTEND_HOST: str = "http://localhost:5173"

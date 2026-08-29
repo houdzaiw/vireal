@@ -301,6 +301,7 @@ function H5AiGenerator() {
     useState<GenerationKind | null>(null)
   const [isGenerating, setIsGenerating] = useState<GenerationKind | null>(null)
   const [configStatus, setConfigStatus] = useState("默认配置")
+  const sessionToken = session?.token
 
   const refreshAppState = useCallback(async (token: string) => {
     try {
@@ -343,13 +344,13 @@ function H5AiGenerator() {
   }, [])
 
   useEffect(() => {
-    if (!session?.token) {
+    if (!sessionToken) {
       setQuota(defaultQuota)
       setWorks([])
       return
     }
-    void refreshAppState(session.token)
-  }, [session?.token, refreshAppState])
+    void refreshAppState(sessionToken)
+  }, [sessionToken, refreshAppState])
 
   const currentDraft = activeTab === "image" ? imageDraft : videoDraft
   const setCurrentDraft = activeTab === "image" ? setImageDraft : setVideoDraft
@@ -357,6 +358,17 @@ function H5AiGenerator() {
   const processingWorks = works.filter(
     (work) => work.status === "processing",
   ).length
+  const hasProcessingWorks = processingWorks > 0
+
+  useEffect(() => {
+    if (!sessionToken || !hasProcessingWorks) return
+
+    const timer = window.setInterval(() => {
+      void refreshAppState(sessionToken)
+    }, 2500)
+
+    return () => window.clearInterval(timer)
+  }, [hasProcessingWorks, refreshAppState, sessionToken])
 
   async function loginWithProvider(provider: LoginProvider) {
     if (loginLoading) return
@@ -432,7 +444,7 @@ function H5AiGenerator() {
   }
 
   async function generateWork(kind: GenerationKind, tokenOverride?: string) {
-    const token = tokenOverride ?? session?.token
+    const token = tokenOverride ?? sessionToken
     if (!token) {
       requireLoginForGenerate(kind)
       return
@@ -489,7 +501,7 @@ function H5AiGenerator() {
   }
 
   function handleGenerate(kind: GenerationKind) {
-    if (!session?.token) {
+    if (!sessionToken) {
       requireLoginForGenerate(kind)
       return
     }
@@ -497,7 +509,7 @@ function H5AiGenerator() {
   }
 
   async function handleDeleteWork(workId: string) {
-    if (!session?.token) {
+    if (!sessionToken) {
       setWorks((currentWorks) =>
         currentWorks.filter((work) => work.id !== workId),
       )
@@ -507,7 +519,7 @@ function H5AiGenerator() {
 
     try {
       await AppGenerationsService.deleteGeneration({
-        auth: () => session.token,
+        auth: () => sessionToken,
         path: { generation_id: workId },
       })
       setWorks((currentWorks) =>
@@ -1140,7 +1152,12 @@ function WorkCard({
   work: WorkItem
 }) {
   const Icon = work.kind === "video" ? Film : ImageIcon
-  const statusText = work.status === "processing" ? "生成中" : "已完成"
+  const statusText =
+    work.status === "processing"
+      ? "生成中"
+      : work.status === "failed"
+        ? "失败"
+        : "已完成"
 
   return (
     <article className="overflow-hidden rounded-[8px] border border-white/10 bg-[#151a18]">
@@ -1160,6 +1177,8 @@ function WorkCard({
         <div className="absolute left-3 top-3 flex items-center gap-2 rounded-[8px] bg-black/55 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
           {work.status === "processing" ? (
             <Loader2 className="size-3.5 animate-spin text-cyan-200" />
+          ) : work.status === "failed" ? (
+            <AlertCircle className="size-3.5 text-rose-200" />
           ) : (
             <CheckCircle2 className="size-3.5 text-cyan-200" />
           )}

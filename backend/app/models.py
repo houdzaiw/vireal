@@ -237,7 +237,7 @@ class AppGeneration(SQLModel, table=True):
     )
     kind: str = Field(max_length=20, index=True)
     model: str = Field(max_length=80)
-    status: str = Field(default="succeeded", max_length=20, index=True)
+    status: str = Field(default="processing", max_length=20, index=True)
     prompt: str = Field(max_length=2000)
     style: str = Field(default="写实", max_length=50)
     aspect_ratio: str = Field(default="9:16", max_length=20)

@@ -233,6 +233,7 @@ def create_app_generation(
     generation_in: AppGenerationCreate,
     model: str,
     output_url: str | None = None,
+    status: str = "processing",
 ) -> AppGeneration:
     now = datetime.now(UTC)
     db_generation = AppGeneration.model_validate(
@@ -240,9 +241,9 @@ def create_app_generation(
         update={
             "app_user_id": app_user.id,
             "model": model,
-            "status": "succeeded",
+            "status": status,
             "output_url": output_url,
-            "completed_at": now,
+            "completed_at": now if status in {"succeeded", "failed"} else None,
             "updated_at": now,
         },
     )
@@ -250,6 +251,30 @@ def create_app_generation(
     session.commit()
     session.refresh(db_generation)
     return db_generation
+
+
+def update_app_generation_result(
+    *,
+    session: Session,
+    generation_id: uuid.UUID,
+    status: str,
+    output_url: str | None = None,
+    error_message: str | None = None,
+) -> AppGeneration | None:
+    generation = session.get(AppGeneration, generation_id)
+    if not generation:
+        return None
+
+    now = datetime.now(UTC)
+    generation.status = status
+    generation.output_url = output_url
+    generation.error_message = error_message
+    generation.completed_at = now
+    generation.updated_at = now
+    session.add(generation)
+    session.commit()
+    session.refresh(generation)
+    return generation
 
 
 def list_app_generations_for_app(

@@ -534,9 +534,9 @@ export class AppGenerationsService {
      *
      * Create a Seedance or Seedream generation task.
      *
-     * The first local MVP records the task and marks it succeeded immediately. The
-     * provider call can replace this local completion step without changing the
-     * public API contract.
+     * The local MVP records the task as processing, then a lightweight background
+     * worker marks it succeeded. A real provider adapter can replace the local
+     * worker without changing the public API contract.
      */
     public static createGeneration<ThrowOnError extends boolean = true>(options: Options<appGenerationsCreateGenerationData, ThrowOnError>) {
         return (options.client ?? client).post<appGenerationsCreateGenerationResponses, appGenerationsCreateGenerationErrors, ThrowOnError>({

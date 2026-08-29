@@ -1,7 +1,29 @@
+import uuid
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from app.models import AppGeneration
+from app.services import ai_generation
 from tests.utils.app_user import app_authentication_headers
+
+
+@pytest.fixture(autouse=True)
+def pause_generation_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    def skip_enqueue(_generation_id: uuid.UUID) -> None:
+        return None
+
+    monkeypatch.setattr(ai_generation, "enqueue_generation", skip_enqueue)
+
+
+class ImmediateProvider:
+    @staticmethod
+    def generate(generation: AppGeneration) -> ai_generation.AIGenerationResult:
+        return ai_generation.AIGenerationResult(
+            output_url=generation.reference_image_url
+            or generation.character_image_url,
+        )
 
 
 def test_create_video_generation_and_read_quota(client: TestClient) -> None:
@@ -24,7 +46,7 @@ def test_create_video_generation_and_read_quota(client: TestClient) -> None:
     generation = create_response.json()
     assert generation["kind"] == "video"
     assert generation["model"] == "Seedance 2.0"
-    assert generation["status"] == "succeeded"
+    assert generation["status"] == "processing"
     assert generation["prompt"] == "写实社交头像短片"
     assert generation["duration_seconds"] == 10
 
@@ -38,6 +60,37 @@ def test_create_video_generation_and_read_quota(client: TestClient) -> None:
     assert quota_response.json()["video_remaining"] == 1
     assert quota_response.json()["image_used"] == 0
     assert quota_response.json()["image_remaining"] == 2
+
+
+def test_generation_worker_marks_task_succeeded(client: TestClient) -> None:
+    headers, _login_data = app_authentication_headers(client=client)
+    create_response = client.post(
+        f"{settings.API_V1_STR}/app/generations/",
+        headers=headers,
+        json={
+            "kind": "image",
+            "prompt": "写实头像",
+            "style": "写实",
+            "aspect_ratio": "1:1",
+            "consistency": True,
+            "reference_image_url": "/uploads/images/user/file.png",
+        },
+    )
+    generation_id = uuid.UUID(create_response.json()["id"])
+
+    ai_generation.run_generation(
+        generation_id=generation_id,
+        provider=ImmediateProvider(),
+    )
+    detail_response = client.get(
+        f"{settings.API_V1_STR}/app/generations/{generation_id}",
+        headers=headers,
+    )
+
+    assert detail_response.status_code == 200
+    generation = detail_response.json()
+    assert generation["status"] == "succeeded"
+    assert generation["output_url"] == "/uploads/images/user/file.png"
 
 
 def test_image_and_video_generation_quota_are_separate(client: TestClient) -> None:
