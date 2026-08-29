@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App 服务端与后台管理系统原型 v1.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#111827',
+            quiet: '#667085',
+            line: '#d9e2ef',
+            admin: '#1d4ed8',
+            app: '#0f766e',
+            panel: '#ffffff'
+          },
+          boxShadow: {
+            soft: '0 18px 45px rgba(15, 23, 42, 0.10)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        linear-gradient(180deg, #f8fafc 0%, #eef3f7 44%, #f7f8fb 100%);
+      color: #111827;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
+    }
+
+    .icon-sm {
+      width: 15px;
+      height: 15px;
+      stroke-width: 2.2;
+    }
+
+    .phone-frame {
+      width: 390px;
+      max-width: 100%;
+      height: 812px;
+      max-height: calc(100vh - 168px);
+      min-height: 620px;
+      border-radius: 28px;
+      border: 10px solid #1f2937;
+      background: #f8fafc;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    }
+
+    .phone-screen {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .phone-content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .admin-screen {
+      min-height: 680px;
+      border: 1px solid #d9e2ef;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.10);
+    }
+
+    .workspace-grid.single-mode {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .workspace-grid.single-mode #appColumn {
+      width: min(100%, 430px);
+      margin: 0 auto;
+    }
+
+    .workspace-grid.single-mode #adminColumn {
+      width: 100%;
+    }
+
+    .prototype-page {
+      display: none;
+    }
+
+    .prototype-page.active {
+      display: block;
+    }
+
+    .nav-link.active {
+      background: #0f172a;
+      color: #fff;
+      border-color: #0f172a;
+    }
+
+    .mode-tab.active {
+      background: #111827;
+      color: #fff;
+    }
+
+    .focus-disabled {
+      pointer-events: none;
+      opacity: 0.42;
+      filter: grayscale(0.25);
+    }
+
+    .focus-bar {
+      display: none;
+    }
+
+    body.focus-mode .focus-bar {
+      display: flex;
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 90;
+      display: none;
+      max-width: min(360px, calc(100vw - 32px));
+      border-radius: 8px;
+      border: 1px solid #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+    }
+
+    .toast.show {
+      display: block;
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.42);
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .drawer {
+      transform: translateX(110%);
+      transition: transform 180ms ease;
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .state-offline .net-sensitive {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1120px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-frame {
+        margin: 0 auto;
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .phone-frame {
+        width: 100%;
+        height: 720px;
+        min-height: 580px;
+        border-width: 6px;
+        border-radius: 22px;
+      }
+
+      .top-bar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .nav-scroll {
+        overflow-x: auto;
+      }
+
+      .admin-screen {
+        min-height: auto;
+      }
+
+      .admin-layout {
+        grid-template-columns: 1fr !important;
+        min-height: auto;
+      }
+
+      .admin-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid #1e293b;
+      }
+
+      .admin-sidebar nav {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .admin-sidebar nav a {
+        white-space: nowrap;
+      }
+
+      .admin-api-card {
+        display: none;
+      }
+
+      .admin-topbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .admin-search-input {
+        width: 100%;
+      }
+
+      .admin-main-content {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="focus-bar fixed left-4 right-4 top-4 z-50 items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 shadow-soft">
+      <div class="flex items-center gap-2">
+        <i data-lucide="focus" class="icon-sm"></i>
+        <span>专注模式：<strong id="focusName">当前功能</strong></span>
+      </div>
+      <a id="exitFocus" class="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-blue-700" href="#app-feed">退出专注</a>
+    </div>
+
+    <main class="mx-auto max-w-[1440px] px-4 py-5 md:px-7 md:py-7">
+      <header class="top-bar mb-5 flex items-center justify-between gap-4 rounded-lg border border-line bg-white px-4 py-4 shadow-soft">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-quiet">
+            <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">Prototype v1.0</span>
+            <span class="rounded-md bg-blue-50 px-2 py-1 text-blue-700">FastAPI + React Admin</span>
+            <span class="rounded-md bg-amber-50 px-2 py-1 text-amber-700">本地/内网</span>
+          </div>
+          <h1 class="mt-2 text-xl font-semibold leading-snug text-ink md:text-2xl">App 服务端与后台管理系统</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex rounded-lg border border-line bg-slate-50 p-1" role="tablist" aria-label="端切换">
+            <a href="#app-feed" class="mode-tab flex min-w-[104px] items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700" data-mode="app" data-feature="global-app">
+              <i data-lucide="smartphone" class="icon-sm"></i>
+              App
+            </a>
+            <a href="#admin-users" class="mode-tab flex min-w-[104px] items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700" data-mode="admin" data-feature="global-admin">
+              <i data-lucide="monitor" class="icon-sm"></i>
+              后台
+            </a>
+          </div>
+          <button id="networkToggle" class="flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-medium text-slate-700" title="切换网络状态" data-global="true">
+            <i data-lucide="wifi" class="icon-sm"></i>
+            <span id="networkLabel">网络正常</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="nav-scroll mb-5 rounded-lg border border-line bg-white p-2 shadow-soft">
+        <nav class="flex min-w-max flex-wrap gap-2 text-sm" aria-label="功能导航">
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#app-login" data-feature="app-login">设备登录</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#app-profile" data-feature="app-profile">资料修改</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#app-feed" data-feature="app-feed">动态流</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#app-compose" data-feature="app-compose">发布动态</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#admin-login" data-feature="admin-login">后台登录</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#admin-users" data-feature="admin-users">用户管理</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#admin-content" data-feature="admin-content">内容管理</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#admin-orders" data-feature="admin-orders">订单状态</a>
+          <a class="nav-link rounded-md border border-line px-3 py-2 font-medium text-slate-700" href="#admin-configs" data-feature="admin-configs">运营配置</a>
+        </nav>
+      </div>
+
+      <section id="workspaceGrid" class="workspace-grid grid grid-cols-[430px_minmax(0,1fr)] gap-5">
+        <div id="appColumn" class="space-y-4">
+          <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+            <div class="mb-3 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase text-emerald-700">Mobile API Flow</p>
+                <h2 class="text-base font-semibold text-ink">移动 App 端</h2>
+              </div>
+              <span id="appTokenBadge" class="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">长期 token 有效</span>
+            </div>
+            <div class="phone-frame" data-feature-group="app">
+              <div class="phone-screen">
+                <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-sm">
+                  <div class="font-semibold text-slate-900">9:41</div>
+                  <div class="flex items-center gap-1.5 text-slate-700">
+                    <i data-lucide="signal" class="icon-sm"></i>
+                    <i data-lucide="wifi" class="icon-sm"></i>
+                    <i data-lucide="battery-full" class="icon-sm"></i>
+                  </div>
+                </div>
+
+                <div class="phone-content bg-slate-50">
+                  <section id="page-app-login" class="prototype-page p-5" data-page="app-login" data-feature="app-login">
+                    <div class="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
+                      <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                        <i data-lucide="fingerprint" class="icon"></i>
+                      </div>
+                      <h3 class="text-xl font-semibold text-slate-950">快速进入</h3>
+                      <p class="mt-1 text-sm text-slate-500">使用本机设备标识创建或恢复当前设备用户。</p>
+                      <div class="mt-5 space-y-3">
+                        <label class="block text-xs font-semibold text-slate-500">设备 UUID</label>
+                        <input id="deviceUuid" class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-slate-900" value="ios-8f4c-23a9-local-device">
+                        <label class="block text-xs font-semibold text-slate-500">平台</label>
+                        <select id="devicePlatform" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900">
+                          <option>iOS</option>
+                          <option>Android</option>
+                        </select>
+                      </div>
+                      <button id="deviceLoginBtn" class="net-sensitive mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white" title="设备号登录">
+                        <i data-lucide="log-in" class="icon-sm"></i>
+                        设备号登录
+                      </button>
+                    </div>
+
+                    <div class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                      <div class="mb-3 flex items-center justify-between">
+                        <span class="text-sm font-semibold text-slate-900">登录结果</span>
+                        <span id="loginStateBadge" class="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">待登录</span>
+                      </div>
+                      <div class="space-y-2 text-sm text-slate-600">
+                        <div class="flex justify-between gap-3"><span>App 用户</span><strong id="loginUserId" class="text-slate-900">未创建</strong></div>
+                        <div class="flex justify-between gap-3"><span>设备绑定</span><strong id="loginDeviceState" class="text-slate-900">未绑定</strong></div>
+                        <div class="flex justify-between gap-3"><span>配置拉取</span><strong id="loginConfigState" class="text-slate-900">未开始</strong></div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section id="page-app-profile" class="prototype-page p-5" data-page="app-profile" data-feature="app-profile">
+                    <div class="mb-4 flex items-center justify-between">
+                      <div>
+                        <p class="text-xs font-semibold text-emerald-700">个人资料</p>
+                        <h3 class="text-xl font-semibold text-slate-950">头像与昵称</h3>
+                      </div>
+                      <button class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700" title="刷新资料">
+                        <i data-lucide="refresh-cw" class="icon-sm"></i>
+                      </button>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200 bg-white p-5">
+                      <div class="flex items-center gap-4">
+                        <div class="relative">
+                          <img id="avatarPreview" class="h-20 w-20 rounded-full object-cover ring-4 ring-emerald-50" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80" alt="用户头像">
+                          <button id="avatarUploadBtn" class="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-white shadow" title="上传头像">
+                            <i data-lucide="upload" class="icon-sm"></i>
+                          </button>
+                        </div>
+                        <div class="min-w-0">
+                          <div id="profileNameLabel" class="truncate text-lg font-semibold text-slate-950">Mia</div>
+                          <div class="text-sm text-slate-500">app_user_10027</div>
+                          <span class="mt-2 inline-flex rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">状态正常</span>
+                        </div>
+                      </div>
+
+                      <div class="mt-6 space-y-4">
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-semibold text-slate-500">昵称</span>
+                          <input id="nicknameInput" maxlength="20" class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="Mia">
+                        </label>
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-semibold text-slate-500">头像 URL</span>
+                          <input id="avatarUrlInput" class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="uploads/avatars/app_user_10027.jpg">
+                        </label>
+                        <button id="saveProfileBtn" class="net-sensitive flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white" title="保存资料">
+                          <i data-lucide="save" class="icon-sm"></i>
+                          保存资料
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section id="page-app-feed" class="prototype-page p-4" data-page="app-feed" data-feature="app-feed">
+                    <div class="sticky top-0 z-10 mb-4 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur">
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <p class="text-xs font-semibold text-emerald-700">动态流</p>
+                          <h3 class="text-lg font-semibold text-slate-950">发现</h3>
+                        </div>
+                        <a href="#app-compose" class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-700 text-white" title="发布动态" data-feature="app-compose">
+                          <i data-lucide="plus" class="icon"></i>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div id="feedList" class="space-y-4">
+                      <article class="feed-card rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-content-id="c-3009">
+                        <div class="mb-3 flex items-center gap-3">
+                          <img class="h-10 w-10 rounded-full object-cover" src="https://images.unsplash.com/photo-1502685104226-ee32379fefbe?auto=format&fit=crop&w=120&q=80" alt="用户头像">
+                          <div class="min-w-0">
+                            <div class="truncate text-sm font-semibold text-slate-950">Nora</div>
+                            <div class="text-xs text-slate-500">2 分钟前</div>
+                          </div>
+                        </div>
+                        <p class="mb-3 text-sm leading-6 text-slate-800">今天把第一版内容流跑通了，图片上传和发布后的刷新都很顺。</p>
+                        <div class="grid grid-cols-2 gap-2">
+                          <img class="h-28 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=500&q=80" alt="动态图片">
+                          <img class="h-28 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=500&q=80" alt="动态图片">
+                        </div>
+                      </article>
+
+                      <article class="feed-card rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-content-id="c-3010">
+                        <div class="mb-3 flex items-center gap-3">
+                          <img class="h-10 w-10 rounded-full object-cover" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80" alt="用户头像">
+                          <div class="min-w-0">
+                            <div class="truncate text-sm font-semibold text-slate-950">Leo</div>
+                            <div class="text-xs text-slate-500">18 分钟前</div>
+                          </div>
+                        </div>
+                        <p class="mb-3 text-sm leading-6 text-slate-800">订单状态同步需要能从后台看到完整事件，这样排查支付问题会快很多。</p>
+                        <img class="h-40 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80" alt="订单相关动态图片">
+                      </article>
+                    </div>
+                  </section>
+
+                  <section id="page-app-compose" class="prototype-page p-5" data-page="app-compose" data-feature="app-compose">
+                    <div class="mb-4 flex items-center justify-between">
+                      <a href="#app-feed" class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700" title="返回动态流">
+                        <i data-lucide="chevron-left" class="icon"></i>
+                      </a>
+                      <h3 class="text-lg font-semibold text-slate-950">发布动态</h3>
+                      <button id="publishPostBtn" class="net-sensitive flex h-10 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white" title="发布">
+                        <i data-lucide="send" class="icon-sm"></i>
+                        发布
+                      </button>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                      <textarea id="postText" class="min-h-[156px] w-full resize-none rounded-md border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-emerald-600" maxlength="500">第一版原型确认后，就可以把 PRD 的详细方案和流程图补齐。</textarea>
+                      <div class="mt-2 flex justify-between text-xs text-slate-500">
+                        <span>文字动态</span>
+                        <span id="postCounter">31/500</span>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                      <div class="mb-3 flex items-center justify-between">
+                        <span class="text-sm font-semibold text-slate-900">图片</span>
+                        <span class="text-xs text-slate-500">最多 9 张</span>
+                      </div>
+                      <div id="imageGrid" class="grid grid-cols-3 gap-2">
+                        <button class="image-slot h-24 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700" title="选择图片">
+                          <i data-lucide="image-plus" class="mx-auto icon"></i>
+                        </button>
+                        <img class="h-24 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1498050108023-c5249f4df0852?auto=format&fit=crop&w=300&q=80" alt="待发布图片">
+                        <img class="h-24 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=300&q=80" alt="待发布图片">
+                      </div>
+                    </div>
+
+                    <div id="composeResult" class="mt-4 hidden rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                      发布成功，动态已进入列表。
+                    </div>
+                  </section>
+                </div>
+
+                <nav class="grid grid-cols-3 border-t border-slate-200 bg-white text-xs font-medium text-slate-500">
+                  <a href="#app-feed" class="flex flex-col items-center gap-1 px-2 py-2" data-feature="app-feed">
+                    <i data-lucide="home" class="icon-sm"></i>
+                    动态
+                  </a>
+                  <a href="#app-compose" class="flex flex-col items-center gap-1 px-2 py-2" data-feature="app-compose">
+                    <i data-lucide="square-pen" class="icon-sm"></i>
+                    发布
+                  </a>
+                  <a href="#app-profile" class="flex flex-col items-center gap-1 px-2 py-2" data-feature="app-profile">
+                    <i data-lucide="user" class="icon-sm"></i>
+                    我的
+                  </a>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminColumn" class="space-y-4">
+          <div class="rounded-lg border border-line bg-white p-4 shadow-soft">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase text-blue-700">Admin Console</p>
+                <h2 class="text-base font-semibold text-ink">后台管理系统</h2>
+              </div>
+              <div class="flex items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                <i data-lucide="shield-check" class="icon-sm"></i>
+                单管理员角色
+              </div>
+            </div>
+
+            <div class="admin-screen" data-feature-group="admin">
+              <div class="admin-layout grid min-h-[680px] grid-cols-[230px_minmax(0,1fr)]">
+                <aside class="admin-sidebar border-r border-slate-200 bg-slate-950 p-4 text-white">
+                  <div class="mb-6 flex items-center gap-2">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-md bg-blue-600">
+                      <i data-lucide="server" class="icon-sm"></i>
+                    </div>
+                    <div>
+                      <div class="text-sm font-semibold">Server Admin</div>
+                      <div class="text-xs text-slate-400">local network</div>
+                    </div>
+                  </div>
+                  <nav class="space-y-1 text-sm">
+                    <a href="#admin-users" class="admin-side-link flex items-center gap-2 rounded-md px-3 py-2 text-slate-200 hover:bg-slate-800" data-feature="admin-users"><i data-lucide="users" class="icon-sm"></i>App 用户</a>
+                    <a href="#admin-content" class="admin-side-link flex items-center gap-2 rounded-md px-3 py-2 text-slate-200 hover:bg-slate-800" data-feature="admin-content"><i data-lucide="images" class="icon-sm"></i>动态内容</a>
+                    <a href="#admin-orders" class="admin-side-link flex items-center gap-2 rounded-md px-3 py-2 text-slate-200 hover:bg-slate-800" data-feature="admin-orders"><i data-lucide="receipt-text" class="icon-sm"></i>订单状态</a>
+                    <a href="#admin-configs" class="admin-side-link flex items-center gap-2 rounded-md px-3 py-2 text-slate-200 hover:bg-slate-800" data-feature="admin-configs"><i data-lucide="settings" class="icon-sm"></i>运营配置</a>
+                  </nav>
+                  <div class="admin-api-card mt-8 rounded-lg border border-slate-700 bg-slate-900 p-3">
+                    <div class="text-xs text-slate-400">API base</div>
+                    <div class="mt-1 break-all text-xs font-semibold text-slate-100">/api/v1/admin</div>
+                  </div>
+                </aside>
+
+                <div class="min-w-0 bg-slate-50">
+                  <div class="admin-topbar flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
+                    <div class="flex min-w-0 items-center gap-3">
+                      <div class="relative">
+                        <i data-lucide="search" class="icon-sm absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input class="admin-search-input h-10 w-[280px] max-w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm" placeholder="搜索用户、订单、配置">
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <span class="rounded-md bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">服务正常</span>
+                      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-700">A</div>
+                    </div>
+                  </div>
+
+                  <div class="admin-main-content p-5">
+                    <section id="page-admin-login" class="prototype-page mx-auto max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm" data-page="admin-login" data-feature="admin-login">
+                      <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-white">
+                        <i data-lucide="key-round" class="icon"></i>
+                      </div>
+                      <h3 class="text-xl font-semibold text-slate-950">管理员登录</h3>
+                      <p class="mt-1 text-sm text-slate-500">账号密码登录后台管理系统。</p>
+                      <div class="mt-5 space-y-4">
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-semibold text-slate-500">邮箱</span>
+                          <input class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="admin@example.com">
+                        </label>
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-semibold text-slate-500">密码</span>
+                          <input type="password" class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="password">
+                        </label>
+                        <button id="adminLoginBtn" class="net-sensitive flex h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-700 text-sm font-semibold text-white" title="管理员登录">
+                          <i data-lucide="log-in" class="icon-sm"></i>
+                          登录后台
+                        </button>
+                      </div>
+                    </section>
+
+                    <section id="page-admin-users" class="prototype-page" data-page="admin-users" data-feature="admin-users">
+                      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-xl font-semibold text-slate-950">App 用户管理</h3>
+                          <p class="text-sm text-slate-500">查看设备用户，禁用或软删除异常账号。</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <select id="userStatusFilter" class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm">
+                            <option value="all">全部状态</option>
+                            <option value="normal">正常</option>
+                            <option value="disabled">已禁用</option>
+                          </select>
+                          <button class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700" title="刷新用户">
+                            <i data-lucide="refresh-cw" class="icon-sm"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-3 gap-3">
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                          <div class="text-xs font-semibold text-slate-500">总用户</div>
+                          <div class="mt-1 text-2xl font-semibold text-slate-950">1,248</div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                          <div class="text-xs font-semibold text-slate-500">今日新增</div>
+                          <div class="mt-1 text-2xl font-semibold text-emerald-700">37</div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-4">
+                          <div class="text-xs font-semibold text-slate-500">已禁用</div>
+                          <div id="disabledUserCount" class="mt-1 text-2xl font-semibold text-amber-700">4</div>
+                        </div>
+                      </div>
+
+                      <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                        <table class="w-full min-w-[760px] border-collapse text-left text-sm">
+                          <thead class="bg-slate-100 text-xs font-semibold text-slate-600">
+                            <tr>
+                              <th class="px-4 py-3">用户</th>
+                              <th class="px-4 py-3">设备</th>
+                              <th class="px-4 py-3">状态</th>
+                              <th class="px-4 py-3">动态</th>
+                              <th class="px-4 py-3">创建时间</th>
+                              <th class="px-4 py-3 text-right">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody id="adminUserRows" class="divide-y divide-slate-200">
+                            <tr data-status="normal" data-user-row="Mia">
+                              <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                  <img class="h-9 w-9 rounded-full object-cover" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80" alt="用户头像">
+                                  <div>
+                                    <div class="font-semibold text-slate-950">Mia</div>
+                                    <div class="text-xs text-slate-500">app_user_10027</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td class="px-4 py-3 text-slate-600">ios-8f4c-23a9...</td>
+                              <td class="px-4 py-3"><span class="user-status rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">正常</span></td>
+                              <td class="px-4 py-3 text-slate-600">16</td>
+                              <td class="px-4 py-3 text-slate-600">2026-08-21</td>
+                              <td class="px-4 py-3">
+                                <div class="flex justify-end gap-2">
+                                  <button class="disable-user flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-700" title="禁用用户" data-name="Mia">
+                                    <i data-lucide="ban" class="icon-sm"></i>
+                                  </button>
+                                  <button class="delete-user flex h-9 w-9 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700" title="删除用户" data-name="Mia">
+                                    <i data-lucide="trash-2" class="icon-sm"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            <tr data-status="normal" data-user-row="Leo">
+                              <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                  <img class="h-9 w-9 rounded-full object-cover" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80" alt="用户头像">
+                                  <div>
+                                    <div class="font-semibold text-slate-950">Leo</div>
+                                    <div class="text-xs text-slate-500">app_user_10031</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td class="px-4 py-3 text-slate-600">android-19c2...</td>
+                              <td class="px-4 py-3"><span class="user-status rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">正常</span></td>
+                              <td class="px-4 py-3 text-slate-600">8</td>
+                              <td class="px-4 py-3 text-slate-600">2026-08-20</td>
+                              <td class="px-4 py-3">
+                                <div class="flex justify-end gap-2">
+                                  <button class="disable-user flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-700" title="禁用用户" data-name="Leo">
+                                    <i data-lucide="ban" class="icon-sm"></i>
+                                  </button>
+                                  <button class="delete-user flex h-9 w-9 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700" title="删除用户" data-name="Leo">
+                                    <i data-lucide="trash-2" class="icon-sm"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            <tr data-status="disabled" data-user-row="Kai">
+                              <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                  <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-600">K</div>
+                                  <div>
+                                    <div class="font-semibold text-slate-950">Kai</div>
+                                    <div class="text-xs text-slate-500">app_user_10004</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td class="px-4 py-3 text-slate-600">ios-a7e1-22bb...</td>
+                              <td class="px-4 py-3"><span class="user-status rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">已禁用</span></td>
+                              <td class="px-4 py-3 text-slate-600">3</td>
+                              <td class="px-4 py-3 text-slate-600">2026-08-17</td>
+                              <td class="px-4 py-3">
+                                <div class="flex justify-end gap-2">
+                                  <button class="delete-user flex h-9 w-9 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700" title="删除用户" data-name="Kai">
+                                    <i data-lucide="trash-2" class="icon-sm"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    <section id="page-admin-content" class="prototype-page" data-page="admin-content" data-feature="admin-content">
+                      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-xl font-semibold text-slate-950">动态内容管理</h3>
+                          <p class="text-sm text-slate-500">发布即展示，后台删除后 App 不再返回。</p>
+                        </div>
+                        <button class="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700" title="刷新内容">
+                          <i data-lucide="refresh-cw" class="icon-sm"></i>
+                          刷新
+                        </button>
+                      </div>
+
+                      <div id="contentAdminList" class="grid gap-4 lg:grid-cols-2">
+                        <article class="rounded-lg border border-slate-200 bg-white p-4" data-admin-content-id="c-3009">
+                          <div class="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                              <div class="font-semibold text-slate-950">Nora 的动态</div>
+                              <div class="text-xs text-slate-500">content_id: c-3009 · 2 分钟前</div>
+                            </div>
+                            <span class="rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">展示中</span>
+                          </div>
+                          <p class="text-sm leading-6 text-slate-700">今天把第一版内容流跑通了，图片上传和发布后的刷新都很顺。</p>
+                          <div class="mt-3 grid grid-cols-2 gap-2">
+                            <img class="h-24 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=360&q=80" alt="动态图片">
+                            <img class="h-24 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=360&q=80" alt="动态图片">
+                          </div>
+                          <div class="mt-4 flex justify-end">
+                            <button class="delete-content flex h-9 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700" title="删除动态" data-content-id="c-3009">
+                              <i data-lucide="trash-2" class="icon-sm"></i>
+                              删除
+                            </button>
+                          </div>
+                        </article>
+
+                        <article class="rounded-lg border border-slate-200 bg-white p-4" data-admin-content-id="c-3010">
+                          <div class="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                              <div class="font-semibold text-slate-950">Leo 的动态</div>
+                              <div class="text-xs text-slate-500">content_id: c-3010 · 18 分钟前</div>
+                            </div>
+                            <span class="rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">展示中</span>
+                          </div>
+                          <p class="text-sm leading-6 text-slate-700">订单状态同步需要能从后台看到完整事件，这样排查支付问题会快很多。</p>
+                          <img class="mt-3 h-28 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=520&q=80" alt="订单动态图片">
+                          <div class="mt-4 flex justify-end">
+                            <button class="delete-content flex h-9 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700" title="删除动态" data-content-id="c-3010">
+                              <i data-lucide="trash-2" class="icon-sm"></i>
+                              删除
+                            </button>
+                          </div>
+                        </article>
+                      </div>
+                    </section>
+
+                    <section id="page-admin-orders" class="prototype-page" data-page="admin-orders" data-feature="admin-orders">
+                      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-xl font-semibold text-slate-950">订单状态</h3>
+                          <p class="text-sm text-slate-500">接收 Apple IAP 与 Google Play 通知后更新订单。</p>
+                        </div>
+                        <div class="flex gap-2">
+                          <button id="simulateAppleEvent" class="flex h-10 items-center gap-2 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white" title="模拟 Apple 通知">
+                            <i data-lucide="bell-ring" class="icon-sm"></i>
+                            Apple 通知
+                          </button>
+                          <button id="simulateGoogleEvent" class="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700" title="模拟 Google 通知">
+                            <i data-lucide="bell" class="icon-sm"></i>
+                            Google 通知
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                        <table class="w-full min-w-[780px] border-collapse text-left text-sm">
+                          <thead class="bg-slate-100 text-xs font-semibold text-slate-600">
+                            <tr>
+                              <th class="px-4 py-3">订单</th>
+                              <th class="px-4 py-3">平台</th>
+                              <th class="px-4 py-3">用户</th>
+                              <th class="px-4 py-3">商品</th>
+                              <th class="px-4 py-3">状态</th>
+                              <th class="px-4 py-3">更新时间</th>
+                              <th class="px-4 py-3 text-right">事件</th>
+                            </tr>
+                          </thead>
+                          <tbody id="orderRows" class="divide-y divide-slate-200">
+                            <tr>
+                              <td class="px-4 py-3 font-semibold text-slate-950">ord_9042</td>
+                              <td class="px-4 py-3 text-slate-600">Apple IAP</td>
+                              <td class="px-4 py-3 text-slate-600">app_user_10027</td>
+                              <td class="px-4 py-3 text-slate-600">premium_monthly</td>
+                              <td class="px-4 py-3"><span id="appleOrderStatus" class="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">待确认</span></td>
+                              <td id="appleOrderTime" class="px-4 py-3 text-slate-600">09:12</td>
+                              <td class="px-4 py-3 text-right">
+                                <button class="open-events h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700" title="查看事件" data-platform="Apple">查看</button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td class="px-4 py-3 font-semibold text-slate-950">ord_9043</td>
+                              <td class="px-4 py-3 text-slate-600">Google Play</td>
+                              <td class="px-4 py-3 text-slate-600">app_user_10031</td>
+                              <td class="px-4 py-3 text-slate-600">coin_pack_01</td>
+                              <td class="px-4 py-3"><span id="googleOrderStatus" class="rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">已支付</span></td>
+                              <td id="googleOrderTime" class="px-4 py-3 text-slate-600">09:08</td>
+                              <td class="px-4 py-3 text-right">
+                                <button class="open-events h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700" title="查看事件" data-platform="Google">查看</button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                        <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                          <i data-lucide="activity" class="icon-sm text-blue-700"></i>
+                          事件记录
+                        </div>
+                        <div id="orderEventLog" class="space-y-2 text-sm text-slate-600">
+                          <div class="rounded-md bg-slate-50 px-3 py-2">Google Play 通知已处理：ord_9043 -> 已支付</div>
+                          <div class="rounded-md bg-slate-50 px-3 py-2">Apple IAP 通知等待校验：ord_9042 -> 待确认</div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section id="page-admin-configs" class="prototype-page" data-page="admin-configs" data-feature="admin-configs">
+                      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-xl font-semibold text-slate-950">运营配置</h3>
+                          <p class="text-sm text-slate-500">App 启动时拉取所有启用的 key-value 配置。</p>
+                        </div>
+                        <button id="addConfigBtn" class="flex h-10 items-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-semibold text-white" title="新增配置">
+                          <i data-lucide="plus" class="icon-sm"></i>
+                          新增配置
+                        </button>
+                      </div>
+
+                      <div class="grid gap-3">
+                        <div class="config-row rounded-lg border border-slate-200 bg-white p-4" data-key="feed_page_size">
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div class="font-semibold text-slate-950">feed_page_size</div>
+                              <div class="text-sm text-slate-500">动态流每页数量</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                              <span class="config-value rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-800">20</span>
+                              <button class="toggle-config relative h-6 w-11 rounded-full bg-blue-600" title="启停配置" aria-label="启停配置">
+                                <span class="absolute right-1 top-1 h-4 w-4 rounded-full bg-white"></span>
+                              </button>
+                              <button class="edit-config flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-700" title="编辑配置" data-key="feed_page_size" data-value="20">
+                                <i data-lucide="pencil" class="icon-sm"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="config-row rounded-lg border border-slate-200 bg-white p-4" data-key="upload_image_max_mb">
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div class="font-semibold text-slate-950">upload_image_max_mb</div>
+                              <div class="text-sm text-slate-500">单张图片大小上限</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                              <span class="config-value rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-800">8</span>
+                              <button class="toggle-config relative h-6 w-11 rounded-full bg-blue-600" title="启停配置" aria-label="启停配置">
+                                <span class="absolute right-1 top-1 h-4 w-4 rounded-full bg-white"></span>
+                              </button>
+                              <button class="edit-config flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-700" title="编辑配置" data-key="upload_image_max_mb" data-value="8">
+                                <i data-lucide="pencil" class="icon-sm"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="config-row rounded-lg border border-slate-200 bg-white p-4 opacity-70" data-key="maintenance_notice">
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div class="font-semibold text-slate-950">maintenance_notice</div>
+                              <div class="text-sm text-slate-500">维护公告</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                              <span class="config-value rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-800">关闭</span>
+                              <button class="toggle-config relative h-6 w-11 rounded-full bg-slate-300" title="启停配置" aria-label="启停配置">
+                                <span class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
+                              </button>
+                              <button class="edit-config flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-700" title="编辑配置" data-key="maintenance_notice" data-value="关闭">
+                                <i data-lucide="pencil" class="icon-sm"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                        <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                          <i data-lucide="smartphone" class="icon-sm"></i>
+                          App 启动返回示例
+                        </div>
+                        <pre id="configPayload" class="overflow-auto rounded-md bg-white p-3 text-xs leading-5 text-slate-800">{
+  "feed_page_size": 20,
+  "upload_image_max_mb": 8
+}</pre>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="confirmModal" class="modal-backdrop">
+      <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-soft">
+        <div class="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-red-50 text-red-700">
+          <i data-lucide="triangle-alert" class="icon"></i>
+        </div>
+        <h3 id="modalTitle" class="text-lg font-semibold text-slate-950">确认操作</h3>
+        <p id="modalBody" class="mt-2 text-sm leading-6 text-slate-600">该操作会立即影响 App 端展示。</p>
+        <div class="mt-5 flex justify-end gap-2">
+          <button id="modalCancel" class="h-10 rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700">取消</button>
+          <button id="modalConfirm" class="h-10 rounded-md bg-red-700 px-4 text-sm font-semibold text-white">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <aside id="configDrawer" class="drawer fixed bottom-0 right-0 top-0 z-[85] w-full max-w-md border-l border-slate-200 bg-white p-5 shadow-soft">
+      <div class="mb-5 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-blue-700">配置编辑</p>
+          <h3 class="text-lg font-semibold text-slate-950">key-value</h3>
+        </div>
+        <button id="closeDrawer" class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300" title="关闭">
+          <i data-lucide="x" class="icon"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-slate-500">Key</span>
+          <input id="drawerKey" class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="feed_page_size">
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-slate-500">Value</span>
+          <input id="drawerValue" class="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm" value="20">
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-slate-500">说明</span>
+          <textarea id="drawerDesc" class="min-h-28 w-full resize-none rounded-md border border-slate-300 px-3 py-2.5 text-sm">动态流每页数量</textarea>
+        </label>
+        <button id="saveConfigBtn" class="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-700 text-sm font-semibold text-white">
+          <i data-lucide="save" class="icon-sm"></i>
+          保存配置
+        </button>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast px-4 py-3 text-sm font-semibold"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    const pageLabels = {
+      'app-login': '设备号登录',
+      'app-profile': '资料修改',
+      'app-feed': '动态流',
+      'app-compose': '发布动态',
+      'admin-login': '后台登录',
+      'admin-users': '用户管理',
+      'admin-content': '内容管理',
+      'admin-orders': '订单状态',
+      'admin-configs': '运营配置'
+    };
+
+    const routeModes = {
+      'app-login': 'app',
+      'app-profile': 'app',
+      'app-feed': 'app',
+      'app-compose': 'app',
+      'admin-login': 'admin',
+      'admin-users': 'admin',
+      'admin-content': 'admin',
+      'admin-orders': 'admin',
+      'admin-configs': 'admin'
+    };
+
+    let pendingAction = null;
+
+    function getCurrentPage() {
+      const hash = window.location.hash.replace('#', '');
+      if (hash && pageLabels[hash]) return hash;
+      return focus && pageLabels[focus] ? focus : 'app-feed';
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast px-4 py-3 text-sm font-semibold show';
+      if (type === 'error') {
+        toast.style.background = '#fef2f2';
+        toast.style.borderColor = '#fecaca';
+        toast.style.color = '#991b1b';
+      } else {
+        toast.style.background = '#f0fdf4';
+        toast.style.borderColor = '#bbf7d0';
+        toast.style.color = '#166534';
+      }
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function route() {
+      const page = getCurrentPage();
+      const mode = routeModes[page];
+
+      document.querySelectorAll('.prototype-page').forEach((el) => {
+        el.classList.toggle('active', el.dataset.page === page);
+      });
+
+      document.querySelectorAll('.nav-link').forEach((link) => {
+        const target = link.getAttribute('href').replace('#', '');
+        link.classList.toggle('active', target === page);
+      });
+
+      document.querySelectorAll('.admin-side-link').forEach((link) => {
+        const target = link.getAttribute('href').replace('#', '');
+        link.classList.toggle('bg-slate-800', target === page);
+        link.classList.toggle('text-white', target === page);
+      });
+
+      document.querySelectorAll('.mode-tab').forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.mode === mode);
+      });
+
+      const appColumn = document.getElementById('appColumn');
+      const adminColumn = document.getElementById('adminColumn');
+      document.getElementById('workspaceGrid').classList.add('single-mode');
+      appColumn.classList.toggle('hidden', mode !== 'app');
+      adminColumn.classList.toggle('hidden', mode !== 'admin');
+      appColumn.classList.remove('focus-disabled');
+      adminColumn.classList.remove('focus-disabled');
+
+      if (focus) applyFocusMode();
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function applyFocusMode() {
+      document.body.classList.add('focus-mode');
+      document.getElementById('focusName').textContent = pageLabels[focus] || focus;
+      document.getElementById('exitFocus').href = `#${focus}`;
+
+      document.querySelectorAll('[data-feature]').forEach((el) => {
+        const feature = el.dataset.feature;
+        const allowed = feature === focus || feature === `global-${routeModes[focus]}` || el.dataset.global === 'true';
+        el.classList.toggle('focus-disabled', !allowed);
+      });
+
+      document.querySelectorAll('[data-feature-group]').forEach((el) => {
+        const group = el.dataset.featureGroup;
+        el.classList.toggle('focus-disabled', routeModes[focus] !== group);
+      });
+    }
+
+    function openConfirm(title, body, action) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').textContent = body;
+      pendingAction = action;
+      document.getElementById('confirmModal').classList.add('show');
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirmModal').classList.remove('show');
+      pendingAction = null;
+    }
+
+    function syncPostCounter() {
+      const value = document.getElementById('postText').value;
+      document.getElementById('postCounter').textContent = `${value.length}/500`;
+    }
+
+    function appendNewFeedPost() {
+      const feedList = document.getElementById('feedList');
+      const existing = document.querySelector('[data-content-id="c-new"]');
+      if (existing) return;
+      const article = document.createElement('article');
+      article.className = 'feed-card rounded-lg border border-emerald-200 bg-white p-4 shadow-sm';
+      article.dataset.contentId = 'c-new';
+      article.innerHTML = `
+        <div class="mb-3 flex items-center gap-3">
+          <img class="h-10 w-10 rounded-full object-cover" src="${document.getElementById('avatarPreview').src}" alt="用户头像">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold text-slate-950">${document.getElementById('profileNameLabel').textContent}</div>
+            <div class="text-xs text-slate-500">刚刚</div>
+          </div>
+        </div>
+        <p class="mb-3 text-sm leading-6 text-slate-800">${document.getElementById('postText').value}</p>
+        <div class="grid grid-cols-2 gap-2">
+          <img class="h-28 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1498050108023-c5249f4df0852?auto=format&fit=crop&w=500&q=80" alt="动态图片">
+          <img class="h-28 w-full rounded-md object-cover" src="https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=500&q=80" alt="动态图片">
+        </div>`;
+      feedList.prepend(article);
+      applyImageFallbacks();
+    }
+
+    function updateConfigPayload() {
+      const payload = {};
+      document.querySelectorAll('.config-row').forEach((row) => {
+        const toggle = row.querySelector('.toggle-config');
+        const enabled = toggle.classList.contains('bg-blue-600');
+        if (!enabled) return;
+        const key = row.dataset.key;
+        const raw = row.querySelector('.config-value').textContent.trim();
+        const numberValue = Number(raw);
+        payload[key] = Number.isNaN(numberValue) ? raw : numberValue;
+      });
+      document.getElementById('configPayload').textContent = JSON.stringify(payload, null, 2);
+    }
+
+    function fallbackImage(index) {
+      const palettes = [
+        ['#0f766e', '#d1fae5', '#99f6e4'],
+        ['#1d4ed8', '#dbeafe', '#bfdbfe'],
+        ['#b45309', '#fef3c7', '#fde68a'],
+        ['#be123c', '#ffe4e6', '#fecdd3']
+      ];
+      const p = palettes[index % palettes.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420"><rect width="600" height="420" fill="${p[1]}"/><circle cx="94" cy="82" r="44" fill="${p[2]}"/><rect x="80" y="250" width="440" height="52" rx="8" fill="${p[0]}" opacity=".18"/><rect x="120" y="322" width="330" height="32" rx="8" fill="${p[0]}" opacity=".26"/><path d="M0 326 132 210c24-21 58-21 82 0l50 44 72-82c28-32 78-30 104 4l160 206v38H0Z" fill="${p[0]}" opacity=".32"/></svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function applyImageFallbacks() {
+      document.querySelectorAll('img').forEach((img, index) => {
+        if (img.dataset.fallbackBound) return;
+        img.dataset.fallbackBound = 'true';
+        const onFail = () => {
+          img.onerror = null;
+          img.alt = '';
+          img.src = fallbackImage(index);
+        };
+        img.addEventListener('error', onFail);
+        if (img.complete && img.naturalWidth === 0) onFail();
+      });
+    }
+
+    function bindEvents() {
+      document.getElementById('networkToggle').addEventListener('click', () => {
+        const offline = document.body.classList.toggle('state-offline');
+        const label = document.getElementById('networkLabel');
+        label.textContent = offline ? '模拟断网' : '网络正常';
+        showToast(offline ? '已切换为断网状态，网络请求按钮被锁定' : '网络已恢复');
+      });
+
+      document.getElementById('deviceLoginBtn').addEventListener('click', () => {
+        document.getElementById('loginStateBadge').textContent = '已登录';
+        document.getElementById('loginStateBadge').className = 'rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700';
+        document.getElementById('loginUserId').textContent = 'app_user_10027';
+        document.getElementById('loginDeviceState').textContent = '已绑定';
+        document.getElementById('loginConfigState').textContent = '已拉取';
+        showToast('设备号登录成功，已返回长期 token');
+      });
+
+      document.getElementById('avatarUploadBtn').addEventListener('click', () => {
+        const nextAvatar = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=160&q=80';
+        document.getElementById('avatarPreview').src = nextAvatar;
+        showToast('头像已选择，保存后生效');
+      });
+
+      document.getElementById('saveProfileBtn').addEventListener('click', () => {
+        const nickname = document.getElementById('nicknameInput').value.trim() || '未命名用户';
+        document.getElementById('profileNameLabel').textContent = nickname;
+        showToast('资料已保存');
+      });
+
+      document.getElementById('postText').addEventListener('input', syncPostCounter);
+      syncPostCounter();
+
+      document.querySelectorAll('.image-slot').forEach((slot) => {
+        slot.addEventListener('click', () => {
+          showToast('图片已加入待发布列表');
+        });
+      });
+
+      document.getElementById('publishPostBtn').addEventListener('click', () => {
+        appendNewFeedPost();
+        document.getElementById('composeResult').classList.remove('hidden');
+        showToast('发布成功，动态已立即展示');
+        window.setTimeout(() => {
+          window.location.hash = 'app-feed';
+        }, 700);
+      });
+
+      document.getElementById('adminLoginBtn').addEventListener('click', () => {
+        showToast('管理员登录成功');
+        window.location.hash = 'admin-users';
+      });
+
+      document.getElementById('userStatusFilter').addEventListener('change', (event) => {
+        const value = event.target.value;
+        document.querySelectorAll('#adminUserRows tr').forEach((row) => {
+          row.style.display = value === 'all' || row.dataset.status === value ? '' : 'none';
+        });
+      });
+
+      document.querySelectorAll('.disable-user').forEach((button) => {
+        button.addEventListener('click', () => {
+          const name = button.dataset.name;
+          openConfirm('禁用 App 用户', `${name} 被禁用后不能继续发布动态，App API 会返回用户禁用状态。`, () => {
+            const row = button.closest('tr');
+            row.dataset.status = 'disabled';
+            const status = row.querySelector('.user-status');
+            status.textContent = '已禁用';
+            status.className = 'user-status rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700';
+            document.getElementById('disabledUserCount').textContent = '5';
+            showToast(`${name} 已禁用`);
+          });
+        });
+      });
+
+      document.querySelectorAll('.delete-user').forEach((button) => {
+        button.addEventListener('click', () => {
+          const name = button.dataset.name;
+          openConfirm('软删除 App 用户', `${name} 将从后台默认列表移除，数据库保留 deleted_at 用于追溯。`, () => {
+            button.closest('tr').remove();
+            showToast(`${name} 已软删除`);
+          });
+        });
+      });
+
+      document.querySelectorAll('.delete-content').forEach((button) => {
+        button.addEventListener('click', () => {
+          const contentId = button.dataset.contentId;
+          openConfirm('删除动态内容', `${contentId} 删除后，App 动态流和详情接口不再返回。`, () => {
+            const adminCard = document.querySelector(`[data-admin-content-id="${contentId}"]`);
+            const feedCard = document.querySelector(`[data-content-id="${contentId}"]`);
+            if (adminCard) adminCard.remove();
+            if (feedCard) feedCard.remove();
+            showToast('动态已删除，App 端不再展示');
+          });
+        });
+      });
+
+      document.getElementById('modalCancel').addEventListener('click', closeConfirm);
+      document.getElementById('modalConfirm').addEventListener('click', () => {
+        if (pendingAction) pendingAction();
+        closeConfirm();
+      });
+      document.getElementById('confirmModal').addEventListener('click', (event) => {
+        if (event.target.id === 'confirmModal') closeConfirm();
+      });
+
+      document.getElementById('simulateAppleEvent').addEventListener('click', () => {
+        const status = document.getElementById('appleOrderStatus');
+        status.textContent = '已支付';
+        status.className = 'rounded-md bg-green-50 px-2 py-1 text-xs font-semibold text-green-700';
+        document.getElementById('appleOrderTime').textContent = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('orderEventLog').insertAdjacentHTML('afterbegin', '<div class="rounded-md bg-green-50 px-3 py-2 text-green-800">Apple IAP 通知已处理：ord_9042 -> 已支付</div>');
+        showToast('Apple IAP 通知处理完成');
+      });
+
+      document.getElementById('simulateGoogleEvent').addEventListener('click', () => {
+        document.getElementById('googleOrderTime').textContent = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('orderEventLog').insertAdjacentHTML('afterbegin', '<div class="rounded-md bg-blue-50 px-3 py-2 text-blue-800">Google Play 重复通知已幂等处理：ord_9043 状态保持已支付</div>');
+        showToast('重复通知已幂等处理');
+      });
+
+      document.querySelectorAll('.open-events').forEach((button) => {
+        button.addEventListener('click', () => {
+          showToast(`${button.dataset.platform} 事件记录已展开`);
+        });
+      });
+
+      document.querySelectorAll('.toggle-config').forEach((button) => {
+        button.addEventListener('click', () => {
+          const enabled = button.classList.toggle('bg-blue-600');
+          button.classList.toggle('bg-slate-300', !enabled);
+          const knob = button.querySelector('span');
+          knob.className = `absolute top-1 h-4 w-4 rounded-full bg-white ${enabled ? 'right-1' : 'left-1'}`;
+          button.closest('.config-row').classList.toggle('opacity-70', !enabled);
+          updateConfigPayload();
+          showToast(enabled ? '配置已启用' : '配置已停用');
+        });
+      });
+
+      document.getElementById('addConfigBtn').addEventListener('click', () => {
+        document.getElementById('drawerKey').value = 'new_feature_enabled';
+        document.getElementById('drawerValue').value = 'true';
+        document.getElementById('drawerDesc').value = '新功能开关';
+        document.getElementById('configDrawer').classList.add('open');
+      });
+
+      document.querySelectorAll('.edit-config').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.getElementById('drawerKey').value = button.dataset.key;
+          document.getElementById('drawerValue').value = button.closest('.config-row').querySelector('.config-value').textContent.trim();
+          document.getElementById('drawerDesc').value = button.closest('.config-row').querySelector('.text-sm').textContent.trim();
+          document.getElementById('configDrawer').classList.add('open');
+        });
+      });
+
+      document.getElementById('closeDrawer').addEventListener('click', () => {
+        document.getElementById('configDrawer').classList.remove('open');
+      });
+
+      document.getElementById('saveConfigBtn').addEventListener('click', () => {
+        const key = document.getElementById('drawerKey').value.trim();
+        const value = document.getElementById('drawerValue').value.trim();
+        let row = document.querySelector(`.config-row[data-key="${key}"]`);
+        if (!row) {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = `
+            <div class="config-row rounded-lg border border-slate-200 bg-white p-4" data-key="${key}">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="font-semibold text-slate-950">${key}</div>
+                  <div class="text-sm text-slate-500">${document.getElementById('drawerDesc').value.trim()}</div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="config-value rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-800">${value}</span>
+                  <button class="toggle-config relative h-6 w-11 rounded-full bg-blue-600" title="启停配置" aria-label="启停配置"><span class="absolute right-1 top-1 h-4 w-4 rounded-full bg-white"></span></button>
+                  <button class="edit-config flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-700" title="编辑配置" data-key="${key}" data-value="${value}"><i data-lucide="pencil" class="icon-sm"></i></button>
+                </div>
+              </div>
+            </div>`;
+          document.querySelector('#page-admin-configs .grid.gap-3').appendChild(wrapper.firstElementChild);
+          bindDynamicConfigButtons();
+        } else {
+          row.querySelector('.config-value').textContent = value;
+        }
+        updateConfigPayload();
+        document.getElementById('configDrawer').classList.remove('open');
+        showToast('配置已保存，App 启动接口将返回最新值');
+        if (window.lucide) window.lucide.createIcons();
+      });
+    }
+
+    function bindDynamicConfigButtons() {
+      document.querySelectorAll('.toggle-config:not([data-bound])').forEach((button) => {
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+          const enabled = button.classList.toggle('bg-blue-600');
+          button.classList.toggle('bg-slate-300', !enabled);
+          const knob = button.querySelector('span');
+          knob.className = `absolute top-1 h-4 w-4 rounded-full bg-white ${enabled ? 'right-1' : 'left-1'}`;
+          button.closest('.config-row').classList.toggle('opacity-70', !enabled);
+          updateConfigPayload();
+          showToast(enabled ? '配置已启用' : '配置已停用');
+        });
+      });
+
+      document.querySelectorAll('.edit-config:not([data-bound])').forEach((button) => {
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+          document.getElementById('drawerKey').value = button.dataset.key;
+          document.getElementById('drawerValue').value = button.closest('.config-row').querySelector('.config-value').textContent.trim();
+          document.getElementById('drawerDesc').value = button.closest('.config-row').querySelector('.text-sm').textContent.trim();
+          document.getElementById('configDrawer').classList.add('open');
+        });
+      });
+    }
+
+    window.addEventListener('hashchange', route);
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.location.hash) {
+        window.location.hash = focus && pageLabels[focus] ? focus : 'app-feed';
+      }
+      bindEvents();
+      route();
+      updateConfigPayload();
+      applyImageFallbacks();
+      window.setTimeout(applyImageFallbacks, 1200);
+      if (window.lucide) window.lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
