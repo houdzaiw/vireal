@@ -1,8 +1,11 @@
+import base64
 import threading
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, Protocol
+from urllib.parse import unquote
 
 import httpx
 from sqlmodel import Session
@@ -11,6 +14,7 @@ from app import crud
 from app.core.config import settings
 from app.core.db import engine
 from app.models import AppGeneration
+from app.services.storage import detect_image_type, get_local_upload_root
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,8 @@ class AIGenerationProvider(Protocol):
 class LocalAIGenerationProvider:
     def generate(self, generation: AppGeneration) -> AIGenerationResult:
         time.sleep(settings.APP_GENERATION_LOCAL_DELAY_SECONDS)
+        if generation.kind == "video":
+            return AIGenerationResult()
         return AIGenerationResult(
             output_url=(
                 generation.reference_image_url or generation.character_image_url
@@ -144,10 +150,18 @@ class ArkAIGenerationProvider:
             f"人物一致性：{consistency_text}"
         )
 
-    def _build_video_content(self, generation: AppGeneration) -> list[dict[str, str]]:
-        content = [{"type": "text", "text": self._build_prompt(generation)}]
+    def _build_video_content(self, generation: AppGeneration) -> list[dict[str, Any]]:
+        content: list[dict[str, Any]] = [
+            {"type": "text", "text": self._build_prompt(generation)}
+        ]
         for image_url in self._generation_image_urls(generation):
-            content.append({"type": "image_url", "image_url": image_url})
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image_url},
+                    "role": "reference_image",
+                }
+            )
         return content
 
     def _generation_image_urls(self, generation: AppGeneration) -> list[str]:
@@ -167,9 +181,34 @@ class ArkAIGenerationProvider:
             return url
         if url.startswith("/uploads/") and settings.APP_PUBLIC_BASE_URL:
             return f"{settings.APP_PUBLIC_BASE_URL.rstrip('/')}{url}"
+        if url.startswith("/uploads/"):
+            return self._local_upload_data_url(url)
         raise AIGenerationProviderError(
             "APP_PUBLIC_BASE_URL is required for local upload references in ark mode"
         )
+
+    @staticmethod
+    def _local_upload_data_url(url: str) -> str:
+        upload_root = get_local_upload_root().resolve()
+        relative_upload_path = Path(unquote(url.removeprefix("/uploads/")))
+        if relative_upload_path.is_absolute() or ".." in relative_upload_path.parts:
+            raise AIGenerationProviderError("Invalid local upload URL")
+
+        upload_path = (upload_root / relative_upload_path).resolve()
+        try:
+            upload_path.relative_to(upload_root)
+        except ValueError as exc:
+            raise AIGenerationProviderError("Invalid local upload URL") from exc
+        if not upload_path.is_file():
+            raise AIGenerationProviderError("Local uploaded image file does not exist")
+
+        content = upload_path.read_bytes()
+        detected = detect_image_type(content)
+        if detected is None:
+            raise AIGenerationProviderError("Local uploaded file must be an image")
+        content_type, _extension = detected
+        encoded = base64.b64encode(content).decode("ascii")
+        return f"data:{content_type};base64,{encoded}"
 
     def _request_json(
         self,

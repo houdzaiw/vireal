@@ -346,11 +346,17 @@ function generationKind(kind: string): GenerationKind {
 }
 
 function generationToWork(generation: AppGenerationPublic): WorkItem {
-  const imageUrl =
-    generation.output_url ||
-    generation.reference_image_url ||
-    generation.character_image_url ||
-    undefined
+  const outputUrl = generation.output_url
+    ? getMediaUrl(generation.output_url)
+    : undefined
+  const fallbackImageUrl =
+    generation.kind === "image"
+      ? generation.reference_image_url ||
+        generation.character_image_url ||
+        undefined
+      : undefined
+  const previewUrl =
+    outputUrl ?? (fallbackImageUrl && getMediaUrl(fallbackImageUrl))
 
   return {
     id: generation.id,
@@ -363,8 +369,8 @@ function generationToWork(generation: AppGenerationPublic): WorkItem {
     durationSeconds: generation.duration_seconds ?? undefined,
     consistency: generation.consistency,
     createdAt: generation.created_at ?? new Date().toISOString(),
-    outputUrl: imageUrl ? getMediaUrl(imageUrl) : undefined,
-    previewUrl: imageUrl ? getMediaUrl(imageUrl) : undefined,
+    outputUrl,
+    previewUrl,
     uploadedImageUrls: [
       generation.reference_image_url,
       generation.character_image_url,
@@ -522,14 +528,18 @@ function H5AiGenerator() {
   async function publishWorkAsContent(
     work: WorkItem,
     token: string,
-    uploadedImageUrls: string[],
+    outputImageUrl?: string | null,
   ) {
+    if (work.kind !== "image" || !outputImageUrl?.startsWith("/uploads/")) {
+      return
+    }
+
     try {
       await AppContentsService.createContent({
         auth: () => token,
         body: {
           text: `${kindLabel(work.kind)}生成：${work.prompt}`,
-          image_urls: uploadedImageUrls,
+          image_urls: [outputImageUrl],
         },
       })
     } catch {
@@ -579,7 +589,11 @@ function H5AiGenerator() {
         ...currentWorks.filter((work) => work.id !== nextWork.id),
       ])
       setActiveTab("works")
-      void publishWorkAsContent(nextWork, token, uploadedImageUrls)
+      void publishWorkAsContent(
+        nextWork,
+        token,
+        generationResponse.data.output_url,
+      )
       void refreshAppState(token)
     } catch (error) {
       const detail = getErrorDetail(error)
@@ -1246,6 +1260,7 @@ function WorkCard({
   work: WorkItem
 }) {
   const Icon = work.kind === "video" ? Film : ImageIcon
+  const hasVideoOutput = work.kind === "video" && work.outputUrl
   const statusText =
     work.status === "processing"
       ? "生成中"
@@ -1256,7 +1271,17 @@ function WorkCard({
   return (
     <article className="overflow-hidden rounded-[8px] border border-white/10 bg-[#151a18]">
       <div className="relative aspect-[4/5] bg-[#0e1312]">
-        {work.previewUrl ? (
+        {hasVideoOutput ? (
+          <video
+            autoPlay
+            className="absolute inset-0 size-full object-cover opacity-85"
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            src={work.outputUrl}
+          />
+        ) : work.previewUrl ? (
           <img
             alt=""
             className="absolute inset-0 size-full object-cover opacity-85"
