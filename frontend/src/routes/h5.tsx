@@ -473,6 +473,8 @@ function H5AiGenerator() {
   async function loginWithProvider(provider: LoginProvider) {
     if (loginLoading) return
     setLoginLoading(provider)
+    let nextGenerateKind: GenerationKind | null = null
+    let nextToken: string | null = null
     try {
       const response = await AppAuthService.deviceLogin({
         body: {
@@ -491,14 +493,18 @@ function H5AiGenerator() {
       toast.success("登录成功")
 
       if (pendingGenerateKind) {
-        const targetKind = pendingGenerateKind
+        nextGenerateKind = pendingGenerateKind
+        nextToken = response.data.access_token
         setPendingGenerateKind(null)
-        await generateWork(targetKind, response.data.access_token)
       }
     } catch {
       toast.error("登录失败，请稍后重试")
     } finally {
       setLoginLoading(null)
+    }
+
+    if (nextGenerateKind && nextToken) {
+      await generateWork(nextGenerateKind, nextToken)
     }
   }
 
@@ -654,22 +660,14 @@ function H5AiGenerator() {
   }
 
   function handleDownloadWork(work: WorkItem) {
-    const anchor = document.createElement("a")
-    if (work.outputUrl) {
-      anchor.href = work.outputUrl
-      anchor.download = `vireal-${work.kind}-${work.id}`
-    } else {
-      const blob = new Blob(
-        [
-          `Vireal ${work.model}\n类型：${kindLabel(work.kind)}\n描述：${
-            work.prompt
-          }\n风格：${work.style}\n比例：${work.aspectRatio}`,
-        ],
-        { type: "text/plain;charset=utf-8" },
-      )
-      anchor.href = URL.createObjectURL(blob)
-      anchor.download = `vireal-${work.kind}-${work.id}.txt`
+    if (!work.outputUrl) {
+      toast.error("作品还没有可下载的媒体文件")
+      return
     }
+
+    const anchor = document.createElement("a")
+    anchor.href = work.outputUrl
+    anchor.download = `vireal-${work.kind}-${work.id}`
     document.body.append(anchor)
     anchor.click()
     anchor.remove()
