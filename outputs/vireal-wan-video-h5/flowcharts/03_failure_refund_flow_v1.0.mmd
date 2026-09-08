@@ -1,0 +1,34 @@
+flowchart TD
+    task([任务处理中])
+    failed{失败类型?}
+    retryable{允许系统重试?}
+    retry[同一任务内部重试]
+    success{重试成功?}
+    markSuccess[标记生成成功]
+    finalFail[标记最终失败]
+    refunded{返还流水已存在?}
+    createRefund[原子写入返还流水]
+    keepRefund[保持原余额]
+    notify[作品记录展示失败原因]
+    done([流程结束])
+
+    task --> failed
+    failed -->|网络或限流| retryable
+    failed -->|内容或参数| finalFail
+    retryable -->|是| retry
+    retryable -->|否| finalFail
+    retry --> success
+    success -->|是| markSuccess
+    success -->|否| finalFail
+    markSuccess --> done
+    finalFail --> refunded
+    refunded -->|否| createRefund
+    refunded -->|是| keepRefund
+    createRefund --> notify
+    keepRefund --> notify
+    notify --> done
+
+    style finalFail fill:#FFCDC2,stroke:#FF7556
+    style createRefund fill:#CDF4D3,stroke:#66D575
+    style keepRefund fill:#FFECBD,stroke:#FFC943
+

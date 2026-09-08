@@ -1,0 +1,44 @@
+flowchart LR
+    subgraph client ["Client Apps"]
+        h5[Responsive H5]
+        admin[Admin Console]
+    end
+    subgraph gateway ["API Layer"]
+        edge[CDN and API Gateway]
+    end
+    subgraph service ["Core Services"]
+        app[FastAPI App]
+        worker[Generation Worker]
+        cleanup[Cleanup Scheduler]
+    end
+    subgraph datastore ["Data Stores"]
+        postgres[PostgreSQL]
+        oss[Singapore OSS]
+    end
+    subgraph external ["External Services"]
+        oauth[Apple and Google]
+        paypal[PayPal Business]
+        wan[Model Studio Wan]
+        email[Email OTP]
+    end
+    subgraph async ["Async Infrastructure"]
+        queue[Task Queue]
+    end
+
+    h5 -->|"HTTPS"| edge
+    admin -->|"HTTPS"| edge
+    edge -->|"Routes API"| app
+    app -->|"Reads and writes"| postgres
+    app -->|"Stores media"| oss
+    app -.->|"Produces tasks"| queue
+    queue -.->|"Delivers tasks"| worker
+    worker -->|"Updates tasks"| postgres
+    worker -->|"Stores results"| oss
+    app -->|"Schedules purge"| cleanup
+    cleanup -->|"Deletes media"| oss
+    cleanup -->|"Updates expiry"| postgres
+    app -.->|"OAuth: Sign in"| oauth
+    app -.->|"PayPal: Checkout"| paypal
+    app -.->|"Email: Send OTP"| email
+    worker -.->|"Wan: Generate"| wan
+
