@@ -18,7 +18,7 @@ flowchart LR
     subgraph external ["External Services"]
         oauth[Apple and Google]
         paypal[PayPal Business]
-        wan[Model Studio Wan]
+        replicate[Replicate Video Models]
         email[Email OTP]
     end
     subgraph async ["Async Infrastructure"]
@@ -40,5 +40,5 @@ flowchart LR
     app -.->|"OAuth: Sign in"| oauth
     app -.->|"PayPal: Checkout"| paypal
     app -.->|"Email: Send OTP"| email
-    worker -.->|"Wan: Generate"| wan
-
+    worker -.->|"Create and query predictions"| replicate
+    replicate -.->|"Completed webhook"| app

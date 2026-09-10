@@ -198,10 +198,10 @@
         </div>
         <div class="eyebrow">Vireal · Image to Video</div>
         <h1>真人图片动作视频生成</h1>
-        <p>用户上传一至两张已获授权的成年人全身照片，选择固定动作模板，以阿里云 Model Studio / Wan 生成仅自己可见、24 小时内可播放和下载的视频。</p>
+        <p>用户上传一至两张已获授权的成年人全身照片，选择固定动作模板，通过 Replicate 视频模型生成仅自己可见、24 小时内可播放和下载的视频。</p>
         <div class="hero-meta">
           <span class="pill">PRD v1.0</span>
-          <span class="pill">2026-09-09</span>
+          <span class="pill">2026-09-10</span>
           <span class="pill">新加坡区域</span>
           <span class="pill">Web / H5 First</span>
         </div>
@@ -215,7 +215,7 @@
             <tbody>
               <tr><th>项目名称</th><td>Vireal Wan Video H5</td><th>文档版本</th><td>v1.0 最终版</td></tr>
               <tr><th>产品形态</th><td>响应式 Web / H5</td><th>目标市场</th><td>中国大陆以外市场，重点覆盖新加坡、马来西亚及海外华人</td></tr>
-              <tr><th>基础设施</th><td>Alibaba Cloud Singapore：Model Studio + OSS</td><th>商业模式</th><td>免费赠送金币 + PayPal Business 美元购买金币包</td></tr>
+              <tr><th>基础设施</th><td>Singapore App/OSS + Replicate Predictions API</td><th>商业模式</th><td>免费赠送金币 + PayPal Business 美元购买金币包</td></tr>
               <tr><th>当前项目</th><td>复用 Vireal FastAPI、PostgreSQL/SQLModel、React/Vite 与管理后台基础</td><th>文档状态</th><td>PRD 与原型已确认，可进入 PoC 与技术设计</td></tr>
             </tbody>
           </table>
@@ -224,7 +224,7 @@
           <table>
             <thead><tr><th>版本</th><th>日期</th><th>变更内容</th><th>状态</th></tr></thead>
             <tbody>
-              <tr><td>v1.0</td><td>2026-09-09</td><td>确认国际版范围；完成高保真原型、六份 Mermaid 流程图、功能交互切片、异常分支及交付验收口径。</td><td><span class="badge on">已确认</span></td></tr>
+              <tr><td>v1.0</td><td>2026-09-10</td><td>确认国际版范围与 Replicate 供应商迁移；完成高保真原型、六份 Mermaid 流程图、功能交互切片、异常分支及交付验收口径。</td><td><span class="badge on">已确认</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -257,7 +257,7 @@
         </div>
 
         <h3>1.2 为什么现在做</h3>
-        <p>Model Studio 当前已提供多主体参考视频生成和图片到动作能力：`wan2.7-r2v` 可同时引用多个独立人物素材；`wan2.2-animate-move` 可把固定动作视频迁移到单张人物图片。两类能力组合后，可以用固定模板降低用户学习成本，并通过后台调优提示词与参考视频逐步提高成功率。</p>
+        <p>Replicate 当前提供 Wan 2.7 R2V、Seedance 2.0 和 Wan 2.2 Animate：前两者作为双人参考图候选，后者把固定动作视频迁移到单张人物图片。Wan R2V 最长 10 秒且多主体效果必须实测；双人 15 秒仅在 Seedance PoC 通过后开放。</p>
 
         <h3>1.3 产品定位</h3>
         <p><strong>一句话定位：</strong>面向海外个人用户的私密真人照片动作视频生成工具。</p>
@@ -346,12 +346,12 @@
               <tr><td>账户</td><td>Apple、Google、邮箱验证码</td><td><span class="badge p0">P0</span></td><td>iPhone 将 Apple 排第一，Android 将 Google 排第一，但始终可选择其他方式；邮箱验证码短时有效且限制频率。</td><td>OAuth/OTP → Backend Auth → App User + Session</td></tr>
               <tr><td>账户</td><td>账号归并</td><td><span class="badge p0">P0</span></td><td>只有第三方返回“已验证邮箱”时才自动匹配；冲突时要求用户验证原账户，避免接管。</td><td>Identity Provider → Linked Identity → App User</td></tr>
               <tr><td>模板</td><td>动作模板列表</td><td><span class="badge p0">P0</span></td><td>拥抱、牵手、跳舞、俯卧撑开放；亲吻通过 feature flag 关闭并标记 Coming later。</td><td>Admin Config → Public Template API → H5</td></tr>
-              <tr><td>素材</td><td>图片上传与质检</td><td><span class="badge p0">P0</span></td><td>单人模板1张，双人模板2张；每张仅1名成年人、全身清晰、无遮挡。格式、大小、分辨率满足 Wan API。</td><td>H5 → Backend Signed Upload → OSS → Moderation/Quality Check</td></tr>
+              <tr><td>素材</td><td>图片上传与质检</td><td><span class="badge p0">P0</span></td><td>单人模板1张，双人模板2张；每张仅1名成年人、全身清晰、无遮挡。格式、大小、分辨率满足所选 Replicate 模型。</td><td>H5 → Backend Signed Upload → OSS → Moderation/Quality Check</td></tr>
               <tr><td>合规</td><td>成年人和授权声明</td><td><span class="badge p0">P0</span></td><td>生成前强制勾选本人/已授权、人物成年、允许用于本次AI生成；声明版本与任务绑定。</td><td>Consent Form → Consent Record → Generation Task</td></tr>
               <tr><td>生成</td><td>时长和扣币</td><td><span class="badge p0">P0</span></td><td>5秒/30金币、10秒/40金币、15秒/50金币；提交时原子扣币，余额不足进入购买页。</td><td>Wallet → Ledger Debit → Generation Task</td></tr>
-              <tr><td>生成</td><td>双人参考生成</td><td><span class="badge p0">P0</span></td><td>使用 `wan2.7-r2v`，两张图分别作为独立人物参考；后台固定提示词控制站位、动作、镜头和环境声。</td><td>OSS Inputs → Wan R2V → Temporary Result</td></tr>
-              <tr><td>生成</td><td>单人动作迁移</td><td><span class="badge p0">P0</span></td><td>使用 `wan2.2-animate-move` 标准模式，服务器为每个模板提供已授权的动作视频和音乐。</td><td>OSS Portrait + Template Video → Wan Animate → Result</td></tr>
-              <tr><td>生成</td><td>异步任务与轮询</td><td><span class="badge p0">P0</span></td><td>服务端提交任务并保存外部 task_id；后台轮询到终态，前端按退避策略刷新，不因页面关闭中断。</td><td>API → Task DB → Worker/Poller → Model Studio</td></tr>
+              <tr><td>生成</td><td>双人参考生成</td><td><span class="badge p0">P0</span></td><td>5/10 秒评估 `wan-video/wan-2.7-r2v` 与 Seedance 2.0，15 秒仅评估 Seedance；两张图作为独立人物参考，模型按模板变体由服务端路由。</td><td>OSS Inputs → Replicate R2V → Temporary Result</td></tr>
+              <tr><td>生成</td><td>单人动作迁移</td><td><span class="badge p0">P0</span></td><td>使用 `wan-video/wan-2.2-animate-animation`，服务器为每个模板提供已授权的动作视频和音乐。</td><td>OSS Portrait + Template Video → Replicate Wan Animate → Result</td></tr>
+              <tr><td>生成</td><td>异步任务与轮询</td><td><span class="badge p0">P0</span></td><td>服务端提交 Prediction 并保存 prediction ID；completed Webhook 推进终态，后台轮询兜底，前端按退避策略刷新。</td><td>API → Task DB → Worker/Webhook/Poller → Replicate</td></tr>
               <tr><td>金币</td><td>失败全额返还</td><td><span class="badge p0">P0</span></td><td>模型失败、审核拒绝、超时和内部错误都返还本次金币；用唯一业务引用保证只返一次。</td><td>Failure Event → Ledger Credit → Wallet Balance</td></tr>
               <tr><td>作品</td><td>记录、播放、下载、删除</td><td><span class="badge p0">P0</span></td><td>仅本人访问；任务进行中展示状态，成功后可播放、下载、删除并显示剩余保存时间。</td><td>Task/Work API → Signed OSS URL → H5 Player</td></tr>
               <tr><td>作品</td><td>24小时自动清理</td><td><span class="badge p0">P0</span></td><td>结果产生后24小时到期；撤销访问后删除输入、输出与作品记录。不含媒体的审计数据保留180天。</td><td>Expiry Scheduler + OSS Lifecycle → Purge → Audit Log</td></tr>
@@ -361,7 +361,7 @@
               <tr><td>客服</td><td>投诉与删除请求</td><td><span class="badge p0">P0</span></td><td>权利人可提交作品编号、证明和联系信息；后台支持冻结、删除、封禁及留痕。</td><td>Complaint Form → Admin Review → Enforcement</td></tr>
               <tr><td>运营</td><td>配置与任务后台</td><td><span class="badge p1">P1</span></td><td>查看模板开关、价格、赠币、任务状态、失败原因、审核结果和支付订单；敏感操作写入审计日志。</td><td>Admin UI ↔ Backend Admin API ↔ DB</td></tr>
               <tr><td>质量</td><td>组合首帧实验</td><td><span class="badge p1">P1</span></td><td>当直接双人 R2V 稳定性不足时，先合成包含两人的起始画面，再结合人物参考生成视频；仅用于 A/B PoC。</td><td>Two Portraits → Image Compose → First Frame + R2V</td></tr>
-              <tr><td>生成</td><td>亲吻模板</td><td><span class="badge p2">P2</span></td><td>完成 Model Studio、PayPal 和内容规则审核后灰度开放；只允许非露骨成年人场景。</td><td>Feature Flag → Restricted Template Pipeline</td></tr>
+              <tr><td>生成</td><td>亲吻模板</td><td><span class="badge p2">P2</span></td><td>完成 Replicate 模型、PayPal 和内容规则审核后灰度开放；只允许非露骨成年人场景。</td><td>Feature Flag → Restricted Template Pipeline</td></tr>
             </tbody>
           </table>
         </div>
@@ -390,10 +390,10 @@
           <div>H5 请求预签名上传</div>
           <div>原图进入私有 OSS 与审核</div>
           <div>后端扣币并创建任务</div>
-          <div>Worker 调用 Wan 并轮询</div>
+          <div>Worker 调用 Replicate，Webhook/轮询收敛状态</div>
           <div>结果转存、标识并授权播放</div>
         </div>
-        <p class="muted">Model Studio 返回的结果 URL 有时效，任务成功后必须由服务端立即下载并转存到私有 OSS。H5 永远不直接持有 Model Studio API Key。</p>
+        <p class="muted">Replicate API 的输入、输出和日志默认约 1 小时后删除，任务成功后必须由服务端立即下载并转存到私有 OSS。H5 永远不直接持有 Replicate API Token，也不依赖临时结果 URL。</p>
       </section>
 
       <section id="solution">
@@ -549,7 +549,7 @@ flowchart TD
                 <li><strong>提交事务：</strong>生成任务、扣币流水和幂等键在同一事务内创建；按钮提交后立即禁用，避免重复任务。</li>
                 <li><strong>后台处理：</strong>用户可离开当前页面；客户端只展示阶段与预计等待，不承诺精确百分比。</li>
                 <li><strong>失败返还：</strong>审核拒绝、模型失败、超时、结果转存或后审失败均全额返还；唯一键 <code>task_id + ledger_type</code> 保证最多返还一次。</li>
-                <li><strong>Wan 临时地址：</strong>结果成功后由 Worker 立即转存私有 OSS，H5 不接触 Model Studio API Key。</li>
+                <li><strong>Replicate 临时地址：</strong>结果成功后由 Worker 立即转存私有 OSS，H5 不接触 API Token，也不直接依赖 <code>replicate.delivery</code>。</li>
               </ul>
             </div>
             <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=generation</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=generation#generation" title="生成进度专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
@@ -640,11 +640,11 @@ flowchart TD
 
         <h3>5.7 模板与模型路由</h3>
         <div class="table-wrap"><table><thead><tr><th>模板</th><th>输入</th><th>模型</th><th>动作控制</th><th>音频</th><th>首期状态</th></tr></thead><tbody>
-          <tr><td>拥抱</td><td>2张独立单人全身照</td><td>wan2.7-r2v</td><td>固定提示词；PoC 评估组合首帧</td><td>模型环境声</td><td><span class="badge on">开放</span></td></tr>
-          <tr><td>牵手</td><td>2张独立单人全身照</td><td>wan2.7-r2v</td><td>固定提示词，强化手臂与手部约束</td><td>模型环境声</td><td><span class="badge on">开放</span></td></tr>
-          <tr><td>亲吻</td><td>2张独立单人全身照</td><td>wan2.7-r2v</td><td>固定非露骨提示词与严格审核</td><td>模型环境声</td><td><span class="badge off">关闭待审</span></td></tr>
-          <tr><td>跳舞</td><td>1张单人全身照</td><td>wan2.2-animate-move</td><td>服务器固定动作参考视频</td><td>已授权模板音乐</td><td><span class="badge on">开放</span></td></tr>
-          <tr><td>俯卧撑</td><td>1张单人全身照</td><td>wan2.2-animate-move</td><td>服务器固定动作参考视频</td><td>模板节奏声</td><td><span class="badge on">开放</span></td></tr>
+          <tr><td>拥抱</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V（5/10秒）/ Seedance 2.0（候选）</td><td>固定提示词；PoC 验证双主体与15秒</td><td>模型环境声</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>牵手</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V（5/10秒）/ Seedance 2.0（候选）</td><td>固定提示词，强化人物引用与手部约束</td><td>模型环境声</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>亲吻</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V / Seedance 2.0</td><td>固定非露骨提示词与严格审核</td><td>模型环境声</td><td><span class="badge off">关闭待审</span></td></tr>
+          <tr><td>跳舞</td><td>1张单人全身照</td><td>Wan 2.2 Animate</td><td>服务器固定动作参考视频</td><td>已授权模板音乐</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>俯卧撑</td><td>1张单人全身照</td><td>Wan 2.2 Animate</td><td>服务器固定动作参考视频</td><td>模板节奏声</td><td><span class="badge on">PoC后开放</span></td></tr>
         </tbody></table></div>
         <div class="callout warning"><strong>质量门槛：</strong>上线前至少使用 50 组真实授权样本，覆盖体型、服装、背景、肤色和拍摄角度。分别记录身份一致性、动作完成度、肢体异常、审核拒绝率、平均耗时和单次成本；固定模板不能被描述为每次都能完美复现。</div>
 
@@ -717,7 +717,7 @@ sequenceDiagram
     participant H5
     participant API
     participant Worker
-    participant Wan
+    participant Replicate
     participant OSS
     participant Database
     User->>H5: 提交照片与配置
@@ -725,8 +725,11 @@ sequenceDiagram
     API->>Database: 扣币并写入任务
     API-->>H5: 返回任务编号
     API->>Worker: 投递异步任务
-    Worker->>Wan: 提交生成
-    Wan-->>Worker: 返回临时地址
+    Worker->>Replicate: 创建 Prediction
+    Replicate-->>Worker: 返回 prediction ID
+    Replicate-->>API: completed Webhook
+    API->>Worker: 投递结果处理任务
+    Worker->>Replicate: 查询结果（兜底）
     Worker->>OSS: 保存视频
     Worker->>Database: 标记成功
     H5->>API: 查询作品状态
@@ -835,7 +838,7 @@ flowchart LR
     subgraph external ["External Services"]
         oauth[Apple and Google]
         paypal[PayPal Business]
-        wan[Model Studio Wan]
+        replicate[Replicate Video Models]
         email[Email OTP]
     end
     subgraph async ["Async Infrastructure"]
@@ -856,7 +859,8 @@ flowchart LR
     app -.-> oauth
     app -.-> paypal
     app -.-> email
-    worker -.-> wan
+    worker -.-> replicate
+    replicate -.-> app
           </div></div><a class="source-link" href="../flowcharts/06_system_architecture_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
         </div>
       </section>
@@ -877,7 +881,7 @@ flowchart LR
               <tr><td>余额不足</td><td>不创建生成任务</td><td>展示所需金币和购买入口</td><td>不变</td></tr>
               <tr><td>重复点击生成</td><td>客户端禁用按钮；服务端幂等键阻止重复任务</td><td>已提交，请在作品记录查看</td><td>只扣一次</td></tr>
               <tr><td>网络中断或关闭页面</td><td>服务端继续任务</td><td>重新登录后恢复任务状态</td><td>按最终状态处理</td></tr>
-              <tr><td>Model Studio 超时/失败</td><td>有限次数查询；不盲目创建新任务</td><td>生成失败，金币已返还</td><td>全额返还一次</td></tr>
+              <tr><td>Replicate 超时/失败</td><td>验证 Webhook 后有限次数查询；不盲目创建新 Prediction</td><td>生成失败，金币已返还</td><td>全额返还一次</td></tr>
               <tr><td>结果转存或后审失败</td><td>删除不可用结果并终止任务</td><td>生成失败，金币已返还</td><td>全额返还一次</td></tr>
               <tr><td>PayPal 页面显示成功但 webhook 未到</td><td>订单保持处理中，后台主动查询</td><td>付款确认中，请稍后查看</td><td>确认后才入账</td></tr>
               <tr><td>重复 PayPal webhook</td><td>按 event_id 幂等忽略</td><td>不重复提示</td><td>只入账一次</td></tr>
@@ -956,9 +960,10 @@ flowchart LR
         <h2>十、附件</h2>
         <h3>10.1 外部资料</h3>
         <ul>
-          <li><a href="https://www.alibabacloud.com/help/en/model-studio/use-video-generation" target="_blank" rel="noreferrer">Alibaba Cloud Model Studio - Video generation</a></li>
-          <li><a href="https://www.alibabacloud.com/help/en/model-studio/wan-video-to-video-api-reference" target="_blank" rel="noreferrer">Wan Reference-to-Video API</a></li>
-          <li><a href="https://www.alibabacloud.com/help/en/model-studio/model-pricing" target="_blank" rel="noreferrer">Model Studio pricing</a></li>
+          <li><a href="https://replicate.com/wan-video/wan-2.7-r2v" target="_blank" rel="noreferrer">Replicate Wan 2.7 R2V</a></li>
+          <li><a href="https://replicate.com/wan-video/wan-2.2-animate-animation" target="_blank" rel="noreferrer">Replicate Wan 2.2 Animate</a></li>
+          <li><a href="https://replicate.com/bytedance/seedance-2.0" target="_blank" rel="noreferrer">Replicate Seedance 2.0</a></li>
+          <li><a href="https://replicate.com/docs/topics/predictions/data-retention" target="_blank" rel="noreferrer">Replicate data retention</a></li>
           <li><a href="https://www.paypal.com/c2/webapps/mpp/account-selection" target="_blank" rel="noreferrer">PayPal China account selection</a></li>
           <li><a href="https://www.paypal.com/c2/business/paypal-business-fees" target="_blank" rel="noreferrer">PayPal China merchant fees</a></li>
           <li><a href="https://www.paypal.com/uk/legalhub/paypal/acceptableuse-full" target="_blank" rel="noreferrer">PayPal Acceptable Use Policy</a></li>
@@ -1001,7 +1006,7 @@ flowchart LR
         </ul>
       </section>
 
-      <footer>Vireal Wan Video H5 · PRD v1.0 · Final · 2026-09-09</footer>
+      <footer>Vireal Wan Video H5 · PRD v1.0 · Final · 2026-09-10</footer>
     </main>
   </div>
   <script type="module">

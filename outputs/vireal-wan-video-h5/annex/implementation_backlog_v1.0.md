@@ -1,16 +1,16 @@
 # Vireal MVP 实施 Backlog v1.0
 
-更新时间：2026-09-09  
+更新时间：2026-09-10  
 建议节奏：1 周一个 Sprint；先打通有失败补偿的最小闭环，再完善运营后台。
 
 ## Epic 0：技术决策与 PoC
 
 | ID | 故事 | 验收 | 依赖 | 估算 |
 |---|---|---|---|---:|
-| E0-1 | 配置 Model Studio 新加坡 workspace | 凭证只在服务端密钥系统；开发默认关闭 | 阿里云账号 | 0.5d |
+| E0-1 | 配置 Replicate 组织与 API Token | 凭证只在服务端密钥系统；开发默认关闭 | Replicate 账号 | 0.5d |
 | E0-2 | 建立私有 OSS 测试桶 | CORS、签名上传/读取、生命周期均验证 | E0-1 | 1d |
-| E0-3 | 执行阶段 A 冒烟 | 4 个用例完成并记录 task/request ID | E0-1,E0-2,素材 | 1d |
-| E0-4 | 执行质量矩阵 | 形成模板×时长开关结论 | E0-3 | 2d |
+| E0-3 | 执行阶段 A 冒烟 | Wan R2V、Seedance 双人和 Wan Animate 用例完成并记录 prediction ID | E0-1,E0-2,素材 | 1d |
+| E0-4 | 执行质量矩阵 | 形成模板×时长×模型开关结论 | E0-3 | 2d |
 | E0-5 | 确认金币经济性 | 决定单人 15 秒维持 50 还是调整 | 官方价格、PayPal费率 | 0.5d |
 
 ## Epic 1：账号、地区与合规
@@ -50,9 +50,9 @@
 | E4-1 | 模板与变体配置 | 模板×时长×价格×模型可单独开关 | 1.5d |
 | E4-2 | Generation/Asset/Outbox 表 | 幂等键、状态机、外部 ID 和媒体均可追踪 | 2d |
 | E4-3 | 创建生成接口 | 一次事务完成任务、扣币、Outbox；不信任前端价格 | 2d |
-| E4-4 | Wan R2V Worker | 两图顺序和固定 prompt 正确；保存 task ID | 1.5d |
-| E4-5 | Wan Animate Worker | 按模板时长选择固定动作视频 | 1d |
-| E4-6 | Poller 与结果转存 | 约 15 秒查询；成功立即转私有 OSS | 2d |
+| E4-4 | Replicate R2V Worker | 按变体路由 Wan/Seedance；两图顺序和固定 prompt 正确；保存 prediction ID | 1.5d |
+| E4-5 | Replicate Wan Animate Worker | 按模板时长选择固定动作视频 | 1d |
+| E4-6 | Webhook、Poller 与结果转存 | completed 回调验签且幂等；轮询兜底；成功立即转私有 OSS | 2.5d |
 | E4-7 | 失败返币 | 所有不可交付终态全额返还且最多一次 | 1.5d |
 | E4-8 | 超时与未知提交处理 | 不盲目重提；`SUBMIT_UNKNOWN` 可追踪并补偿 | 1d |
 
@@ -93,4 +93,4 @@
 - 任意重复请求、Webhook 重放、Worker 重启都不会重复扣币、返币或发金币。
 - 原图和视频 24 小时内完成清理，用户删除后立即失去访问能力。
 - 生产日志无密钥、OAuth token、OSS 签名 URL 和真人媒体内容。
-- PayPal 与 Model Studio 真实环境各完成小额冒烟并留存可追踪 ID。
+- PayPal 与 Replicate 真实环境各完成小额冒烟并留存可追踪 ID。

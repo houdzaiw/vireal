@@ -4,7 +4,7 @@ sequenceDiagram
     participant H5
     participant API
     participant Worker
-    participant ModelStudio
+    participant Replicate
     participant OSS
     participant Database
 
@@ -13,13 +13,14 @@ sequenceDiagram
     API->>Database: 扣币并写入任务
     API-->>H5: 返回任务编号
     API->>Worker: 投递异步任务
-    Worker->>ModelStudio: 提交 Wan 任务
-    ModelStudio-->>Worker: 返回模型任务编号
-    Worker->>ModelStudio: 查询任务结果
-    ModelStudio-->>Worker: 返回临时视频地址
+    Worker->>Replicate: 创建 Prediction
+    Replicate-->>Worker: 返回 prediction ID
+    Replicate-->>API: completed Webhook
+    API->>Worker: 投递结果处理任务
+    Worker->>Replicate: 查询结果（兜底）
+    Replicate-->>Worker: 返回临时视频地址
     Worker->>OSS: 保存输出视频
     Worker->>Database: 标记成功及到期时间
     H5->>API: 查询作品状态
     API-->>H5: 返回私有播放地址
     H5-->>User: 展示播放与下载
-
