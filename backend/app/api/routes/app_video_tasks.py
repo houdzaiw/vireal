@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException, status
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlmodel import col, select
 
 from app.api.deps import CurrentAppUser, SessionDep
@@ -188,10 +188,19 @@ async def create_video_task(
     ).first()
     if existing is not None:
         return _serialize_idempotent_task(existing, body)
+    # Only count submissions that Replicate accepted (a prediction id exists),
+    # plus ambiguous network outcomes that could still have created a billable
+    # prediction. Deterministic provider rejections such as HTTP 402 must not
+    # consume the PoC budget because no prediction was created.
     attempted_count = session.exec(
         select(func.count())
         .select_from(AppVideoTask)
-        .where(col(AppVideoTask.submission_attempted_at).is_not(None))
+        .where(
+            or_(
+                col(AppVideoTask.provider_task_id).is_not(None),
+                AppVideoTask.status == "submission_unknown",
+            )
+        )
     ).one()
     if attempted_count >= settings.REPLICATE_POC_MAX_SUBMISSIONS:
         raise HTTPException(

@@ -15,6 +15,7 @@ from sqlmodel import Session, delete
 from app.api.routes import app_video_tasks as app_video_tasks_module
 from app.core.config import settings
 from app.models import AppUpload, AppVideoTask, AppVideoTaskWebhookEvent
+from app.services.replicate_video import ReplicateAPIError
 from app.services.storage import StoredVideo
 from app.services.video_generation import VideoTaskStatus, VideoTaskSubmission
 from app.workers.video_tasks import process_next_video_task
@@ -38,8 +39,14 @@ def clean_video_task_tables(db: Session) -> Generator[None]:
 
 
 class FakeProvider:
-    def __init__(self, *, timeout: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: bool = False,
+        api_error: ReplicateAPIError | None = None,
+    ) -> None:
         self.timeout = timeout
+        self.api_error = api_error
         self.calls: list[dict[str, Any]] = []
         self.closed = False
 
@@ -52,6 +59,8 @@ class FakeProvider:
                     "POST", "https://api.replicate.com/v1/predictions"
                 ),
             )
+        if self.api_error is not None:
+            raise self.api_error
         return VideoTaskSubmission(
             provider_task_id="prediction-poc-1",
             status=VideoTaskStatus.PENDING,
@@ -356,3 +365,43 @@ def test_video_task_enforces_poc_submission_ceiling(
         response.json()["detail"] == "Replicate PoC submission limit has been reached"
     )
     assert provider.calls == []
+
+
+def test_provider_rejection_without_prediction_does_not_consume_poc_budget(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider(
+        api_error=ReplicateAPIError(
+            message="Insufficient credit",
+            status_code=402,
+        )
+    )
+    _enable_mock_replicate(monkeypatch, provider)
+    monkeypatch.setattr(settings, "REPLICATE_POC_MAX_SUBMISSIONS", 1)
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+    body = {
+        "template_id": "dance",
+        "upload_ids": [upload["id"]],
+        "duration": 5,
+    }
+
+    rejected = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-credit-rejected"},
+        json=body,
+    )
+    assert rejected.status_code == 202
+    assert rejected.json()["status"] == "failed"
+
+    provider.api_error = None
+    accepted = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-after-credit-added"},
+        json=body,
+    )
+
+    assert accepted.status_code == 202
+    assert accepted.json()["status"] == "pending"
+    assert len(provider.calls) == 2
