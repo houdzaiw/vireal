@@ -40,8 +40,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Install dependencies
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
+RUN --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-workspace --package app
 
@@ -55,8 +54,7 @@ COPY --from=frontend-build /app/backend/app/frontend /app/backend/app/frontend
 
 # Sync the project
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
+RUN --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --package app
 
