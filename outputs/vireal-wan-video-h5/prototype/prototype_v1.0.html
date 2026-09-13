@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#071b1b" />
+  <meta name="vireal-api-base-url" content="__VIREAL_API_BASE_URL__" />
+  <meta name="vireal-backend-mode" content="__VIREAL_BACKEND_MODE__" />
   <title>Vireal · 真人图片动作视频生成</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -83,6 +85,11 @@
     .upload-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
     .upload-zone:hover { border-color: var(--mint-dark); background: rgba(67,226,176,.06); }
     .upload-zone.error { border-color: #dc5444; background: #fff4f1; animation: shake .2s ease-in-out 2; }
+    .backend-mode-banner { background: linear-gradient(90deg, #071b1b, #126c58); }
+    .backend-upload-card { min-height: 210px; }
+    .backend-upload-image { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; }
+    .backend-upload-status { color: var(--mint-dark); }
+    .backend-upload-status.error { color: #b42318; }
     @keyframes shake { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
     .ring-progress { background: conic-gradient(var(--mint) var(--progress, 42%), rgba(255,255,255,.12) 0); }
     .focus-locked { opacity: .26 !important; filter: grayscale(.8); pointer-events: none !important; user-select: none; }
@@ -115,6 +122,11 @@
   <div id="focusBanner" class="focus-banner fixed top-2 left-1/2 z-[80] -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white shadow-soft">
     <span class="inline-block h-2 w-2 rounded-full bg-mint"></span>
     <span id="focusLabel">专注演示模式</span>
+  </div>
+
+  <div id="backendModeBanner" class="backend-mode-banner fixed left-1/2 top-2 z-[79] hidden -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold text-white shadow-soft">
+    <span class="inline-block h-2 w-2 rounded-full bg-mint"></span>
+    <span>Replicate + R2 实链路测试 · API <span id="backendApiHost">localhost:8000</span></span>
   </div>
 
   <header class="app-header sticky top-0 z-40 border-b border-black/5 glass">
@@ -173,8 +185,8 @@
               </div>
               <div class="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/55">
                 <span class="flex items-center gap-2"><b class="text-mint">✓</b> 720P · 9:16</span>
-                <span class="flex items-center gap-2"><b class="text-mint">✓</b> 5 / 10 / 15 sec</span>
-                <span class="flex items-center gap-2"><b class="text-mint">✓</b> AI audio</span>
+                <span id="heroDurationSpec" class="flex items-center gap-2"><b class="text-mint">✓</b> 5 / 10 / 15 sec</span>
+                <span id="heroAudioSpec" class="flex items-center gap-2"><b class="text-mint">✓</b> AI audio</span>
               </div>
             </div>
           </div>
@@ -185,14 +197,14 @@
             <div class="absolute left-1/2 top-1/2 h-[330px] w-[230px] -translate-x-1/2 -translate-y-1/2 rotate-3 rounded-[30px] bg-white/10 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-sm">
               <div class="relative flex h-full items-center justify-center overflow-hidden rounded-[23px] bg-gradient-to-b from-[#d9f1e8] via-[#8db6a9] to-[#1c3532]">
                 <div class="absolute left-5 top-5 rounded-full bg-black/30 px-3 py-1.5 text-[10px] font-bold backdrop-blur">00:05</div>
-                <div class="absolute right-5 top-5 grid h-7 w-7 place-items-center rounded-full bg-white/20">♫</div>
+                <div id="heroAudioIcon" class="absolute right-5 top-5 grid h-7 w-7 place-items-center rounded-full bg-white/20">♫</div>
                 <div class="flex items-end gap-[-8px] pt-16">
                   <div class="person -mr-2 -rotate-6"></div>
                   <div class="person alt ml-[-8px] rotate-6"></div>
                 </div>
                 <div class="absolute bottom-5 left-5 right-5 flex items-center gap-3 rounded-2xl bg-white/15 p-3 backdrop-blur-md">
                   <span class="grid h-9 w-9 place-items-center rounded-full bg-white text-ink">▶</span>
-                  <div class="flex-1"><div class="h-1 rounded-full bg-white/25"><div class="h-1 w-1/3 rounded-full bg-mint"></div></div><div class="mt-2 text-[9px] font-bold tracking-wider text-white/70">HUG · WAN VIDEO</div></div>
+                  <div class="flex-1"><div class="h-1 rounded-full bg-white/25"><div class="h-1 w-1/3 rounded-full bg-mint"></div></div><div id="heroModelLabel" class="mt-2 text-[9px] font-bold tracking-wider text-white/70">HUG · WAN VIDEO</div></div>
                 </div>
               </div>
             </div>
@@ -209,7 +221,7 @@
 
       <div class="mt-5 grid gap-3 sm:grid-cols-3">
         <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-mint/20 text-mint-dark">01</span><div><b class="text-sm">Choose</b><p class="text-xs text-gray-500">选择固定动作</p></div></div>
-        <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-coral/20 text-[#a84232]">02</span><div><b class="text-sm">Upload</b><p class="text-xs text-gray-500">上传 1–2 张照片</p></div></div>
+        <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-coral/20 text-[#a84232]">02</span><div><b class="text-sm">Upload</b><p id="homeUploadCount" class="text-xs text-gray-500">上传 1–2 张照片</p></div></div>
         <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-ink/10 text-ink">03</span><div><b class="text-sm">Create</b><p class="text-xs text-gray-500">离开页面也会继续</p></div></div>
       </div>
 
@@ -223,7 +235,7 @@
 
       <div class="rounded-[28px] border border-black/5 bg-white p-6 shadow-card sm:p-8" data-focus-zone="privacy home">
         <div class="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
-          <div class="flex items-start gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-ink text-mint"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 14v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div><h3 class="font-black">你的照片，不会变成公开内容</h3><p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500">原图和视频存储在新加坡区域，仅你本人可访问。用户删除后立即失效，最迟 24 小时完成物理清理。</p></div></div>
+          <div class="flex items-start gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-ink text-mint"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 14v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div><h3 class="font-black">你的照片，不会变成公开内容</h3><p id="privacyStorageCopy" class="mt-1 max-w-2xl text-sm leading-6 text-gray-500">原图和视频存储在新加坡区域，仅你本人可访问。用户删除后立即失效，最迟 24 小时完成物理清理。</p></div></div>
           <button class="rounded-full border border-black/10 px-5 py-3 text-sm font-extrabold hover:bg-gray-50" data-modal="privacy">查看隐私说明</button>
         </div>
       </div>
@@ -286,9 +298,9 @@
           </section>
 
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create upload">
-            <div class="flex items-start justify-between gap-4"><div><span class="text-xs font-black text-mint-dark">STEP 2</span><h2 class="mt-1 text-xl font-black">上传全身照</h2><p class="mt-1 text-xs leading-5 text-gray-500">JPG/PNG，单张不超过 10MB。脸部清晰、身体完整、无遮挡。</p></div><button class="shrink-0 text-xs font-bold text-mint-dark hover:underline" data-modal="photo-guide">拍摄指南</button></div>
+            <div class="flex items-start justify-between gap-4"><div><span class="text-xs font-black text-mint-dark">STEP 2</span><h2 class="mt-1 text-xl font-black">上传全身照</h2><p class="mt-1 text-xs leading-5 text-gray-500">JPG/PNG，单张不超过 5MB。脸部清晰、身体完整、无遮挡。</p></div><button class="shrink-0 text-xs font-bold text-mint-dark hover:underline" data-modal="photo-guide">拍摄指南</button></div>
             <div id="uploadGrid" class="mt-5 grid gap-3 sm:grid-cols-2"></div>
-            <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span>双人模板请分别上传两张独立单人照，不要上传已经合照在一起的图片。系统会在生成前进行人物与内容检测。</span></div>
+            <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span id="uploadGuidance">双人模板请分别上传两张独立单人照，不要上传已经合照在一起的图片。系统会在生成前进行人物与内容检测。</span></div>
           </section>
 
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create duration">
@@ -338,7 +350,8 @@
           <div class="relative flex min-h-[330px] items-center justify-center overflow-hidden p-8">
             <div class="hero-grid absolute inset-0 opacity-40"></div>
             <div class="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/15 blur-3xl"></div>
-            <div class="relative text-center">
+            <video id="generationVideo" class="relative hidden max-h-[70vh] w-full max-w-sm rounded-[24px] bg-black shadow-2xl" controls playsinline preload="metadata"></video>
+            <div id="generationProgressPanel" class="relative text-center">
               <div id="progressRing" class="ring-progress mx-auto grid h-36 w-36 place-items-center rounded-full p-2" style="--progress: 42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink"><div><b id="progressValue" class="block text-3xl font-black">42%</b><span class="text-[10px] uppercase tracking-widest text-white/45">Generating</span></div></div></div>
               <h1 id="generationTitle" class="mt-7 text-2xl font-black">正在让照片动起来</h1>
               <p id="generationSubtitle" class="mt-2 text-sm text-white/55">已提交到 Wan 视频生成队列，预计还需 2–4 分钟。</p>
@@ -350,7 +363,7 @@
               <div id="progressStep2" class="rounded-2xl bg-white/8 p-4"><span class="grid h-7 w-7 place-items-center rounded-full border border-mint text-xs font-black text-mint">2</span><b class="mt-3 block text-sm">动作生成中</b><span class="text-[11px] text-white/40">身份与肢体一致性处理</span></div>
               <div id="progressStep3" class="rounded-2xl bg-white/[.03] p-4 opacity-45"><span class="grid h-7 w-7 place-items-center rounded-full border border-white/25 text-xs font-black">3</span><b class="mt-3 block text-sm">声音与合成</b><span class="text-[11px] text-white/40">生成环境声并封装 MP4</span></div>
             </div>
-            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p class="max-w-md text-xs leading-5 text-white/45">你可以安全离开本页面。任务会在后台继续，完成后可在“作品”中查看。</p><div class="flex gap-2"><button class="rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold hover:bg-white/5" data-action="simulate-failure">演示失败</button><button class="rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-ink" data-action="complete-generation">完成演示</button></div></div>
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p class="max-w-md text-xs leading-5 text-white/45">你可以安全离开本页面。任务会在后台继续，完成后可在“作品”中查看。</p><div id="generationDemoActions" class="flex gap-2"><button class="rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold hover:bg-white/5" data-action="simulate-failure">演示失败</button><button class="rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-ink" data-action="complete-generation">完成演示</button></div></div>
           </div>
         </div>
       </div>
@@ -443,25 +456,43 @@
       { id: 'kiss', name: '亲吻', en: 'Kiss', people: 2, tag: '审核准备中', audio: '模型环境声', palette: 'from-[#eadde2] to-[#80636d]', disabled: true }
     ];
 
+    const query = new URLSearchParams(location.search);
+    const configuredApiBaseUrl = document.querySelector('meta[name="vireal-api-base-url"]')?.content.trim() || '';
+    const productionApiBaseUrl = configuredApiBaseUrl.startsWith('__VIREAL_') ? '' : configuredApiBaseUrl;
+    const configuredBackendMode = document.querySelector('meta[name="vireal-backend-mode"]')?.content === '1';
+    const backendMode = query.has('backend') ? query.get('backend') === '1' : configuredBackendMode;
+    const API_BASE_URL = (query.get('api') || productionApiBaseUrl || 'http://localhost:8000').replace(/\/+$/, '');
+    const APP_TOKEN_STORAGE_KEY = 'virealAppAccessToken';
+    const DEVICE_UUID_STORAGE_KEY = 'virealBackendDeviceUuid';
+    const VIDEO_TASK_STORAGE_KEY = 'virealBackendVideoTask';
+    const VIDEO_SUBMISSION_STORAGE_KEY = 'virealBackendVideoSubmission';
+    const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+    const VIDEO_TASK_POLL_MS = 3000;
+
     const state = {
-      loggedIn: sessionStorage.getItem('virealLoggedIn') === '1',
+      loggedIn: backendMode
+        ? Boolean(sessionStorage.getItem(APP_TOKEN_STORAGE_KEY))
+        : sessionStorage.getItem('virealLoggedIn') === '1',
       balance: Number(sessionStorage.getItem('virealBalance') || 30),
       language: localStorage.getItem('virealLang') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'),
-      template: 'hug',
+      template: backendMode ? 'dance' : 'hug',
       duration: 5,
       cost: 30,
       uploads: {},
+      appToken: sessionStorage.getItem(APP_TOKEN_STORAGE_KEY) || '',
+      appUser: null,
       consent: false,
       generation: 'processing',
+      currentTask: null,
       regionLocked: new URLSearchParams(location.search).get('region') === 'cn',
       selectedPack: null
     };
 
-    const query = new URLSearchParams(location.search);
     const focus = query.get('focus');
     const sandbox = query.get('sandbox') === 'true';
     const deviceOverride = query.get('device');
     let toastTimer;
+    let videoTaskPollTimer;
 
     const translations = {
       zh: { navDiscover:'发现',navCreate:'创作',navWorks:'作品',privacyTag:'仅自己可见 · 24 小时自动删除',heroA:'让一张照片，',heroB:'动成一段记忆。',heroDesc:'上传已授权的成年人全身照，选择动作和时长。无需提示词，几分钟生成带声音的私人短视频。',startCreate:'开始创作',viewTemplates:'查看动作模板',templatesTitle:'动作已调好，只等你的照片',templatesDesc:'每个模板都有固定的动作指令和声音方案，降低肢体变形与身份漂移。'},
@@ -474,14 +505,15 @@
     }
 
     function renderTemplateCards() {
-      const available = templates.filter(t => !t.disabled);
+      const available = templates.filter(t => !t.disabled && (!backendMode || t.id === 'dance'));
+      const selectable = backendMode ? templates.filter(t => t.id === 'dance') : templates;
       document.getElementById('homeTemplateGrid').innerHTML = available.map(t => `
         <button class="template-card overflow-hidden rounded-[24px] border border-black/5 bg-white text-left shadow-card" data-template-route="${t.id}">
           <div class="relative h-52 overflow-hidden bg-gradient-to-b ${t.palette}"><div class="hero-grid absolute inset-0 opacity-25"></div>${iconPeople(t.people, t.id)}<span class="absolute left-3 top-3 rounded-full bg-black/25 px-2.5 py-1 text-[9px] font-black text-white backdrop-blur">${t.people} PERSON${t.people > 1 ? 'S' : ''}</span><span class="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white text-ink shadow">→</span></div>
-          <div class="p-4"><div class="flex items-center justify-between"><b class="text-lg">${state.language === 'zh' ? t.name : t.en}</b><span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">${t.tag}</span></div><p class="mt-2 text-xs text-gray-500">${t.people === 2 ? '两张独立全身照' : '一张单人全身照'} · ${t.audio}</p></div>
+          <div class="p-4"><div class="flex items-center justify-between"><b class="text-lg">${state.language === 'zh' ? t.name : t.en}</b><span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">${t.tag}</span></div><p class="mt-2 text-xs text-gray-500">${t.people === 2 ? '两张独立全身照' : '一张单人全身照'} · ${backendMode ? '静音' : t.audio}</p></div>
         </button>`).join('');
 
-      document.getElementById('createTemplateGrid').innerHTML = templates.map(t => `
+      document.getElementById('createTemplateGrid').innerHTML = selectable.map(t => `
         <button class="template-card ${state.template === t.id ? 'selected' : ''} ${t.disabled ? 'cursor-not-allowed opacity-50' : ''} relative overflow-hidden rounded-2xl border border-black/10 bg-white p-3 text-left" data-template="${t.id}" ${t.disabled ? 'disabled' : ''}>
           <div class="flex h-20 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-b ${t.palette}">${iconPeople(t.people, t.id)}</div>
           <b class="mt-3 block text-sm">${state.language === 'zh' ? t.name : t.en}</b><span class="mt-1 block text-[10px] text-gray-400">${t.disabled ? 'Coming later' : t.people + ' 人 · 固定模板'}</span>
@@ -501,6 +533,220 @@
 
     function selectedTemplate() { return templates.find(t => t.id === state.template) || templates[0]; }
 
+    function apiUrl(path) {
+      return new URL(path, `${API_BASE_URL}/`).toString();
+    }
+
+    function assetUrl(url) {
+      return new URL(url, `${API_BASE_URL}/`).toString();
+    }
+
+    function privateContentUrl(url) {
+      const parsed = new URL(url, `${API_BASE_URL}/`);
+      if (parsed.pathname.startsWith('/uploads/images/')) {
+        parsed.pathname = `/api/v1/app${parsed.pathname}`;
+      }
+      parsed.pathname = parsed.pathname.replace(/\/$/, '') + '/content';
+      return parsed.toString();
+    }
+
+    function appRequestHeaders(headers = {}) {
+      return {
+        Authorization: `Bearer ${state.appToken}`,
+        ...headers
+      };
+    }
+
+    async function responseError(response) {
+      const text = await response.text();
+      try {
+        const payload = JSON.parse(text);
+        if (typeof payload.detail === 'string') return payload.detail;
+        if (Array.isArray(payload.detail)) return payload.detail.map(item => item.msg || item).join('; ');
+      } catch (_) {
+        // Keep the raw response below when it is not JSON.
+      }
+      return text || `${response.status} ${response.statusText}`;
+    }
+
+    function errorMessage(error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+
+    function backendErrorMessage(error) {
+      const message = errorMessage(error);
+      if (backendMode && message === 'Failed to fetch') {
+        return '无法连接后端，请确认 API 服务已启动';
+      }
+      return message;
+    }
+
+    function getDeviceUuid() {
+      let deviceUuid = localStorage.getItem(DEVICE_UUID_STORAGE_KEY);
+      if (!deviceUuid) {
+        deviceUuid = typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `h5-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(DEVICE_UUID_STORAGE_KEY, deviceUuid);
+      }
+      return deviceUuid;
+    }
+
+    function getDevicePlatform() {
+      return /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios' : 'android';
+    }
+
+    async function deviceLogin() {
+      const response = await fetch(apiUrl('/api/v1/app/auth/device-login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_uuid: getDeviceUuid(),
+          platform: getDevicePlatform()
+        })
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+
+      const payload = await response.json();
+      if (!payload.access_token) throw new Error('设备登录响应缺少 access_token');
+      state.appToken = payload.access_token;
+      state.appUser = payload.app_user || null;
+      state.loggedIn = true;
+      sessionStorage.setItem(APP_TOKEN_STORAGE_KEY, state.appToken);
+      sessionStorage.setItem('virealLoggedIn', '1');
+      updateAccountUI();
+      return payload;
+    }
+
+    function revokePreviewUrl(entry) {
+      if (entry?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(entry.previewUrl);
+    }
+
+    function resetUploads() {
+      Object.values(state.uploads).forEach(revokePreviewUrl);
+      state.uploads = {};
+    }
+
+    function isExpiredBackendSession(error) {
+      return /app user not found|could not validate credentials|invalid or expired token|not authenticated/i.test(errorMessage(error));
+    }
+
+    function clearExpiredBackendSession() {
+      resetUploads();
+      state.loggedIn = false;
+      state.appToken = '';
+      state.appUser = null;
+      sessionStorage.removeItem(APP_TOKEN_STORAGE_KEY);
+      sessionStorage.setItem('virealLoggedIn', '0');
+      updateAccountUI();
+      sessionStorage.setItem('virealAfterLogin', 'create');
+      routeTo('login');
+      showToast('登录状态已失效，请重新登录', true);
+    }
+
+    function removeUpload(index) {
+      revokePreviewUrl(state.uploads[index]);
+      delete state.uploads[index];
+      renderUploads();
+    }
+
+    function renderBackendUploadCard(index, entry) {
+      const statusText = {
+        uploading: '正在上传到 R2…',
+        uploaded: '上传成功，正在验证私有读取…',
+        verifying: '正在通过后端同源代理读取…',
+        verified: 'R2 私有读取验证成功',
+        error: entry.error || '上传失败'
+      }[entry.status] || '处理中…';
+      const statusClass = entry.status === 'error' ? 'backend-upload-status error' : 'backend-upload-status';
+      const image = entry.previewUrl
+        ? `<img class="backend-upload-image rounded-2xl" src="${entry.previewUrl}" alt="人物 ${index} 上传预览"/>`
+        : '<div class="grid aspect-[4/3] place-items-center rounded-2xl bg-gray-100 text-sm text-gray-400">等待图片</div>';
+      return `<div class="backend-upload-card overflow-hidden rounded-2xl border border-black/10 bg-white p-3 shadow-sm">
+        ${image}
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <div class="min-w-0"><b class="block text-sm">人物 ${index}</b><span class="${statusClass} mt-1 block truncate text-[11px]">${statusText}</span></div>
+          <button class="shrink-0 rounded-full bg-gray-100 px-3 py-2 text-[10px] font-bold hover:bg-gray-200" data-remove-upload="${index}">更换</button>
+        </div>
+      </div>`;
+    }
+
+    async function verifyPrivateImage(index) {
+      const entry = state.uploads[index];
+      if (!entry?.url) return;
+      entry.status = 'verifying';
+      renderUploads();
+      const response = await fetch(privateContentUrl(entry.url), {
+        headers: appRequestHeaders(),
+        redirect: 'follow'
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('私有读取返回的内容不是图片');
+      revokePreviewUrl(entry);
+      entry.previewUrl = URL.createObjectURL(blob);
+      entry.status = 'verified';
+      renderUploads();
+    }
+
+    async function uploadRealImage(index, file) {
+      if (!state.appToken) {
+        showToast('请先完成设备登录', true);
+        routeTo('login');
+        return;
+      }
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        showToast('仅支持 JPG 或 PNG 图片', true);
+        return;
+      }
+      if (file.size > MAX_UPLOAD_IMAGE_BYTES) {
+        showToast('图片不能超过 5MB', true);
+        return;
+      }
+
+      const entry = {
+        file,
+        previewUrl: URL.createObjectURL(file),
+        url: null,
+        uploadId: null,
+        expiresAt: null,
+        status: 'uploading',
+        error: ''
+      };
+      state.uploads[index] = entry;
+      renderUploads();
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        const response = await fetch(apiUrl('/api/v1/app/uploads/images'), {
+          method: 'POST',
+          headers: appRequestHeaders(),
+          body: formData
+        });
+        if (!response.ok) throw new Error(await responseError(response));
+        const payload = await response.json();
+        if (!payload.url || !payload.id) throw new Error('上传响应缺少图片地址或 upload_id');
+        entry.url = payload.url;
+        entry.uploadId = payload.id;
+        entry.expiresAt = payload.expires_at || null;
+        entry.status = 'uploaded';
+        renderUploads();
+        await verifyPrivateImage(index);
+        showToast(`人物 ${index} 已完成 R2 上传与私有读取验证`);
+      } catch (error) {
+        if (state.uploads[index] !== entry) return;
+        if (backendMode && isExpiredBackendSession(error)) {
+          clearExpiredBackendSession();
+          return;
+        }
+        entry.status = 'error';
+        entry.error = backendErrorMessage(error);
+        renderUploads();
+        showToast(`人物 ${index} 上传失败：${entry.error}`, true);
+      }
+    }
+
     function samplePortrait(index) {
       const alt = index === 2 ? 'alt' : '';
       return `<div class="relative flex h-full min-h-[180px] items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-b ${index === 2 ? 'from-[#ffd9cd] to-[#815447]' : 'from-[#d2eee4] to-[#31564e]'}"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="person ${alt} mb-[-14px] scale-90"></div><span class="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-mint text-xs font-black text-ink">✓</span><span class="absolute bottom-3 left-3 rounded-full bg-black/30 px-2.5 py-1 text-[9px] font-bold text-white backdrop-blur">检测通过</span></div>`;
@@ -512,16 +758,29 @@
       grid.className = `mt-5 grid gap-3 ${count === 2 ? 'sm:grid-cols-2' : ''}`;
       grid.innerHTML = Array.from({length: count}, (_, i) => {
         const n = i + 1;
+        if (backendMode && state.uploads[n] && typeof state.uploads[n] === 'object') return renderBackendUploadCard(n, state.uploads[n]);
         if (state.uploads[n]) return `<div class="relative min-h-[210px] overflow-hidden rounded-2xl border border-black/10">${samplePortrait(n)}<button class="absolute right-3 bottom-3 rounded-full bg-white/90 px-3 py-2 text-[10px] font-bold shadow" data-remove-upload="${n}">更换</button></div>`;
-        return `<div class="upload-zone relative flex min-h-[210px] flex-col items-center justify-center rounded-2xl border border-dashed border-black/20 p-5 text-center" data-upload-zone="${n}"><input class="hidden" type="file" accept="image/jpeg,image/png" data-file-input="${n}"/><span class="grid h-12 w-12 place-items-center rounded-2xl bg-mint/15 text-xl text-mint-dark">＋</span><b class="mt-3 text-sm">上传人物 ${n}</b><span class="mt-1 text-[11px] text-gray-400">点击选择全身照片</span><button class="mt-4 rounded-full bg-gray-100 px-3 py-2 text-[10px] font-bold hover:bg-gray-200" data-sample-upload="${n}">使用示例照片</button></div>`;
+        return `<div class="upload-zone relative flex min-h-[210px] flex-col items-center justify-center rounded-2xl border border-dashed border-black/20 p-5 text-center" data-upload-zone="${n}"><input class="hidden" type="file" accept="image/jpeg,image/png" data-file-input="${n}"/><span class="grid h-12 w-12 place-items-center rounded-2xl bg-mint/15 text-xl text-mint-dark">＋</span><b class="mt-3 text-sm">上传人物 ${n}</b><span class="mt-1 text-[11px] text-gray-400">点击选择全身照片</span><button class="mt-4 rounded-full bg-gray-100 px-3 py-2 text-[10px] font-bold hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50" data-sample-upload="${n}" ${backendMode ? 'disabled' : ''}>${backendMode ? '需选择真实照片' : '使用示例照片'}</button></div>`;
       }).join('');
       grid.querySelectorAll('[data-upload-zone]').forEach(zone => zone.addEventListener('click', e => {
         if (e.target.closest('[data-sample-upload]')) return;
         zone.querySelector('input').click();
       }));
-      grid.querySelectorAll('[data-sample-upload]').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); state.uploads[btn.dataset.sampleUpload] = true; renderUploads(); showToast('示例照片已通过基础检测'); }));
-      grid.querySelectorAll('[data-remove-upload]').forEach(btn => btn.addEventListener('click', () => { delete state.uploads[btn.dataset.removeUpload]; renderUploads(); }));
-      grid.querySelectorAll('[data-file-input]').forEach(input => input.addEventListener('change', () => { if (input.files && input.files[0]) { state.uploads[input.dataset.fileInput] = true; renderUploads(); showToast('照片已添加，等待生成前检测'); } }));
+      grid.querySelectorAll('[data-sample-upload]').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (backendMode) return showToast('R2 测试模式需要选择真实图片', true);
+        state.uploads[btn.dataset.sampleUpload] = true;
+        renderUploads();
+        showToast('示例照片已通过基础检测');
+      }));
+      grid.querySelectorAll('[data-remove-upload]').forEach(btn => btn.addEventListener('click', () => removeUpload(btn.dataset.removeUpload)));
+      grid.querySelectorAll('[data-file-input]').forEach(input => input.addEventListener('change', () => {
+        if (!input.files || !input.files[0]) return;
+        if (backendMode) return void uploadRealImage(input.dataset.fileInput, input.files[0]);
+        state.uploads[input.dataset.fileInput] = true;
+        renderUploads();
+        showToast('照片已添加，等待生成前检测');
+      }));
     }
 
     function renderCreate() {
@@ -531,7 +790,7 @@
       document.getElementById('summaryDuration').textContent = `${state.duration} 秒`;
       document.getElementById('summaryCost').textContent = state.cost;
       document.getElementById('summaryBalance').textContent = state.balance;
-      document.getElementById('audioSpec').textContent = t.audio;
+      document.getElementById('audioSpec').textContent = backendMode ? '静音' : t.audio;
       document.getElementById('summaryPeople').innerHTML = iconPeople(t.people, t.id);
       document.querySelectorAll('.duration-btn').forEach(btn => btn.classList.toggle('selected', Number(btn.dataset.duration) === state.duration));
       document.querySelectorAll('[data-template]').forEach(btn => btn.classList.toggle('selected', btn.dataset.template === state.template));
@@ -580,7 +839,26 @@
       routeTo(route);
     }
 
-    function completeLogin(provider) {
+    async function completeLogin(provider) {
+      if (backendMode) {
+        const loginButtons = document.querySelectorAll('.login-provider, #verifyOtp');
+        loginButtons.forEach(button => { button.disabled = true; button.classList.add('opacity-60'); });
+        try {
+          const payload = await deviceLogin();
+          resetUploads();
+          showToast(payload.is_new_user ? '设备登录成功，已创建测试用户' : '设备登录成功');
+          const target = sessionStorage.getItem('virealAfterLogin') || 'home';
+          sessionStorage.removeItem('virealAfterLogin');
+          setTimeout(() => {
+            if (!resumeBackendVideoTask()) routeTo(target);
+          }, 450);
+        } catch (error) {
+          showToast(`设备登录失败：${errorMessage(error)}`, true);
+        } finally {
+          loginButtons.forEach(button => { button.disabled = false; button.classList.remove('opacity-60'); });
+        }
+        return;
+      }
       state.loggedIn = true;
       sessionStorage.setItem('virealLoggedIn', '1');
       updateAccountUI();
@@ -649,18 +927,216 @@
       if (type === 'region') { state.regionLocked = true; routeTo('region-locked'); }
       if (type === 'empty') { routeTo('works'); updateEmptyWorks(true); }
       if (type === 'network') { routeTo('create'); setTimeout(() => showToast('网络连接已断开，请检查网络后重试。照片仍保留在本页。', true), 300); }
-      if (type === 'reset') { sessionStorage.clear(); state.loggedIn = false; state.balance = 30; state.regionLocked = false; state.uploads = {}; state.consent = false; updateAccountUI(); renderCreate(); routeTo('home'); showToast('原型状态已重置'); }
+      if (type === 'reset') { clearTimeout(videoTaskPollTimer); sessionStorage.clear(); state.loggedIn = false; state.balance = 30; state.regionLocked = false; state.uploads = {}; state.currentTask = null; state.consent = false; updateAccountUI(); renderCreate(); routeTo('home'); showToast('原型状态已重置'); }
     }
 
-    function startGeneration() {
+    function readStoredVideoTask() {
+      try {
+        const task = JSON.parse(sessionStorage.getItem(VIDEO_TASK_STORAGE_KEY) || 'null');
+        return task && typeof task.id === 'string' ? task : null;
+      } catch (_) {
+        sessionStorage.removeItem(VIDEO_TASK_STORAGE_KEY);
+        return null;
+      }
+    }
+
+    function persistVideoTask(task) {
+      state.currentTask = task;
+      sessionStorage.setItem(VIDEO_TASK_STORAGE_KEY, JSON.stringify(task));
+    }
+
+    function createIdempotencyKey() {
+      return typeof crypto.randomUUID === 'function'
+        ? `h5-${crypto.randomUUID()}`
+        : `h5-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function getVideoSubmission(uploadId) {
+      const fingerprint = `dance:${uploadId}:${state.duration}`;
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(VIDEO_SUBMISSION_STORAGE_KEY) || 'null');
+        if (stored?.fingerprint === fingerprint && stored?.idempotencyKey) return stored;
+      } catch (_) {
+        // Replace corrupt local state with a new idempotency key below.
+      }
+      const submission = { fingerprint, idempotencyKey: createIdempotencyKey() };
+      sessionStorage.setItem(VIDEO_SUBMISSION_STORAGE_KEY, JSON.stringify(submission));
+      return submission;
+    }
+
+    function refundDemoCoins(task) {
+      if (!task.charged || task.refunded) return;
+      task.refunded = true;
+      state.balance += Number(task.cost || 0);
+      updateAccountUI();
+      persistVideoTask(task);
+      showToast(`${task.cost} 金币已返还`);
+    }
+
+    function updateGenerationFromTask(payload) {
+      const task = state.currentTask || { id: payload.id, cost: state.cost, charged: false, refunded: false };
+      const previousStatus = task.status;
+      task.status = payload.status;
+      persistVideoTask(task);
+
+      const video = document.getElementById('generationVideo');
+      const progressPanel = document.getElementById('generationProgressPanel');
+      const title = document.getElementById('generationTitle');
+      const subtitle = document.getElementById('generationSubtitle');
+      const progress = document.getElementById('progressValue');
+      const ring = document.getElementById('progressRing');
+      const display = {
+        submitting: ['正在提交生成任务', '正在安全创建 Replicate prediction…', '15%', '15%'],
+        pending: ['任务已进入生成队列', '等待 Wan 2.7 开始处理，请勿重复提交。', '25%', '25%'],
+        running: ['正在让照片动起来', 'Wan 2.7 正在生成 720P · 9:16 静音视频。', '62%', '62%'],
+        saving: ['生成完成，正在安全转存', 'Worker 正在把临时结果写入私有 Cloudflare R2。', '88%', '88%'],
+        submission_unknown: ['提交结果暂时无法确认', payload.error || '系统不会自动重提，以避免重复计费；仍会等待已签名 Webhook。', '!', '100%'],
+        failed: ['本次生成未完成', payload.error || 'Replicate 返回生成失败。', '!', '100%'],
+        canceled: ['生成任务已取消', payload.error || '本次任务没有输出视频。', '!', '100%'],
+        expired: ['作品已过期', '图片和视频已按 24 小时规则清理。', '—', '100%']
+      }[payload.status];
+
+      if (payload.status === 'succeeded') {
+        state.generation = 'ready';
+        progressPanel.classList.add('hidden');
+        video.classList.remove('hidden');
+        if (payload.playback_url && video.src !== payload.playback_url) {
+          video.src = payload.playback_url;
+          video.load();
+        }
+        if (previousStatus !== 'succeeded') showToast('视频已转存到私有 R2，可以播放');
+        return;
+      }
+
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.classList.add('hidden');
+      progressPanel.classList.remove('hidden');
+      if (display) {
+        title.textContent = display[0];
+        subtitle.textContent = display[1];
+        progress.textContent = display[2];
+        ring.style.setProperty('--progress', display[3]);
+      }
+      if (['failed', 'canceled', 'submission_unknown'].includes(payload.status)) {
+        state.generation = 'failed';
+        refundDemoCoins(task);
+      } else {
+        state.generation = 'processing';
+      }
+    }
+
+    function shouldPollVideoTask(status) {
+      return !['succeeded', 'failed', 'canceled', 'expired'].includes(status);
+    }
+
+    async function pollBackendVideoTask() {
+      clearTimeout(videoTaskPollTimer);
+      const task = state.currentTask;
+      if (!backendMode || !state.appToken || !task?.id) return;
+      try {
+        const response = await fetch(apiUrl(`/api/v1/app/video-tasks/${task.id}`), {
+          headers: appRequestHeaders()
+        });
+        if (!response.ok) throw new Error(await responseError(response));
+        const payload = await response.json();
+        updateGenerationFromTask(payload);
+        if (shouldPollVideoTask(payload.status)) {
+          videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+        }
+      } catch (error) {
+        if (isExpiredBackendSession(error)) return clearExpiredBackendSession();
+        document.getElementById('generationSubtitle').textContent = `状态查询失败：${backendErrorMessage(error)}，3 秒后重试。`;
+        videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+      }
+    }
+
+    function resumeBackendVideoTask() {
+      if (!backendMode || !state.loggedIn) return false;
+      const stored = readStoredVideoTask();
+      if (!stored) return false;
+      state.currentTask = stored;
+      routeTo('generation', true);
+      void pollBackendVideoTask();
+      return true;
+    }
+
+    async function submitBackendVideoTask() {
+      const upload = Object.values(state.uploads)[0];
+      const submission = getVideoSubmission(upload.uploadId);
+      const button = document.getElementById('generateButton');
+      button.disabled = true;
+      button.classList.add('opacity-60');
+      button.firstElementChild.textContent = '正在提交…';
+      try {
+        const response = await fetch(apiUrl('/api/v1/app/video-tasks'), {
+          method: 'POST',
+          headers: appRequestHeaders({
+            'Content-Type': 'application/json',
+            'Idempotency-Key': submission.idempotencyKey
+          }),
+          body: JSON.stringify({
+            template_id: 'dance',
+            upload_ids: [upload.uploadId],
+            duration: state.duration
+          })
+        });
+        if (!response.ok) {
+          if (response.status < 500) sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+          throw new Error(await responseError(response));
+        }
+        const payload = await response.json();
+        if (!payload.id || !payload.status) throw new Error('任务响应缺少 id 或 status');
+        const task = {
+          id: payload.id,
+          idempotencyKey: submission.idempotencyKey,
+          cost: state.cost,
+          charged: true,
+          refunded: false,
+          status: payload.status
+        };
+        state.balance -= state.cost;
+        updateAccountUI();
+        persistVideoTask(task);
+        sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+        routeTo('generation');
+        updateGenerationFromTask(payload);
+        if (shouldPollVideoTask(payload.status)) {
+          videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+        }
+        showToast(`真实任务已提交，演示余额扣除 ${state.cost} 金币`);
+      } catch (error) {
+        if (isExpiredBackendSession(error)) return clearExpiredBackendSession();
+        showToast(`生成任务提交失败：${backendErrorMessage(error)}`, true);
+      } finally {
+        button.disabled = false;
+        button.classList.remove('opacity-60');
+        button.firstElementChild.textContent = backendMode ? '生成真实视频' : '生成视频';
+      }
+    }
+
+    async function startGeneration() {
+      if (backendMode && readStoredVideoTask()) {
+        resumeBackendVideoTask();
+        showToast('已恢复当前真实生成任务，请勿重复提交');
+        return;
+      }
       const need = selectedTemplate().people;
       const uploaded = Object.keys(state.uploads).length;
       if (uploaded < need) {
         document.querySelectorAll('[data-upload-zone]').forEach(z => z.classList.add('error'));
         showToast(`还需要上传 ${need - uploaded} 张照片`, true); return;
       }
+      if (backendMode && !Object.values(state.uploads).every(entry => entry && entry.status === 'verified')) {
+        showToast('请等待所有图片完成 R2 私有读取验证', true); return;
+      }
+      if (backendMode && !Object.values(state.uploads).every(entry => entry.uploadId)) {
+        showToast('上传响应缺少 upload_id，请重新上传图片', true); return;
+      }
       if (!state.consent) { openModal('consent'); showToast('请先确认成年人及肖像授权声明', true); return; }
       if (state.balance < state.cost) { openModal('insufficient'); return; }
+      if (backendMode) return submitBackendVideoTask();
       state.balance -= state.cost; updateAccountUI(); state.generation = 'processing';
       routeTo('generation'); showToast(`任务已提交，已扣除 ${state.cost} 金币`);
     }
@@ -692,6 +1168,14 @@
       document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
       document.getElementById('langToggle').textContent = state.language === 'zh' ? '中' : 'EN';
       document.querySelectorAll('[data-i18n]').forEach(el => { const val = translations[state.language][el.dataset.i18n]; if (val) el.textContent = val; });
+      if (backendMode) {
+        document.querySelector('[data-i18n="heroDesc"]').textContent = state.language === 'zh'
+          ? '上传一张已授权的成年人全身照，生成 5 或 10 秒的私有静音跳舞视频。'
+          : 'Upload one authorized full-body photo of an adult to create a private 5- or 10-second silent dance video.';
+        document.querySelector('[data-i18n="templatesDesc"]').textContent = state.language === 'zh'
+          ? '首次 PoC 固定使用 Wan 2.7 单人跳舞提示词，减少身份与肢体漂移。'
+          : 'The first PoC uses a controlled Wan 2.7 single-person dance prompt.';
+      }
       renderTemplateCards(); renderCreate();
       localStorage.setItem('virealLang', state.language);
     }
@@ -704,6 +1188,30 @@
       const apple = document.getElementById('appleLogin'), google = document.getElementById('googleLogin');
       if (android) list.insertBefore(google, apple); else list.insertBefore(apple, google);
       document.getElementById('deviceHint').textContent = iphone ? '检测到 Apple 设备，已优先展示 Apple 登录。其他方式仍可选择。' : android ? '检测到 Android 设备，已优先展示 Google 登录。其他方式仍可选择。' : '选择一种方式登录。首次登录赠送 30 金币。';
+    }
+
+    function applyBackendModeUI() {
+      const banner = document.getElementById('backendModeBanner');
+      if (!backendMode) return;
+      banner.classList.remove('hidden');
+      banner.classList.add('flex');
+      document.getElementById('backendApiHost').textContent = new URL(API_BASE_URL).host;
+      document.getElementById('deviceHint').textContent = 'Replicate + R2 实链路测试模式：点击任意登录方式将使用当前设备创建测试用户。';
+      const fifteenSecondButton = document.querySelector('[data-duration="15"]');
+      if (fifteenSecondButton) fifteenSecondButton.classList.add('hidden');
+      document.getElementById('durationList').classList.remove('grid-cols-3');
+      document.getElementById('durationList').classList.add('grid-cols-2');
+      document.getElementById('audioSpec').textContent = '静音';
+      document.getElementById('heroDurationSpec').innerHTML = '<b class="text-mint">✓</b> 5 / 10 sec';
+      document.getElementById('heroAudioSpec').innerHTML = '<b class="text-mint">✓</b> Silent output';
+      document.getElementById('heroAudioIcon').textContent = '∅';
+      document.getElementById('heroModelLabel').textContent = 'DANCE · WAN 2.7';
+      document.getElementById('homeUploadCount').textContent = '上传 1 张真实全身照';
+      document.getElementById('privacyStorageCopy').textContent = '原图和视频存储在私有 Cloudflare R2，仅你本人可通过短期授权地址访问，并在 24 小时后进入清理。';
+      document.getElementById('uploadGuidance').textContent = '首次 PoC 仅支持一张已授权的成年人单人全身照；请确保脸部清晰、身体完整且无遮挡。';
+      document.getElementById('generateButton').firstElementChild.textContent = '生成真实视频';
+      document.getElementById('generationDemoActions').classList.add('hidden');
+      document.getElementById('progressStep3').innerHTML = '<span class="grid h-7 w-7 place-items-center rounded-full border border-white/25 text-xs font-black">3</span><b class="mt-3 block text-sm">安全转存</b><span class="text-[11px] text-white/40">写入私有 Cloudflare R2</span>';
     }
 
     function applyFocusMode() {
@@ -744,7 +1252,21 @@
     document.getElementById('sendOtp').addEventListener('click', () => { const email = document.getElementById('emailInput'); if (!email.value.includes('@')) return showToast('请输入有效邮箱地址', true); document.getElementById('emailStepOne').classList.add('hidden'); document.getElementById('emailStepTwo').classList.remove('hidden'); showToast('验证码已发送'); });
     document.getElementById('editEmail').addEventListener('click', () => { document.getElementById('emailStepTwo').classList.add('hidden'); document.getElementById('emailStepOne').classList.remove('hidden'); });
     document.getElementById('verifyOtp').addEventListener('click', () => { if (document.getElementById('otpInput').value !== '123456') return showToast('验证码不正确', true); completeLogin('邮箱'); });
-    document.getElementById('logoutButton').addEventListener('click', () => { state.loggedIn = false; sessionStorage.setItem('virealLoggedIn','0'); updateAccountUI(); routeTo('home'); showToast('已退出登录'); });
+    document.getElementById('logoutButton').addEventListener('click', () => {
+      clearTimeout(videoTaskPollTimer);
+      resetUploads();
+      state.loggedIn = false;
+      state.appToken = '';
+      state.appUser = null;
+      state.currentTask = null;
+      sessionStorage.removeItem(APP_TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(VIDEO_TASK_STORAGE_KEY);
+      sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+      sessionStorage.setItem('virealLoggedIn','0');
+      updateAccountUI();
+      routeTo('home');
+      showToast('已退出登录');
+    });
     document.querySelectorAll('.duration-btn').forEach(btn => btn.addEventListener('click', () => { state.duration = Number(btn.dataset.duration); state.cost = Number(btn.dataset.cost); renderCreate(); }));
     document.getElementById('consentRow').addEventListener('click', () => openModal('consent'));
     document.getElementById('generateButton').addEventListener('click', startGeneration);
@@ -756,8 +1278,10 @@
     updateAccountUI();
     orderLoginProviders();
     applyLanguage();
+    applyBackendModeUI();
     const initialRoute = focus ? 'home' : (location.hash.slice(1) || 'home');
     if (state.regionLocked && !focus && initialRoute !== 'home') routeTo('region-locked', true); else routeTo(initialRoute, true);
+    if (backendMode && state.loggedIn) resumeBackendVideoTask();
     applyFocusMode();
   </script>
 </body>

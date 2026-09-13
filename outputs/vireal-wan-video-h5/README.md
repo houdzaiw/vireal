@@ -25,6 +25,29 @@
 - `#account`：账户设置
 - `#region-locked`：地区限制
 
+## Cloudflare Pages 部署
+
+生产构建会把 API Origin 注入页面，并默认启用真实后端模式。本地原型文件仍可继续使用查询参数覆盖配置。
+
+Cloudflare Pages 项目配置：
+
+```text
+Production branch: master
+Root directory: /
+Build command: bash scripts/build-vireal-pages.sh
+Build output directory: dist/vireal-pages
+Environment variable: VIREAL_API_BASE_URL=https://api.example.com
+```
+
+本地验证生产构建：
+
+```bash
+VIREAL_API_BASE_URL=https://api.example.com bash scripts/build-vireal-pages.sh
+python3 -m http.server 5173 --directory dist/vireal-pages
+```
+
+打开 `http://localhost:5173` 时页面会使用构建时注入的 HTTPS API。Cloudflare Pages 绑定 `app.example.com` 后，需要把该完整 Origin 同时加入后端 `BACKEND_CORS_ORIGINS`。
+
 使用 `?sandbox=true&focus=功能编号` 可进入专注模式，例如：
 
 - `prototype_v1.0.html?sandbox=true&focus=upload#create`
