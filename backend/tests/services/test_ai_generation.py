@@ -181,6 +181,29 @@ def test_ark_provider_uses_public_base_url_for_local_upload_when_configured(
     assert result.output_url == "https://result.example.com/video.mp4"
 
 
+def test_ark_provider_uses_signed_r2_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app_user_id = uuid.uuid4()
+    image_url = f"/api/v1/app/uploads/images/{app_user_id}/{uuid.uuid4()}.png"
+    monkeypatch.setattr(settings, "ARK_API_KEY", "test-key")
+    monkeypatch.setattr(settings, "APP_IMAGE_STORAGE_BACKEND", "r2")
+    monkeypatch.setattr(
+        "app.services.ai_generation.create_provider_read_url",
+        lambda value: (
+            "https://r2.example.com/signed-image.png"
+            if value == image_url
+            else pytest.fail("unexpected image URL")
+        ),
+    )
+
+    provider = ArkAIGenerationProvider()
+
+    assert provider._absolute_url(image_url) == (
+        "https://r2.example.com/signed-image.png"
+    )
+
+
 def test_ark_provider_rejects_missing_local_upload_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -14,7 +14,11 @@ from app import crud
 from app.core.config import settings
 from app.core.db import engine
 from app.models import AppGeneration
-from app.services.storage import detect_image_type, get_local_upload_root
+from app.services.storage import (
+    create_provider_read_url,
+    detect_image_type,
+    get_local_upload_root,
+)
 
 
 @dataclass(frozen=True)
@@ -179,6 +183,11 @@ class ArkAIGenerationProvider:
     def _absolute_url(self, url: str) -> str:
         if url.startswith(("http://", "https://")):
             return url
+        if settings.APP_IMAGE_STORAGE_BACKEND == "r2":
+            try:
+                return create_provider_read_url(url)
+            except ValueError as exc:
+                raise AIGenerationProviderError(str(exc)) from exc
         if url.startswith("/uploads/") and settings.APP_PUBLIC_BASE_URL:
             return f"{settings.APP_PUBLIC_BASE_URL.rstrip('/')}{url}"
         if url.startswith("/uploads/"):

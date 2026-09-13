@@ -1,8 +1,14 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
+from app.api.routes import app_uploads as app_uploads_module
 from app.core.config import settings
+from app.models import AppUpload
+from app.services.storage import ReadImage, build_r2_app_image_url
 from tests.utils.app_user import app_authentication_headers
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\napp-test-image"
@@ -56,9 +62,11 @@ def test_upload_app_image(client: TestClient) -> None:
 
     assert response.status_code == 200
     content = response.json()
+    assert uuid.UUID(content["id"])
     assert content["content_type"] == "image/png"
     assert content["size"] == len(PNG_BYTES)
     assert content["url"].startswith(f"/uploads/images/{app_user['id']}/")
+    assert datetime.fromisoformat(content["expires_at"]) > datetime.now(UTC)
 
 
 def test_upload_app_image_rejects_non_image(client: TestClient) -> None:
@@ -86,6 +94,93 @@ def test_upload_app_image_rejects_too_large_image(client: TestClient) -> None:
 
     assert response.status_code == 413
     assert response.json()["detail"] == "Image is too large"
+
+
+def test_read_r2_image_redirects_to_short_lived_signed_url(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeImageStorage:
+        def create_object_read_url(self, object_key: str, *, expires_in: int) -> str:
+            assert object_key.startswith("vireal/images/")
+            assert expires_in == settings.R2_DOWNLOAD_URL_EXPIRE_SECONDS
+            return "https://bucket.account.r2.cloudflarestorage.com/signed-image"
+
+    headers, login_data = app_authentication_headers(client=client)
+    monkeypatch.setattr(
+        app_uploads_module,
+        "get_image_storage",
+        lambda: FakeImageStorage(),
+    )
+    app_user_id = uuid.UUID(login_data["app_user"]["id"])
+    filename = f"{uuid.uuid4()}.png"
+    image_url = build_r2_app_image_url(
+        app_user_id=app_user_id,
+        filename=filename,
+    )
+    db.add(
+        AppUpload(
+            app_user_id=app_user_id,
+            url=image_url,
+            object_key=f"vireal/images/{app_user_id}/{filename}",
+            content_type="image/png",
+            size=len(PNG_BYTES),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/app/uploads/images/{app_user_id}/{filename}",
+        headers=headers,
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"].startswith("https://")
+    assert response.headers["cache-control"] == "private, no-store"
+
+
+def test_read_image_content_uses_same_origin_private_proxy(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeImageStorage:
+        def read_app_image(self, url: str) -> ReadImage:
+            assert url.startswith("/uploads/images/")
+            return ReadImage(content=b"proxy-image", content_type="image/png")
+
+    headers, login_data = app_authentication_headers(client=client)
+    monkeypatch.setattr(
+        app_uploads_module,
+        "get_image_storage",
+        lambda: FakeImageStorage(),
+    )
+    app_user_id = uuid.UUID(login_data["app_user"]["id"])
+    filename = f"{uuid.uuid4()}.png"
+    db.add(
+        AppUpload(
+            app_user_id=app_user_id,
+            url=f"/uploads/images/{app_user_id}/{filename}",
+            object_key=f"images/{app_user_id}/{filename}",
+            content_type="image/png",
+            size=len(PNG_BYTES),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/app/uploads/images/{app_user_id}/{filename}/content",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"proxy-image"
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "private, no-store"
 
 
 def test_create_content_and_read_feed(client: TestClient) -> None:

@@ -11,8 +11,6 @@ from app.core.config import settings
 from app.services.storage import get_local_upload_root
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
-UPLOADS_DIR = get_local_upload_root()
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -30,14 +28,24 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_HOST],
+    allow_origins=list(
+        dict.fromkeys(
+            [
+                settings.FRONTEND_HOST.rstrip("/"),
+                *(str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS),
+            ]
+        )
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+if settings.APP_IMAGE_STORAGE_BACKEND == "local":
+    uploads_dir = get_local_upload_root()
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 if FRONTEND_DIR.exists():
     app.frontend("/", directory=FRONTEND_DIR)
 elif settings.FASTAPI_ENV != "development":

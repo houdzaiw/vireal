@@ -21,6 +21,7 @@ fileConfig(config.config_file_name)
 
 from app.models import SQLModel  # noqa
 from app.core.config import settings # noqa
+from app.services.legacy_migrations import reconcile_legacy_replicate_revision  # noqa
 
 target_metadata = SQLModel.metadata
 
@@ -72,6 +73,9 @@ def run_migrations_online():
     )
 
     with connectable.connect() as connection:
+        with connection.begin():
+            reconcile_legacy_replicate_revision(connection)
+
         context.configure(
             connection=connection, target_metadata=target_metadata, compare_type=True
         )

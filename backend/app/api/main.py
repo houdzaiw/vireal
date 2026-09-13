@@ -9,10 +9,12 @@ from app.api.routes import (
     app_orders,
     app_uploads,
     app_users,
+    app_video_tasks,
     items,
     login,
     payment_webhooks,
     private,
+    replicate_webhooks,
     users,
     utils,
 )
@@ -30,8 +32,10 @@ api_router.include_router(app_contents.router)
 api_router.include_router(app_generations.router)
 api_router.include_router(app_configs.router)
 api_router.include_router(app_orders.router)
+api_router.include_router(app_video_tasks.router)
 api_router.include_router(admin_app.router)
 api_router.include_router(payment_webhooks.router)
+api_router.include_router(replicate_webhooks.router)
 
 
 if settings.FASTAPI_ENV == "development":

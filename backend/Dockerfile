@@ -62,4 +62,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 WORKDIR /app/backend/
 
+EXPOSE 8000
+
 CMD ["fastapi", "run", "--workers", "4"]

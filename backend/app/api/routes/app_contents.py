@@ -29,7 +29,9 @@ def _normalize_content_input(content_in: AppContentCreate) -> AppContentCreate:
     if len(image_urls) > MAX_CONTENT_IMAGES:
         raise HTTPException(status_code=400, detail="Too many images")
     if any(not is_supported_uploaded_image_url(image_url) for image_url in image_urls):
-        raise HTTPException(status_code=400, detail="Image URL must be local upload URL")
+        raise HTTPException(
+            status_code=400, detail="Image URL must be an uploaded image"
+        )
     return AppContentCreate(text=text, image_urls=image_urls)
 
 

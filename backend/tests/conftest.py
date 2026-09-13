@@ -16,12 +16,24 @@ from app.models import (
     AppGeneration,
     AppOrder,
     AppOrderEvent,
+    AppUpload,
     AppUser,
+    AppVideoTask,
+    AppVideoTaskWebhookEvent,
     Item,
     User,
 )
 from tests.utils.user import authentication_token_from_email
 from tests.utils.utils import get_superuser_token_headers
+
+
+@pytest.fixture(scope="session", autouse=True)
+def local_image_storage_for_tests() -> Generator[None]:
+    """Keep API tests deterministic when a developer .env enables R2."""
+    original_backend = settings.APP_IMAGE_STORAGE_BACKEND
+    settings.APP_IMAGE_STORAGE_BACKEND = "local"  # type: ignore[assignment]
+    yield
+    settings.APP_IMAGE_STORAGE_BACKEND = original_backend
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -42,6 +54,12 @@ def db() -> Generator[Session]:
         statement = delete(AppContentImage)
         session.execute(statement)
         statement = delete(AppContent)
+        session.execute(statement)
+        statement = delete(AppVideoTaskWebhookEvent)
+        session.execute(statement)
+        statement = delete(AppVideoTask)
+        session.execute(statement)
+        statement = delete(AppUpload)
         session.execute(statement)
         statement = delete(AppDevice)
         session.execute(statement)

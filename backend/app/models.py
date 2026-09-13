@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import EmailStr
-from sqlalchemy import DateTime, Text
+from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -102,6 +102,12 @@ class AppUser(AppUserBase, table=True):
     generations: list[AppGeneration] = Relationship(
         back_populates="app_user", cascade_delete=True
     )
+    uploads: list[AppUpload] = Relationship(
+        back_populates="app_user", cascade_delete=True
+    )
+    video_tasks: list[AppVideoTask] = Relationship(
+        back_populates="app_user", cascade_delete=True
+    )
 
 
 class AppDevice(SQLModel, table=True):
@@ -151,10 +157,150 @@ class AppUserProfileUpdate(SQLModel):
     avatar_url: str | None = Field(default=None, max_length=2048)
 
 
+class AppUpload(SQLModel, table=True):
+    __tablename__ = "app_upload"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    url: str
+    object_key: str = Field(max_length=2048)
+    content_type: str = Field(max_length=100)
+    size: int
+    status: str = Field(default="active", max_length=20, index=True)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    expires_at: datetime = Field(sa_type=DateTime(timezone=True), index=True)  # type: ignore
+    deleted_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    app_user: AppUser | None = Relationship(back_populates="uploads")
+
+
 class AppUploadPublic(SQLModel):
+    id: uuid.UUID
     url: str
     content_type: str
     size: int
+    expires_at: datetime
+
+
+class AppVideoTask(SQLModel, table=True):
+    __tablename__ = "app_video_task"
+    __table_args__ = (
+        UniqueConstraint(
+            "app_user_id",
+            "idempotency_key",
+            name="uq_app_video_task_user_idempotency_key",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    idempotency_key: str = Field(max_length=255)
+    template_id: str = Field(max_length=50)
+    upload_ids_json: str = Field(sa_type=Text)
+    provider: str = Field(default="replicate", max_length=30)
+    model: str = Field(max_length=255)
+    provider_task_id: str | None = Field(
+        default=None, unique=True, index=True, max_length=255
+    )
+    status: str = Field(default="submitting", max_length=30, index=True)
+    duration: int
+    resolution: str = Field(default="720p", max_length=20)
+    aspect_ratio: str = Field(default="9:16", max_length=20)
+    seed: int
+    provider_output_url: str | None = Field(default=None, sa_type=Text)
+    output_object_key: str | None = Field(default=None, max_length=2048)
+    error: str | None = Field(default=None, sa_type=Text)
+    metrics_json: str | None = Field(default=None, sa_type=Text)
+    submission_attempted_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        index=True,  # type: ignore
+    )
+    worker_attempts: int = Field(default=0)
+    worker_locked_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        index=True,  # type: ignore
+    )
+    next_attempt_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        index=True,  # type: ignore
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    expires_at: datetime = Field(sa_type=DateTime(timezone=True), index=True)  # type: ignore
+    app_user: AppUser | None = Relationship(back_populates="video_tasks")
+    webhook_events: list[AppVideoTaskWebhookEvent] = Relationship(
+        back_populates="video_task", cascade_delete=True
+    )
+
+
+class AppVideoTaskWebhookEvent(SQLModel, table=True):
+    __tablename__ = "app_video_task_webhook_event"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    video_task_id: uuid.UUID = Field(
+        foreign_key="app_video_task.id",
+        nullable=False,
+        ondelete="CASCADE",
+        index=True,
+    )
+    webhook_id: str = Field(unique=True, index=True, max_length=255)
+    provider_task_id: str = Field(index=True, max_length=255)
+    provider_status: str = Field(max_length=30)
+    payload_sha256: str = Field(max_length=64)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    video_task: AppVideoTask | None = Relationship(back_populates="webhook_events")
+
+
+class AppVideoTaskCreate(SQLModel):
+    template_id: Literal["dance"]
+    upload_ids: list[uuid.UUID] = Field(min_length=1, max_length=1)
+    duration: Literal[5, 10]
+
+
+class AppVideoTaskPublic(SQLModel):
+    id: uuid.UUID
+    template_id: str
+    status: Literal[
+        "submitting",
+        "pending",
+        "running",
+        "saving",
+        "succeeded",
+        "failed",
+        "canceled",
+        "submission_unknown",
+        "expired",
+    ]
+    duration: int
+    resolution: str
+    aspect_ratio: str
+    error: str | None = None
+    playback_url: str | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+    expires_at: datetime
 
 
 class AppContent(SQLModel, table=True):
@@ -422,6 +568,13 @@ class AppOrder(SQLModel, table=True):
 
 class AppOrderEvent(SQLModel, table=True):
     __tablename__ = "app_order_event"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "event_id",
+            name="uq_app_order_event_provider_event_id",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     order_id: uuid.UUID | None = Field(
