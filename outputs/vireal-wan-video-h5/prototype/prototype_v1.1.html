@@ -355,6 +355,7 @@
           <div class="relative flex min-h-[330px] items-center justify-center overflow-hidden p-8">
             <div class="hero-grid absolute inset-0 opacity-40"></div>
             <div class="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/15 blur-3xl"></div>
+            <span id="demoResultBadge" class="absolute right-5 top-5 z-10 hidden rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-white shadow-lg">演示结果</span>
             <video id="generationVideo" class="relative hidden max-h-[70vh] w-full max-w-sm rounded-[24px] bg-black shadow-2xl" controls playsinline preload="metadata"></video>
             <div id="generationProgressPanel" class="relative text-center">
               <div id="progressRing" class="ring-progress mx-auto grid h-36 w-36 place-items-center rounded-full p-2" style="--progress: 42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink"><div><b id="progressValue" class="block text-3xl font-black">42%</b><span class="text-[10px] uppercase tracking-widest text-white/45">Generating</span></div></div></div>
@@ -978,7 +979,7 @@
     }
 
     function getVideoSubmission(uploadId) {
-      const fingerprint = `dance:${uploadId}:${state.duration}`;
+      const fingerprint = `dance:${state.mode}:${uploadId}:${state.duration}`;
       try {
         const stored = JSON.parse(sessionStorage.getItem(VIDEO_SUBMISSION_STORAGE_KEY) || 'null');
         if (stored?.fingerprint === fingerprint && stored?.idempotencyKey) return stored;
@@ -1009,9 +1010,19 @@
       const previousStatus = task.status;
       const failureCopy = videoTaskFailureCopy(payload);
       task.status = payload.status;
+      task.mode = payload.mode || task.mode || state.mode;
+      task.duration = payload.duration || task.duration || state.duration;
+      task.executionType = payload.execution_type || task.executionType || null;
+      task.isDemo = typeof payload.is_demo === 'boolean' ? payload.is_demo : Boolean(task.isDemo);
+      task.fallbackReason = payload.fallback_reason || task.fallbackReason || null;
+      if (Number.isInteger(payload.user_real_remaining)) state.userRealRemaining = payload.user_real_remaining;
+      if (Number.isInteger(payload.wan_global_remaining)) state.wanGlobalRemaining = payload.wan_global_remaining;
+      state.mode = task.mode;
+      state.duration = task.duration;
       persistVideoTask(task);
 
       const video = document.getElementById('generationVideo');
+      const demoResultBadge = document.getElementById('demoResultBadge');
       const progressPanel = document.getElementById('generationProgressPanel');
       const title = document.getElementById('generationTitle');
       const subtitle = document.getElementById('generationSubtitle');
@@ -1021,6 +1032,7 @@
         submitting: ['正在提交生成任务', '正在安全创建 Replicate prediction…', '15%', '15%'],
         pending: ['任务已进入生成队列', '等待 Wan 2.7 开始处理，请勿重复提交。', '25%', '25%'],
         running: ['正在让照片动起来', 'Wan 2.7 正在生成 720P · 9:16 静音视频。', '62%', '62%'],
+        rendering_demo: ['正在生成演示动画', '真实生成服务暂时不可用，正在使用上传图片制作简单动画。', '72%', '72%'],
         saving: ['生成完成，正在安全转存', 'Worker 正在把临时结果写入私有 Cloudflare R2。', '88%', '88%'],
         submission_unknown: ['提交结果暂时无法确认', payload.error || '系统不会自动重提，以避免重复计费；仍会等待已签名 Webhook。', '!', '100%'],
         failed: [failureCopy[0], failureCopy[1], '!', '100%'],
@@ -1032,6 +1044,7 @@
         state.generation = 'ready';
         progressPanel.classList.add('hidden');
         video.classList.remove('hidden');
+        demoResultBadge.classList.toggle('hidden', !task.isDemo);
         if (payload.playback_url && video.src !== payload.playback_url) {
           video.src = payload.playback_url;
           video.load();
@@ -1044,6 +1057,7 @@
       video.removeAttribute('src');
       video.load();
       video.classList.add('hidden');
+      demoResultBadge.classList.add('hidden');
       progressPanel.classList.remove('hidden');
       if (display) {
         title.textContent = display[0];
@@ -1092,6 +1106,8 @@
       const stored = readStoredVideoTask();
       if (!stored) return false;
       state.currentTask = stored;
+      state.mode = stored.mode || state.mode;
+      state.duration = stored.duration || state.duration;
       routeTo('generation', true);
       void pollBackendVideoTask();
       return true;
@@ -1113,7 +1129,8 @@
           }),
           body: JSON.stringify({
             template_id: 'dance',
-            upload_ids: [upload.uploadId],
+            mode: state.mode,
+            upload_id: upload.uploadId,
             duration: state.duration
           })
         });
@@ -1126,6 +1143,11 @@
         const task = {
           id: payload.id,
           idempotencyKey: submission.idempotencyKey,
+          mode: state.mode,
+          duration: state.duration,
+          executionType: payload.execution_type,
+          isDemo: Boolean(payload.is_demo),
+          fallbackReason: payload.fallback_reason || null,
           status: payload.status
         };
         persistVideoTask(task);

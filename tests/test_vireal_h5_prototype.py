@@ -51,6 +51,21 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def test_free_experience_summary_exists(self) -> None:
         self.assertIn('id="freeExperienceSummary"', self.html)
 
+    def test_idempotency_fingerprint_includes_mode(self) -> None:
+        self.assertIn("dance:${state.mode}:${uploadId}:${state.duration}", self.html)
+
+    def test_video_task_request_sends_mode(self) -> None:
+        self.assertIn("mode: state.mode", self.html)
+
+    def test_task_persists_execution_metadata(self) -> None:
+        self.assertIn("executionType: payload.execution_type", self.html)
+        self.assertIn("isDemo: Boolean(payload.is_demo)", self.html)
+
+    def test_demo_rendering_state_and_badge_exist(self) -> None:
+        self.assertIn("rendering_demo", self.html)
+        self.assertIn("payload.is_demo", self.html)
+        self.assertIn('id="demoResultBadge"', self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
