@@ -66,6 +66,24 @@ class VirealH5PrototypeTests(unittest.TestCase):
         self.assertIn("payload.is_demo", self.html)
         self.assertIn('id="demoResultBadge"', self.html)
 
+    def test_bilingual_mode_and_demo_labels_exist(self) -> None:
+        for label in (
+            "普通模式",
+            "高级模式",
+            "Standard",
+            "Advanced",
+            "演示结果",
+            "Demo result",
+        ):
+            self.assertIn(label, self.html)
+
+    def test_progress_copy_is_not_hard_coded_to_wan(self) -> None:
+        self.assertNotIn("已提交到 Wan 视频生成队列", self.html)
+
+    def test_execution_label_helper_exists(self) -> None:
+        self.assertIn("function executionLabel(task)", self.html)
+        self.assertIn("local_demo", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

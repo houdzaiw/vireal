@@ -305,14 +305,14 @@
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create upload">
             <div class="flex items-start justify-between gap-4"><div><span class="text-xs font-black text-mint-dark">STEP 2</span><h2 class="mt-1 text-xl font-black">上传全身照</h2><p class="mt-1 text-xs leading-5 text-gray-500">JPG/PNG，单张不超过 5MB。脸部清晰、身体完整、无遮挡。</p></div><button class="shrink-0 text-xs font-bold text-mint-dark hover:underline" data-modal="photo-guide">拍摄指南</button></div>
             <div id="uploadGrid" class="mt-5 grid gap-3 sm:grid-cols-2"></div>
-            <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span id="uploadGuidance">上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。</span></div>
+            <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span id="uploadGuidance" data-i18n="uploadDisclosure">上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。</span></div>
           </section>
 
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" aria-labelledby="generationModeTitle" data-focus-zone="create mode">
-            <div><span class="text-xs font-black text-mint-dark">STEP 3</span><h2 id="generationModeTitle" class="mt-1 text-xl font-black">生成模式</h2></div>
+            <div><span class="text-xs font-black text-mint-dark">STEP 3</span><h2 id="generationModeTitle" class="mt-1 text-xl font-black" data-i18n="generationModeTitle">生成模式</h2></div>
             <div id="generationModeSwitch" class="generation-mode-switch mt-5" role="group" aria-label="生成模式">
-              <button type="button" class="generation-mode-btn" data-mode="standard" aria-pressed="true">普通模式</button>
-              <button type="button" class="generation-mode-btn" data-mode="advanced" aria-pressed="false">高级模式</button>
+              <button type="button" class="generation-mode-btn" data-mode="standard" aria-pressed="true" data-i18n="standardMode">普通模式</button>
+              <button type="button" class="generation-mode-btn" data-mode="advanced" aria-pressed="false" data-i18n="advancedMode">高级模式</button>
             </div>
             <p id="generationModeHint" class="mt-3 text-xs leading-5 text-gray-500">普通模式 · MiniMax · 固定约 5 秒</p>
           </section>
@@ -339,7 +339,7 @@
               <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between"><dt class="text-white/50">生成模式</dt><dd id="summaryMode" class="font-bold">普通模式</dd></div><div class="flex justify-between"><dt class="text-white/50">生成规格</dt><dd class="font-bold">720P · 9:16</dd></div><div class="flex justify-between"><dt class="text-white/50">预计等待</dt><dd class="font-bold">1–5 分钟</dd></div><div class="flex justify-between"><dt class="text-white/50">保存时长</dt><dd class="font-bold">24 小时</dd></div></dl>
               <div class="my-5 h-px bg-white/10"></div>
               <div id="freeExperienceSummary" class="rounded-2xl bg-white/[.06] p-4 text-sm" aria-live="polite"></div>
-              <button id="generateButton" class="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-mint font-extrabold text-ink transition hover:bg-white"><span>免费生成视频</span><span>→</span></button>
+              <button id="generateButton" class="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-mint font-extrabold text-ink transition hover:bg-white"><span data-i18n="freeGeneration">免费生成视频</span><span>→</span></button>
               <p class="mt-3 text-center text-[10px] leading-4 text-white/40">普通与高级模式合计每日最多真实生成 5 次</p>
             </div>
           </div>
@@ -355,12 +355,13 @@
           <div class="relative flex min-h-[330px] items-center justify-center overflow-hidden p-8">
             <div class="hero-grid absolute inset-0 opacity-40"></div>
             <div class="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/15 blur-3xl"></div>
-            <span id="demoResultBadge" class="absolute right-5 top-5 z-10 hidden rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-white shadow-lg">演示结果</span>
+            <span id="generationExecutionLabel" class="absolute left-5 top-5 z-10 hidden rounded-full bg-black/35 px-3 py-1.5 text-[10px] font-black text-white backdrop-blur"></span>
+            <span id="demoResultBadge" class="absolute right-5 top-5 z-10 hidden rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-white shadow-lg" data-i18n="demoResult">演示结果</span>
             <video id="generationVideo" class="relative hidden max-h-[70vh] w-full max-w-sm rounded-[24px] bg-black shadow-2xl" controls playsinline preload="metadata"></video>
             <div id="generationProgressPanel" class="relative text-center">
               <div id="progressRing" class="ring-progress mx-auto grid h-36 w-36 place-items-center rounded-full p-2" style="--progress: 42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink"><div><b id="progressValue" class="block text-3xl font-black">42%</b><span class="text-[10px] uppercase tracking-widest text-white/45">Generating</span></div></div></div>
               <h1 id="generationTitle" class="mt-7 text-2xl font-black">正在让照片动起来</h1>
-              <p id="generationSubtitle" class="mt-2 text-sm text-white/55">已提交到 Wan 视频生成队列，预计还需 2–4 分钟。</p>
+              <p id="generationSubtitle" class="mt-2 text-sm text-white/55">任务已进入生成队列，请勿重复提交。</p>
             </div>
           </div>
           <div class="border-t border-white/10 p-6 sm:p-8">
@@ -382,15 +383,15 @@
       <div id="worksGrid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <article id="work-processing" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
           <div class="relative flex aspect-[9/11] items-center justify-center overflow-hidden bg-ink text-white"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="relative text-center"><div class="ring-progress mx-auto grid h-20 w-20 place-items-center rounded-full p-1.5" style="--progress:42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink text-sm font-black">42%</div></div><p class="mt-4 text-xs font-bold text-white/65">生成中 · 可离开页面</p></div><span class="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold backdrop-blur">PROCESSING</span></div>
-          <div class="p-4"><div class="flex items-center justify-between"><div><b class="block">拥抱 · 5 秒</b><span class="text-[11px] text-gray-400">刚刚创建</span></div><button class="rounded-full border border-black/10 px-3 py-2 text-xs font-bold" data-route="generation">查看进度</button></div></div>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-mint-dark" data-work-execution data-mode="standard" data-execution-type="minimax">普通模式 · MiniMax 真实生成</span><div class="flex items-center justify-between"><div><b class="block">跳舞 · 5 秒</b><span class="text-[11px] text-gray-400">刚刚创建</span></div><button class="rounded-full border border-black/10 px-3 py-2 text-xs font-bold" data-route="generation">查看进度</button></div></div>
         </article>
         <article id="work-ready" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
           <button class="group relative block aspect-[9/11] w-full overflow-hidden bg-gradient-to-b from-[#bcded1] via-[#7fae9d] to-[#17312f] text-white" data-action="play-work"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="absolute inset-x-0 bottom-6 flex items-end justify-center"><div class="person -mr-2 -rotate-6 scale-90"></div><div class="person alt -ml-2 rotate-6 scale-90"></div></div><span class="absolute left-4 top-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] font-bold backdrop-blur">READY · 10 SEC</span><span class="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-ink shadow-xl transition group-hover:scale-110">▶</span><span class="absolute bottom-4 right-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] backdrop-blur">剩余 18:42:10</span></button>
-          <div class="p-4"><div class="flex items-center justify-between gap-3"><div><b class="block">牵手 · 10 秒</b><span class="text-[11px] text-gray-400">今天 14:20</span></div><div class="flex gap-1"><button class="grid h-9 w-9 place-items-center rounded-full border border-black/10 text-sm hover:bg-gray-50" title="下载" data-action="download-work">↓</button><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-ready">⌫</button></div></div></div>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-mint-dark" data-work-execution data-mode="advanced" data-execution-type="wan">高级模式 · Wan 真实生成</span><div class="flex items-center justify-between gap-3"><div><b class="block">跳舞 · 10 秒</b><span class="text-[11px] text-gray-400">今天 14:20</span></div><div class="flex gap-1"><button class="grid h-9 w-9 place-items-center rounded-full border border-black/10 text-sm hover:bg-gray-50" title="下载" data-action="download-work">↓</button><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-ready">⌫</button></div></div></div>
         </article>
-        <article id="work-refunded" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
-          <div class="relative flex aspect-[9/11] items-center justify-center overflow-hidden bg-[#ebeae6]"><div class="text-center"><span class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white text-xl shadow-sm">!</span><b class="mt-4 block text-sm">生成未完成</b><p class="mt-2 max-w-[190px] text-xs leading-5 text-gray-500">系统无法稳定呈现动作，本次未输出视频。</p><span class="mt-4 inline-flex rounded-full bg-mint/20 px-3 py-1.5 text-[11px] font-bold text-mint-dark">已返还 50 金币</span></div></div>
-          <div class="p-4"><div class="flex items-center justify-between gap-3"><div><b class="block">跳舞 · 15 秒</b><span class="text-[11px] text-gray-400">昨天 21:06</span></div><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-refunded">⌫</button></div></div>
+        <article id="work-demo" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
+          <button class="group relative block aspect-[9/11] w-full overflow-hidden bg-gradient-to-b from-[#ffe8df] via-[#d9b6aa] to-[#4a302c] text-white" data-action="play-work"><div class="hero-grid absolute inset-0 opacity-25"></div><div class="absolute inset-x-0 bottom-6 flex items-end justify-center"><div class="person dance scale-90"></div></div><span class="absolute left-4 top-4 rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-wide">Demo</span><span class="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-ink shadow-xl transition group-hover:scale-110">▶</span><span class="absolute bottom-4 right-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] backdrop-blur">剩余 22:16:03</span></button>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-[#a84232]" data-work-execution data-mode="standard" data-execution-type="local_demo">本地演示动画</span><div class="flex items-center justify-between gap-3"><div><b class="block">跳舞 · 5 秒</b><span class="text-[11px] text-gray-400">今天 13:05</span></div><div class="flex gap-1"><button class="grid h-9 w-9 place-items-center rounded-full border border-black/10 text-sm hover:bg-gray-50" title="下载" data-action="download-work">↓</button><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-demo">⌫</button></div></div></div>
         </article>
       </div>
     </section>
@@ -502,9 +503,67 @@
     let videoTaskPollTimer;
 
     const translations = {
-      zh: { navDiscover:'发现',navCreate:'创作',navWorks:'作品',privacyTag:'仅自己可见 · 24 小时自动删除',heroA:'让一张照片，',heroB:'动成一段记忆。',heroDesc:'上传已授权的成年人全身照，选择动作和时长。无需提示词，几分钟生成带声音的私人短视频。',startCreate:'开始创作',viewTemplates:'查看动作模板',templatesTitle:'动作已调好，只等你的照片',templatesDesc:'每个模板都有固定的动作指令和声音方案，降低肢体变形与身份漂移。'},
-      en: { navDiscover:'Discover',navCreate:'Create',navWorks:'Works',privacyTag:'Private · Auto-deleted in 24 hours',heroA:'Turn a photo into',heroB:'a moving memory.',heroDesc:'Upload authorized full-body photos of adults, choose a motion and duration. No prompts—get a private video with sound in minutes.',startCreate:'Start creating',viewTemplates:'Browse motions',templatesTitle:'Curated motion, ready for your photo',templatesDesc:'Each template uses a tuned motion prompt and audio setup for more consistent identity and body movement.'}
+      zh: {
+        navDiscover: '发现', navCreate: '创作', navWorks: '作品',
+        privacyTag: '仅自己可见 · 24 小时自动删除',
+        heroA: '让一张照片，', heroB: '动成一段记忆。',
+        heroDesc: '上传已授权的成年人全身照，选择动作和时长。无需提示词，几分钟生成私有静音短视频。',
+        startCreate: '开始创作', viewTemplates: '查看动作模板',
+        templatesTitle: '动作已调好，只等你的照片',
+        templatesDesc: '固定单人跳舞提示词，提供普通与高级两种生成模式。',
+        generationModeTitle: '生成模式', standardMode: '普通模式', advancedMode: '高级模式',
+        standardHint: '普通模式 · MiniMax · 固定约 5 秒',
+        advancedHint: '高级模式 · Wan · 可选 5 或 10 秒',
+        uploadDisclosure: '上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。',
+        freeGeneration: '免费生成视频', freeExperience: '免费',
+        personalQuota: '今日真实生成剩余', advancedQuota: '高级模式全站剩余',
+        executionMiniMax: '普通模式 · MiniMax 真实生成',
+        executionWan: '高级模式 · Wan 真实生成',
+        executionLocalDemo: '本地演示动画',
+        demoResult: '演示结果', retention: '素材和作品保留 24 小时',
+        statusSubmitting: '正在安全创建真实生成任务…',
+        statusQueued: '任务已进入生成队列，请勿重复提交。',
+        statusRunning: '正在生成 720P · 9:16 静音视频。',
+        statusRenderingDemo: '真实生成服务暂时不可用，正在使用上传图片制作简单动画。',
+        statusSaving: '正在把结果写入私有 Cloudflare R2。',
+        statusReady: '作品已写入私有 R2，可以播放。'
+      },
+      en: {
+        navDiscover: 'Discover', navCreate: 'Create', navWorks: 'Works',
+        privacyTag: 'Private · Auto-deleted in 24 hours',
+        heroA: 'Turn a photo into', heroB: 'a moving memory.',
+        heroDesc: 'Upload an authorized adult full-body photo and create a private, silent dance video—no prompt writing needed.',
+        startCreate: 'Start creating', viewTemplates: 'Browse motions',
+        templatesTitle: 'Curated motion, ready for your photo',
+        templatesDesc: 'A controlled solo-dance prompt with Standard and Advanced generation modes.',
+        generationModeTitle: 'Generation mode', standardMode: 'Standard', advancedMode: 'Advanced',
+        standardHint: 'Standard · MiniMax · About 5 seconds',
+        advancedHint: 'Advanced · Wan · Choose 5 or 10 seconds',
+        uploadDisclosure: 'By uploading, you confirm that you have the right to use this image. Third-party AI services may process it. Media is removed after 24 hours.',
+        freeGeneration: 'Generate for free', freeExperience: 'Free',
+        personalQuota: 'Real generations left today', advancedQuota: 'Advanced slots left globally',
+        executionMiniMax: 'Standard · MiniMax real generation',
+        executionWan: 'Advanced · Wan real generation',
+        executionLocalDemo: 'Local demo animation',
+        demoResult: 'Demo result', retention: 'Media is retained for 24 hours',
+        statusSubmitting: 'Securely creating the generation task…',
+        statusQueued: 'Queued for generation. Do not submit again.',
+        statusRunning: 'Generating a silent 720P · 9:16 video.',
+        statusRenderingDemo: 'The real provider is temporarily unavailable. Creating a simple animation from your photo.',
+        statusSaving: 'Saving the result to private Cloudflare R2.',
+        statusReady: 'Saved to private R2 and ready to play.'
+      }
     };
+
+    function t(key) {
+      return translations[state.language]?.[key] || translations.zh[key] || key;
+    }
+
+    function executionLabel(task) {
+      if (task.executionType === 'local_demo') return t('executionLocalDemo');
+      if (task.mode === 'advanced') return t('executionWan');
+      return t('executionMiniMax');
+    }
 
     function iconPeople(count, kind = '') {
       if (count === 2) return `<div class="flex items-end justify-center pt-8"><div class="person -mr-2 -rotate-6 scale-[.58]"></div><div class="person alt -ml-2 rotate-6 scale-[.58]"></div></div>`;
@@ -795,8 +854,8 @@
       renderGenerationMode();
       document.getElementById('selectedInputCount').textContent = `需要 ${t.people} 张照片`;
       document.getElementById('summaryTemplate').textContent = state.language === 'zh' ? t.name : t.en;
-      document.getElementById('summaryMode').textContent = state.mode === 'standard' ? '普通模式' : '高级模式';
-      document.getElementById('summaryDuration').textContent = `${state.duration} 秒`;
+      document.getElementById('summaryMode').textContent = state.mode === 'standard' ? t('standardMode') : t('advancedMode');
+      document.getElementById('summaryDuration').textContent = state.language === 'zh' ? `${state.duration} 秒` : `${state.duration} sec`;
       document.getElementById('audioSpec').textContent = backendMode ? '静音' : t.audio;
       document.getElementById('summaryPeople').innerHTML = iconPeople(t.people, t.id);
       document.querySelectorAll('.duration-btn').forEach(btn => btn.classList.toggle('selected', Number(btn.dataset.duration) === state.duration));
@@ -818,19 +877,19 @@
         .find((button) => Number(button.dataset.duration) === 10);
       duration10Button.disabled = isStandard;
       document.getElementById('generationModeHint').textContent = isStandard
-        ? '普通模式 · MiniMax · 固定约 5 秒'
-        : '高级模式 · Wan · 可选 5 或 10 秒';
+        ? t('standardHint')
+        : t('advancedHint');
     }
 
     function renderFreeExperienceSummary() {
       const advancedQuota = state.mode === 'advanced'
-        ? `<span class="mt-2 block text-white/55">高级模式全站剩余 ${state.wanGlobalRemaining}/3</span>`
+        ? `<span class="mt-2 block text-white/55">${t('advancedQuota')} ${state.wanGlobalRemaining}/3</span>`
         : '';
       document.getElementById('freeExperienceSummary').innerHTML = `
-        <span class="flex items-center justify-between gap-3"><span class="text-white/55">本次体验</span><b class="text-mint">免费</b></span>
-        <span class="mt-3 block text-xs text-white/55">今日真实生成剩余 ${state.userRealRemaining}/5</span>
+        <span class="flex items-center justify-between gap-3"><span class="text-white/55">${state.language === 'zh' ? '本次体验' : 'This generation'}</span><b class="text-mint">${t('freeExperience')}</b></span>
+        <span class="mt-3 block text-xs text-white/55">${t('personalQuota')} ${state.userRealRemaining}/5</span>
         ${advancedQuota}`;
-      document.getElementById('generateButton').firstElementChild.textContent = '免费生成视频';
+      document.getElementById('generateButton').firstElementChild.textContent = t('freeGeneration');
     }
 
     function updateAccountUI() {
@@ -921,7 +980,19 @@
       delete: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-xl text-red-500">⌫</span><h2 class="mt-5 text-2xl font-black">删除这条记录？</h2><p class="mt-3 text-sm leading-6 text-gray-500">作品将立即无法播放或下载，原图和视频会进入物理删除队列。删除后无法恢复。</p><div class="mt-6 grid grid-cols-2 gap-3"><button class="modal-close h-12 rounded-2xl border border-black/10 font-bold">取消</button><button id="confirmDelete" class="h-12 rounded-2xl bg-red-500 font-bold text-white">确认删除</button></div></div>`,
       player: () => `<div class="bg-ink text-white"><div class="relative flex aspect-[9/12] max-h-[72vh] items-end justify-center overflow-hidden bg-gradient-to-b from-[#bcded1] via-[#7fae9d] to-[#17312f]"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="mb-12 flex items-end"><div class="person -mr-2 -rotate-6"></div><div class="person alt -ml-2 rotate-6"></div></div><button class="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-xl text-ink shadow-xl">▶</button><div class="absolute inset-x-5 bottom-5"><div class="h-1 rounded-full bg-white/25"><div class="h-1 w-2/5 rounded-full bg-mint"></div></div><div class="mt-3 flex justify-between text-[10px] text-white/60"><span>00:04</span><span>00:10</span></div></div></div><div class="flex items-center justify-between p-5"><div><b>牵手 · 10 秒</b><p class="text-[11px] text-white/45">18 小时后自动删除</p></div><button class="rounded-full bg-white px-4 py-2 text-xs font-bold text-ink" data-action="download-work">下载</button></div></div>`,
       complaint: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="text-xs font-black uppercase tracking-[.2em] text-coral">Safety support</span><h2 class="mt-2 text-2xl font-black">内容投诉与肖像申诉</h2><p class="mt-3 text-sm leading-6 text-gray-500">如果你发现自己的肖像被未经授权使用，请提交可核验的信息。我们会冻结相关内容并进行人工复核。</p><label class="mt-5 block text-sm font-bold">联系邮箱</label><input class="mt-2 h-12 w-full rounded-xl border border-black/10 bg-gray-50 px-4" placeholder="name@example.com"/><label class="mt-4 block text-sm font-bold">问题描述</label><textarea class="mt-2 h-28 w-full resize-none rounded-xl border border-black/10 bg-gray-50 p-4" placeholder="请描述发生了什么"></textarea><button class="modal-close mt-5 h-12 w-full rounded-2xl bg-ink font-bold text-white" onclick="showToast('投诉请求已提交，我们会尽快处理')">提交投诉</button></div>`,
-      review: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="text-xs font-black uppercase tracking-[.2em] text-coral">Prototype controls</span><h2 class="mt-2 text-2xl font-black">演示场景</h2><p class="mt-2 text-xs leading-5 text-gray-500">用于评审关键状态，不属于正式产品界面。</p><div class="mt-6 grid gap-3"><button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="region"><span><b class="block">大陆地区限制</b><small class="text-gray-500">查看不可登录和付费状态</small></span><span>→</span></button><button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="empty"><span><b class="block">作品空状态</b><small class="text-gray-500">隐藏现有作品</small></span><span>→</span></button><button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="network"><span><b class="block">断网提示</b><small class="text-gray-500">模拟生成提交网络异常</small></span><span>→</span></button><button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="reset"><span><b class="block">重置原型</b><small class="text-gray-500">恢复登录与 30 金币状态</small></span><span>↺</span></button></div></div>`
+      review: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16">
+        <span class="text-xs font-black uppercase tracking-[.2em] text-coral">Prototype controls</span>
+        <h2 class="mt-2 text-2xl font-black">演示场景</h2>
+        <p class="mt-2 text-xs leading-5 text-gray-500">用于评审关键状态，不属于正式产品界面。</p>
+        <div class="mt-6 grid gap-3">
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="real-result"><span><b class="block">真实生成结果</b><small class="text-gray-500">普通模式 · MiniMax 播放器</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="demo-result"><span><b class="block">演示降级结果</b><small class="text-gray-500">同一播放器并显示 Demo 标记</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="region"><span><b class="block">大陆地区限制</b><small class="text-gray-500">查看不可登录状态</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="empty"><span><b class="block">作品空状态</b><small class="text-gray-500">隐藏现有作品</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="network"><span><b class="block">断网提示</b><small class="text-gray-500">模拟生成提交网络异常</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="reset"><span><b class="block">重置原型</b><small class="text-gray-500">恢复初始评审状态</small></span><span>↺</span></button>
+        </div>
+      </div>`
     };
 
     let pendingDeleteTarget = null;
@@ -949,8 +1020,44 @@
       document.getElementById('worksGrid').classList.toggle('hidden', empty);
     }
 
+    function renderWorkMetadata() {
+      document.querySelectorAll('[data-work-execution]').forEach((element) => {
+        element.textContent = executionLabel({
+          mode: element.dataset.mode,
+          executionType: element.dataset.executionType
+        });
+      });
+    }
+
+    function showReviewResult(isDemo) {
+      const task = {
+        id: isDemo ? 'review-demo-result' : 'review-real-result',
+        mode: 'standard',
+        duration: 5,
+        executionType: isDemo ? 'local_demo' : 'minimax',
+        isDemo,
+        fallbackReason: isDemo ? 'provider_unavailable' : null,
+        status: 'succeeded'
+      };
+      const video = document.getElementById('generationVideo');
+      video.poster = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1280"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#9bd8c4"/><stop offset="1" stop-color="#17312f"/></linearGradient></defs><rect width="720" height="1280" fill="url(#g)"/><circle cx="360" cy="420" r="92" fill="#e9b98c"/><path d="M220 560 Q360 500 500 560 L550 1120 L170 1120 Z" fill="#071b1b"/><text x="360" y="1210" text-anchor="middle" fill="white" font-family="sans-serif" font-size="32">Vireal review video</text></svg>')}`;
+      persistVideoTask(task);
+      routeTo('generation');
+      updateGenerationFromTask({
+        id: task.id,
+        mode: task.mode,
+        duration: task.duration,
+        execution_type: task.executionType,
+        is_demo: task.isDemo,
+        fallback_reason: task.fallbackReason,
+        status: task.status
+      });
+    }
+
     function runReviewScenario(type) {
       closeModal();
+      if (type === 'real-result') showReviewResult(false);
+      if (type === 'demo-result') showReviewResult(true);
       if (type === 'region') { state.regionLocked = true; routeTo('region-locked'); }
       if (type === 'empty') { routeTo('works'); updateEmptyWorks(true); }
       if (type === 'network') { routeTo('create'); setTimeout(() => showToast('网络连接已断开，请检查网络后重试。照片仍保留在本页。', true), 300); }
@@ -998,8 +1105,8 @@
     function videoTaskFailureCopy(payload) {
       if (isReplicateCreditError(payload.error)) {
         return [
-          '视频服务账户余额不足',
-          '页面金币仅为 PoC 演示值，不等于 Replicate 余额。运营方需为 Replicate 账户充值后再试。'
+          '真实视频服务暂不可用',
+          '真实生成额度不足，且本次演示降级未能完成。请稍后再试。'
         ];
       }
       return ['本次生成未完成', payload.error || '视频生成服务返回失败。'];
@@ -1023,17 +1130,19 @@
 
       const video = document.getElementById('generationVideo');
       const demoResultBadge = document.getElementById('demoResultBadge');
+      const generationExecutionLabel = document.getElementById('generationExecutionLabel');
       const progressPanel = document.getElementById('generationProgressPanel');
       const title = document.getElementById('generationTitle');
       const subtitle = document.getElementById('generationSubtitle');
       const progress = document.getElementById('progressValue');
       const ring = document.getElementById('progressRing');
+      const taskExecutionLabel = executionLabel(task);
       const display = {
-        submitting: ['正在提交生成任务', '正在安全创建 Replicate prediction…', '15%', '15%'],
-        pending: ['任务已进入生成队列', '等待 Wan 2.7 开始处理，请勿重复提交。', '25%', '25%'],
-        running: ['正在让照片动起来', 'Wan 2.7 正在生成 720P · 9:16 静音视频。', '62%', '62%'],
-        rendering_demo: ['正在生成演示动画', '真实生成服务暂时不可用，正在使用上传图片制作简单动画。', '72%', '72%'],
-        saving: ['生成完成，正在安全转存', 'Worker 正在把临时结果写入私有 Cloudflare R2。', '88%', '88%'],
+        submitting: ['正在提交生成任务', `${taskExecutionLabel} · ${t('statusSubmitting')}`, '15%', '15%'],
+        pending: ['任务已进入生成队列', `${taskExecutionLabel} · ${t('statusQueued')}`, '25%', '25%'],
+        running: ['正在让照片动起来', `${taskExecutionLabel} · ${t('statusRunning')}`, '62%', '62%'],
+        rendering_demo: ['正在生成演示动画', `${taskExecutionLabel} · ${t('statusRenderingDemo')}`, '72%', '72%'],
+        saving: ['生成完成，正在安全转存', `${taskExecutionLabel} · ${t('statusSaving')}`, '88%', '88%'],
         submission_unknown: ['提交结果暂时无法确认', payload.error || '系统不会自动重提，以避免重复计费；仍会等待已签名 Webhook。', '!', '100%'],
         failed: [failureCopy[0], failureCopy[1], '!', '100%'],
         canceled: ['生成任务已取消', payload.error || '本次任务没有输出视频。', '!', '100%'],
@@ -1044,12 +1153,15 @@
         state.generation = 'ready';
         progressPanel.classList.add('hidden');
         video.classList.remove('hidden');
+        generationExecutionLabel.textContent = taskExecutionLabel;
+        generationExecutionLabel.classList.remove('hidden');
+        demoResultBadge.textContent = t('demoResult');
         demoResultBadge.classList.toggle('hidden', !task.isDemo);
         if (payload.playback_url && video.src !== payload.playback_url) {
           video.src = payload.playback_url;
           video.load();
         }
-        if (previousStatus !== 'succeeded') showToast('视频已转存到私有 R2，可以播放');
+        if (previousStatus !== 'succeeded') showToast(t('statusReady'));
         return;
       }
 
@@ -1057,6 +1169,7 @@
       video.removeAttribute('src');
       video.load();
       video.classList.add('hidden');
+      generationExecutionLabel.classList.add('hidden');
       demoResultBadge.classList.add('hidden');
       progressPanel.classList.remove('hidden');
       if (display) {
@@ -1193,7 +1306,7 @@
 
     function completeGeneration(failed = false) {
       if (state.generation === 'failed' || state.generation === 'ready') {
-        showToast(state.generation === 'failed' ? '失败返还已处理，请勿重复操作' : '视频已经生成');
+        showToast(state.generation === 'failed' ? '失败状态已记录，请勿重复操作' : '视频已经生成');
         return;
       }
       if (failed) {
@@ -1223,10 +1336,14 @@
           ? '上传一张已授权的成年人全身照，生成 5 或 10 秒的私有静音跳舞视频。'
           : 'Upload one authorized full-body photo of an adult to create a private 5- or 10-second silent dance video.';
         document.querySelector('[data-i18n="templatesDesc"]').textContent = state.language === 'zh'
-          ? '首次 PoC 固定使用 Wan 2.7 单人跳舞提示词，减少身份与肢体漂移。'
-          : 'The first PoC uses a controlled Wan 2.7 single-person dance prompt.';
+          ? '固定使用单人跳舞提示词，普通模式使用 MiniMax，高级模式使用 Wan。'
+          : 'A controlled solo-dance prompt routes Standard to MiniMax and Advanced to Wan.';
       }
-      renderTemplateCards(); renderCreate();
+      renderTemplateCards(); renderCreate(); renderWorkMetadata();
+      if (state.currentTask) {
+        document.getElementById('generationExecutionLabel').textContent = executionLabel(state.currentTask);
+        document.getElementById('demoResultBadge').textContent = t('demoResult');
+      }
       localStorage.setItem('virealLang', state.language);
     }
 
@@ -1251,11 +1368,11 @@
       document.getElementById('heroDurationSpec').innerHTML = '<b class="text-mint">✓</b> 5 / 10 sec';
       document.getElementById('heroAudioSpec').innerHTML = '<b class="text-mint">✓</b> Silent output';
       document.getElementById('heroAudioIcon').textContent = '∅';
-      document.getElementById('heroModelLabel').textContent = 'DANCE · WAN 2.7';
+      document.getElementById('heroModelLabel').textContent = 'DANCE · MINIMAX / WAN';
       document.getElementById('homeUploadCount').textContent = '上传 1 张真实全身照';
       document.getElementById('privacyStorageCopy').textContent = '原图和视频存储在私有 Cloudflare R2，仅你本人可通过短期授权地址访问，并在 24 小时后进入清理。';
-      document.getElementById('uploadGuidance').textContent = '上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。';
-      document.getElementById('generateButton').firstElementChild.textContent = '免费生成视频';
+      document.getElementById('uploadGuidance').textContent = t('uploadDisclosure');
+      document.getElementById('generateButton').firstElementChild.textContent = t('freeGeneration');
       document.getElementById('generationDemoActions').classList.add('hidden');
       document.getElementById('progressStep3').innerHTML = '<span class="grid h-7 w-7 place-items-center rounded-full border border-white/25 text-xs font-black">3</span><b class="mt-3 block text-sm">安全转存</b><span class="text-[11px] text-white/40">写入私有 Cloudflare R2</span>';
     }
