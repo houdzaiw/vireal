@@ -82,6 +82,11 @@
     .template-card:hover { transform: translateY(-3px); box-shadow: 0 18px 42px rgba(7,27,27,.11); }
     .template-card.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink), 0 18px 42px rgba(7,27,27,.12); }
     .duration-btn.selected { background: var(--ink); color: white; border-color: var(--ink); }
+    .generation-mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 18px; background: #f3f5f3; }
+    .generation-mode-btn { min-height: 52px; border-radius: 14px; color: var(--muted); font-size: 13px; font-weight: 800; transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
+    .generation-mode-btn[aria-pressed="true"] { background: var(--ink); color: white; box-shadow: 0 8px 22px rgba(7,27,27,.16); }
+    .generation-mode-btn:focus-visible { outline: 3px solid rgba(67,226,176,.6); outline-offset: 2px; }
+    .duration-option:disabled { cursor: not-allowed; opacity: .38; background: #eef0ee; color: var(--muted); border-color: transparent; }
     .upload-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
     .upload-zone:hover { border-color: var(--mint-dark); background: rgba(67,226,176,.06); }
     .upload-zone.error { border-color: #dc5444; background: #fff4f1; animation: shake .2s ease-in-out 2; }
@@ -284,7 +289,7 @@
     </section>
 
     <!-- Create -->
-    <section id="screen-create" class="screen" data-screen="create" data-focus-zone="create upload duration consent generation">
+    <section id="screen-create" class="screen" data-screen="create" data-focus-zone="create upload mode duration consent generation">
       <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div><p class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Create studio</p><h1 class="mt-2 text-3xl font-black tracking-[-.04em] md:text-4xl">创建一段动作视频</h1><p class="mt-2 text-sm text-gray-500">无需写提示词，按步骤准备好照片即可。</p></div>
         <div class="flex items-center gap-2 text-xs font-bold text-gray-400"><span class="h-2 w-2 rounded-full bg-mint"></span>素材仅用于本次生成</div>
@@ -303,18 +308,26 @@
             <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span id="uploadGuidance">双人模板请分别上传两张独立单人照，不要上传已经合照在一起的图片。系统会在生成前进行人物与内容检测。</span></div>
           </section>
 
+          <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" aria-labelledby="generationModeTitle" data-focus-zone="create mode">
+            <div><span class="text-xs font-black text-mint-dark">STEP 3</span><h2 id="generationModeTitle" class="mt-1 text-xl font-black">生成模式</h2></div>
+            <div id="generationModeSwitch" class="generation-mode-switch mt-5" role="group" aria-label="生成模式">
+              <button type="button" class="generation-mode-btn" data-mode="standard" aria-pressed="true">普通模式</button>
+              <button type="button" class="generation-mode-btn" data-mode="advanced" aria-pressed="false">高级模式</button>
+            </div>
+            <p id="generationModeHint" class="mt-3 text-xs leading-5 text-gray-500">普通模式 · MiniMax · 固定约 5 秒</p>
+          </section>
+
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create duration">
-            <div><span class="text-xs font-black text-mint-dark">STEP 3</span><h2 class="mt-1 text-xl font-black">选择视频时长</h2></div>
-            <div id="durationList" class="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
-              <button class="duration-btn selected rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="5" data-cost="30"><b class="block text-lg">5 秒</b><span class="mt-1 block text-[11px] opacity-60">30 金币</span></button>
-              <button class="duration-btn rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="10" data-cost="40"><b class="block text-lg">10 秒</b><span class="mt-1 block text-[11px] opacity-60">40 金币</span></button>
-              <button class="duration-btn rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="15" data-cost="50"><b class="block text-lg">15 秒</b><span class="mt-1 block text-[11px] opacity-60">50 金币</span></button>
+            <div><span class="text-xs font-black text-mint-dark">STEP 4</span><h2 class="mt-1 text-xl font-black">选择视频时长</h2></div>
+            <div id="durationList" class="mt-5 grid grid-cols-2 gap-2 sm:gap-3">
+              <button class="duration-btn duration-option selected rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="5" data-cost="30"><b class="block text-lg">5 秒</b><span class="mt-1 block text-[11px] opacity-60">30 金币</span></button>
+              <button class="duration-btn duration-option rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="10" data-cost="40"><b class="block text-lg">10 秒</b><span class="mt-1 block text-[11px] opacity-60">40 金币</span></button>
             </div>
             <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-bold text-gray-500"><span class="rounded-full bg-gray-100 px-3 py-1.5">720P</span><span class="rounded-full bg-gray-100 px-3 py-1.5">9:16</span><span class="rounded-full bg-gray-100 px-3 py-1.5">MP4</span><span id="audioSpec" class="rounded-full bg-gray-100 px-3 py-1.5">模型环境声</span></div>
           </section>
 
           <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create consent">
-            <div><span class="text-xs font-black text-mint-dark">STEP 4</span><h2 class="mt-1 text-xl font-black">确认授权</h2></div>
+            <div><span class="text-xs font-black text-mint-dark">STEP 5</span><h2 class="mt-1 text-xl font-black">确认授权</h2></div>
             <button id="consentRow" class="mt-5 flex w-full items-start gap-3 rounded-2xl border border-black/10 p-4 text-left transition hover:border-ink">
               <span id="consentCheck" class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border border-black/20 bg-white text-xs text-transparent">✓</span>
               <span><b class="block text-sm">成年人及肖像授权声明</b><span class="mt-1 block text-xs leading-5 text-gray-500">我确认照片中的人物均已年满 18 周岁，且为本人或已明确授权我制作本视频的人。</span><span class="mt-2 block text-xs font-bold text-mint-dark">点击阅读并确认完整声明 →</span></span>
@@ -331,7 +344,7 @@
             </div>
             <div class="p-5">
               <div class="flex items-start justify-between"><div><p class="text-[10px] font-bold uppercase tracking-[.2em] text-white/45">Your creation</p><h3 id="summaryTemplate" class="mt-1 text-xl font-black">拥抱</h3></div><span id="summaryDuration" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">5 秒</span></div>
-              <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between"><dt class="text-white/50">生成规格</dt><dd class="font-bold">720P · 9:16</dd></div><div class="flex justify-between"><dt class="text-white/50">预计等待</dt><dd class="font-bold">1–5 分钟</dd></div><div class="flex justify-between"><dt class="text-white/50">保存时长</dt><dd class="font-bold">24 小时</dd></div></dl>
+              <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between"><dt class="text-white/50">生成模式</dt><dd id="summaryMode" class="font-bold">普通模式</dd></div><div class="flex justify-between"><dt class="text-white/50">生成规格</dt><dd class="font-bold">720P · 9:16</dd></div><div class="flex justify-between"><dt class="text-white/50">预计等待</dt><dd class="font-bold">1–5 分钟</dd></div><div class="flex justify-between"><dt class="text-white/50">保存时长</dt><dd class="font-bold">24 小时</dd></div></dl>
               <div class="my-5 h-px bg-white/10"></div>
               <div class="flex items-end justify-between"><span class="text-sm text-white/50">本次扣除</span><div class="text-right"><b id="summaryCost" class="text-2xl font-black text-mint">30</b><span class="ml-1 text-xs text-white/50">金币</span><p class="mt-1 text-[10px] text-white/40">余额 <span id="summaryBalance">30</span></p></div></div>
               <button id="generateButton" class="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-mint font-extrabold text-ink transition hover:bg-white"><span>生成视频</span><span>→</span></button>
@@ -476,8 +489,11 @@
       balance: Number(sessionStorage.getItem('virealBalance') || 30),
       language: localStorage.getItem('virealLang') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'),
       template: backendMode ? 'dance' : 'hug',
+      mode: 'standard',
       duration: 5,
       cost: 30,
+      userRealRemaining: 5,
+      wanGlobalRemaining: 3,
       uploads: {},
       appToken: sessionStorage.getItem(APP_TOKEN_STORAGE_KEY) || '',
       appUser: null,
@@ -785,8 +801,10 @@
 
     function renderCreate() {
       const t = selectedTemplate();
+      renderGenerationMode();
       document.getElementById('selectedInputCount').textContent = `需要 ${t.people} 张照片`;
       document.getElementById('summaryTemplate').textContent = state.language === 'zh' ? t.name : t.en;
+      document.getElementById('summaryMode').textContent = state.mode === 'standard' ? '普通模式' : '高级模式';
       document.getElementById('summaryDuration').textContent = `${state.duration} 秒`;
       document.getElementById('summaryCost').textContent = state.cost;
       document.getElementById('summaryBalance').textContent = state.balance;
@@ -796,6 +814,22 @@
       document.querySelectorAll('[data-template]').forEach(btn => btn.classList.toggle('selected', btn.dataset.template === state.template));
       renderUploads();
       applyFocusMode();
+    }
+
+    function renderGenerationMode() {
+      const isStandard = state.mode === 'standard';
+      if (isStandard) state.duration = 5;
+      const modeButtons = document.querySelectorAll('.generation-mode-btn');
+      const durationButtons = document.querySelectorAll('.duration-btn');
+      modeButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
+      });
+      const duration10Button = [...durationButtons]
+        .find((button) => Number(button.dataset.duration) === 10);
+      duration10Button.disabled = isStandard;
+      document.getElementById('generationModeHint').textContent = isStandard
+        ? '普通模式 · MiniMax · 固定约 5 秒'
+        : '高级模式 · Wan · 可选 5 或 10 秒';
     }
 
     function updateAccountUI() {
@@ -1216,10 +1250,6 @@
       banner.classList.add('flex');
       banner.innerHTML = `<span class="h-2 w-2 rounded-full bg-mint"></span><span>PoC 实链路 · 页面金币仅为演示，不等于 Replicate 余额 · API ${new URL(API_BASE_URL).host}</span>`;
       document.getElementById('deviceHint').textContent = 'Replicate + R2 实链路测试模式：点击任意登录方式将使用当前设备创建测试用户。';
-      const fifteenSecondButton = document.querySelector('[data-duration="15"]');
-      if (fifteenSecondButton) fifteenSecondButton.classList.add('hidden');
-      document.getElementById('durationList').classList.remove('grid-cols-3');
-      document.getElementById('durationList').classList.add('grid-cols-2');
       document.getElementById('audioSpec').textContent = '静音';
       document.getElementById('heroDurationSpec').innerHTML = '<b class="text-mint">✓</b> 5 / 10 sec';
       document.getElementById('heroAudioSpec').innerHTML = '<b class="text-mint">✓</b> Silent output';
@@ -1295,6 +1325,11 @@
       routeTo('home');
       showToast('已退出登录');
     });
+    document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
+      state.mode = button.dataset.mode;
+      renderGenerationMode();
+      renderCreate();
+    }));
     document.querySelectorAll('.duration-btn').forEach(btn => btn.addEventListener('click', () => { state.duration = Number(btn.dataset.duration); state.cost = Number(btn.dataset.cost); renderCreate(); }));
     document.getElementById('consentRow').addEventListener('click', () => openModal('consent'));
     document.getElementById('generateButton').addEventListener('click', startGeneration);

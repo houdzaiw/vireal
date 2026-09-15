@@ -25,6 +25,19 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def test_pages_build_uses_v11(self) -> None:
         self.assertIn("prototype_v1.1.html", self.build_script)
 
+    def test_compact_generation_mode_switch_exists(self) -> None:
+        self.assertIn('id="generationModeSwitch"', self.html)
+        self.assertIn('data-mode="standard"', self.html)
+        self.assertIn('data-mode="advanced"', self.html)
+
+    def test_standard_mode_is_the_default(self) -> None:
+        self.assertIn("mode: 'standard'", self.html)
+
+    def test_standard_mode_forces_five_seconds(self) -> None:
+        self.assertIn("state.mode === 'standard'", self.html)
+        self.assertIn("state.duration = 5", self.html)
+        self.assertIn("duration10Button.disabled = isStandard", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
