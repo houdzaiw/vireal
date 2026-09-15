@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#071b1b" />
   <meta name="vireal-api-base-url" content="__VIREAL_API_BASE_URL__" />
   <meta name="vireal-backend-mode" content="__VIREAL_BACKEND_MODE__" />
-  <title>Vireal · 真人图片动作视频生成</title>
+  <title>Vireal · 双模式视频生成 v1.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -1385,7 +1385,7 @@
         const allowed = (el.dataset.focusZone || '').split(/\s+/);
         el.classList.toggle('focus-locked', !allowed.includes(focus));
       });
-      const routeMap = { home:'home', templates:'home', privacy:'home', login:'login', region:'region-locked', create:'create', template:'create', upload:'create', mode:'create', duration:'create', summary:'create', generation:'generation', works:'works', wallet:'wallet', payment:'wallet', account:'account' };
+      const routeMap = { home:'home', templates:'home', privacy:'home', login:'login', region:'region-locked', create:'create', template:'create', upload:'create', mode: 'create', duration:'create', summary:'create', generation:'generation', works:'works', wallet:'wallet', payment:'wallet', account:'account' };
       const target = routeMap[focus] || 'home';
       document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === target));
     }

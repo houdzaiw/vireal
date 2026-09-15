@@ -11,6 +11,7 @@ PROTOTYPE = (
     / "prototype_v1.1.html"
 )
 BUILD_SCRIPT = ROOT / "scripts" / "build-vireal-pages.sh"
+README = ROOT / "outputs" / "vireal-wan-video-h5" / "README.md"
 
 
 class VirealH5PrototypeTests(unittest.TestCase):
@@ -18,6 +19,7 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.html = PROTOTYPE.read_text(encoding="utf-8") if PROTOTYPE.exists() else ""
         cls.build_script = BUILD_SCRIPT.read_text(encoding="utf-8")
+        cls.readme = README.read_text(encoding="utf-8")
 
     def test_v11_prototype_exists(self) -> None:
         self.assertTrue(PROTOTYPE.exists())
@@ -83,6 +85,13 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def test_execution_label_helper_exists(self) -> None:
         self.assertIn("function executionLabel(task)", self.html)
         self.assertIn("local_demo", self.html)
+
+    def test_v11_title_and_mode_review_route_exist(self) -> None:
+        self.assertIn("Vireal · 双模式视频生成 v1.1", self.html)
+        self.assertIn("mode: 'create'", self.html)
+
+    def test_readme_names_v11_as_current_prototype(self) -> None:
+        self.assertIn("prototype_v1.1.html", self.readme)
 
 
 if __name__ == "__main__":
