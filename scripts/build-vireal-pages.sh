@@ -4,7 +4,7 @@ set -euo pipefail
 
 workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_dir="$workspace_dir/outputs/vireal-wan-video-h5/prototype"
-source_file="$source_dir/prototype_v1.0.html"
+source_file="$source_dir/prototype_v1.1.html"
 output_dir="$workspace_dir/dist/vireal-pages"
 api_base_url="${VIREAL_API_BASE_URL:-}"
 
