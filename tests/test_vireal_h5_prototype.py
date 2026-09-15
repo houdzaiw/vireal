@@ -38,6 +38,19 @@ class VirealH5PrototypeTests(unittest.TestCase):
         self.assertIn("state.duration = 5", self.html)
         self.assertIn("duration10Button.disabled = isStandard", self.html)
 
+    def test_upload_disclosure_is_non_blocking_and_complete(self) -> None:
+        self.assertIn("上传即表示你拥有图片使用权", self.html)
+        self.assertIn("第三方 AI 服务处理", self.html)
+        self.assertIn("24 小时后清理", self.html)
+        self.assertNotIn("if (!state.consent)", self.html)
+
+    def test_generation_does_not_spend_or_refund_demo_coins(self) -> None:
+        self.assertNotIn("state.balance -= state.cost", self.html)
+        self.assertNotIn("refundDemoCoins(task)", self.html)
+
+    def test_free_experience_summary_exists(self) -> None:
+        self.assertIn('id="freeExperienceSummary"', self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
