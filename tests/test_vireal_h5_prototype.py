@@ -93,6 +93,27 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def test_readme_names_v11_as_current_prototype(self) -> None:
         self.assertIn("prototype_v1.1.html", self.readme)
 
+    def test_create_renderer_does_not_shadow_translation_helper(self) -> None:
+        self.assertNotIn("const t = selectedTemplate()", self.html)
+        self.assertNotIn("available.map(t =>", self.html)
+        self.assertNotIn("selectable.map(t =>", self.html)
+
+    def test_single_person_dance_is_the_only_creation_template(self) -> None:
+        self.assertIn("template: 'dance'", self.html)
+        self.assertIn("const available = templates.filter(t => t.id === 'dance')", self.html)
+        self.assertIn("const selectable = templates.filter(t => t.id === 'dance')", self.html)
+        self.assertNotIn("HUG · WAN VIDEO", self.html)
+        self.assertNotIn("<b>牵手 · 10 秒</b>", self.html)
+
+    def test_creation_flow_is_always_silent(self) -> None:
+        self.assertIn("document.getElementById('audioSpec').textContent = t('silentSpec')", self.html)
+        self.assertNotIn("AI audio", self.html)
+        self.assertNotIn("模型环境声", self.html)
+        self.assertNotIn("带声音的私人短视频", self.html)
+        self.assertNotIn("声音方案", self.html)
+        self.assertNotIn("声音与合成", self.html)
+        self.assertNotIn("生成环境声并封装 MP4", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
