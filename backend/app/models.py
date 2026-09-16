@@ -203,13 +203,18 @@ class AppVideoTask(SQLModel, table=True):
     idempotency_key: str = Field(max_length=255)
     template_id: str = Field(max_length=50)
     upload_ids_json: str = Field(sa_type=Text)
+    mode: str = Field(default="advanced", max_length=20, index=True)
     provider: str = Field(default="replicate", max_length=30)
     model: str = Field(max_length=255)
+    execution_type: str = Field(default="wan", max_length=30, index=True)
+    is_demo: bool = Field(default=False, index=True)
+    fallback_reason: str | None = Field(default=None, max_length=80, index=True)
     provider_task_id: str | None = Field(
         default=None, unique=True, index=True, max_length=255
     )
     status: str = Field(default="submitting", max_length=30, index=True)
     duration: int
+    source_duration: int | None = None
     resolution: str = Field(default="720p", max_length=20)
     aspect_ratio: str = Field(default="9:16", max_length=20)
     seed: int
@@ -218,6 +223,11 @@ class AppVideoTask(SQLModel, table=True):
     error: str | None = Field(default=None, sa_type=Text)
     metrics_json: str | None = Field(default=None, sa_type=Text)
     submission_attempted_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        index=True,  # type: ignore
+    )
+    real_submission_counted_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         index=True,  # type: ignore
@@ -276,7 +286,18 @@ class AppVideoTaskWebhookEvent(SQLModel, table=True):
 class AppVideoTaskCreate(SQLModel):
     template_id: Literal["dance"]
     upload_ids: list[uuid.UUID] = Field(min_length=1, max_length=1)
+    # Advanced preserves compatibility while v1.0 H5 and v1.1 API overlap.
+    # The v1.1 client always sends this field explicitly and defaults to standard.
+    mode: Literal["standard", "advanced"] = "advanced"
     duration: Literal[5, 10]
+
+
+class AppVideoTaskQuotaPublic(SQLModel):
+    user_real_limit: int
+    user_real_remaining: int
+    wan_global_limit: int
+    wan_global_remaining: int
+    resets_at: datetime
 
 
 class AppVideoTaskPublic(SQLModel):
@@ -286,6 +307,7 @@ class AppVideoTaskPublic(SQLModel):
         "submitting",
         "pending",
         "running",
+        "rendering_demo",
         "saving",
         "succeeded",
         "failed",
@@ -293,6 +315,10 @@ class AppVideoTaskPublic(SQLModel):
         "submission_unknown",
         "expired",
     ]
+    mode: Literal["standard", "advanced"]
+    execution_type: Literal["minimax", "wan", "local_demo"]
+    is_demo: bool
+    fallback_reason: str | None = None
     duration: int
     resolution: str
     aspect_ratio: str
@@ -301,6 +327,7 @@ class AppVideoTaskPublic(SQLModel):
     created_at: datetime | None = None
     completed_at: datetime | None = None
     expires_at: datetime
+    quota: AppVideoTaskQuotaPublic | None = None
 
 
 class AppContent(SQLModel, table=True):

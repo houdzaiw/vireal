@@ -14,7 +14,7 @@ from app.models import (
     AppVideoTask,
     AppVideoTaskWebhookEvent,
 )
-from app.services.storage import ImageStorageError, StoredVideo
+from app.services.storage import ImageStorageError, ReadImage, StoredVideo
 from app.workers.video_tasks import cleanup_expired_media, process_next_video_task
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42generated-video"
@@ -44,6 +44,31 @@ class CleanupStorage:
 
     def delete_object(self, object_key: str) -> None:
         self.deleted.append(object_key)
+
+
+class LocalDemoStorage:
+    def __init__(self) -> None:
+        self.stored_content: bytes | None = None
+
+    def read_app_image(self, url: str) -> ReadImage:
+        assert url.endswith("person.png")
+        return ReadImage(content=b"\x89PNG\r\n\x1a\nsource", content_type="image/png")
+
+    def store_video_file(
+        self,
+        *,
+        app_user_id: uuid.UUID,
+        task_id: uuid.UUID,
+        file_path: Any,
+        content_type: str,
+    ) -> StoredVideo:
+        assert content_type == "video/mp4"
+        self.stored_content = file_path.read_bytes()
+        return StoredVideo(
+            object_key=f"vireal/videos/{app_user_id}/{task_id}.mp4",
+            content_type=content_type,
+            size=len(self.stored_content),
+        )
 
 
 def _create_saving_task(db: Session) -> AppVideoTask:
@@ -168,3 +193,67 @@ def test_cleanup_removes_expired_input_and_output_objects(db: Session) -> None:
     assert cleaned_task is not None
     assert cleaned_task.status == "expired"
     assert cleaned_task.output_object_key is None
+
+
+def test_worker_renders_local_demo_from_owned_upload(
+    db: Session,
+) -> None:
+    app_user = AppUser()
+    db.add(app_user)
+    db.commit()
+    db.refresh(app_user)
+    now = datetime.now(UTC)
+    upload = AppUpload(
+        app_user_id=app_user.id,
+        url=f"/uploads/images/{app_user.id}/person.png",
+        object_key=f"vireal/images/{app_user.id}/person.png",
+        content_type="image/png",
+        size=123,
+        expires_at=now + timedelta(hours=24),
+    )
+    db.add(upload)
+    db.commit()
+    db.refresh(upload)
+    task = AppVideoTask(
+        app_user_id=app_user.id,
+        idempotency_key=f"local-demo-{uuid.uuid4()}",
+        template_id="dance",
+        upload_ids_json=f'["{upload.id}"]',
+        mode="standard",
+        provider="local",
+        model="local/ffmpeg",
+        execution_type="local_demo",
+        is_demo=True,
+        fallback_reason="replicate_disabled",
+        status="rendering_demo",
+        duration=5,
+        seed=123,
+        next_attempt_at=now,
+        expires_at=now + timedelta(hours=24),
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    storage = LocalDemoStorage()
+
+    def fake_renderer(source: Any, output: Any, duration: int) -> None:
+        assert source.read_bytes().startswith(b"\x89PNG")
+        assert duration == 5
+        output.write_bytes(MP4_BYTES)
+
+    assert (
+        process_next_video_task(
+            storage=storage,
+            local_demo_renderer=fake_renderer,
+        )
+        is True
+    )
+
+    db.expire_all()
+    completed = db.get(AppVideoTask, task.id)
+    assert completed is not None
+    assert completed.status == "succeeded"
+    assert completed.execution_type == "local_demo"
+    assert completed.is_demo is True
+    assert completed.fallback_reason == "replicate_disabled"
+    assert storage.stored_content == MP4_BYTES

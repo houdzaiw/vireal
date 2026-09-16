@@ -132,7 +132,7 @@ Do not add arbitrary `*.pages.dev` preview origins to CORS. Use the custom H5 do
 
 ## 5. Safe rollout
 
-1. Deploy Neon, `vireal-api`, and `vireal-video-worker` with `REPLICATE_ENABLED=False`.
+1. Deploy Neon, `vireal-api`, and `vireal-video-worker` with `REPLICATE_ENABLED=False` and `LOCAL_DEMO_ENABLED=True`.
 2. Deploy Pages and bind both custom domains.
 3. Run the edge checks:
 
@@ -143,12 +143,13 @@ Do not add arbitrary `*.pages.dev` preview origins to CORS. Use the custom H5 do
    ```
 
 4. Verify device login, authenticated upload, R2 private read, and a direct unsigned R2 denial.
-5. Confirm the worker is running and polling without database or R2 errors.
-6. Change `REPLICATE_ENABLED=True` in both Railway services and redeploy them.
-7. Upload one authorized adult full-body image and submit one five-second dance task.
-8. Confirm exactly one Replicate prediction, signed webhook receipt, R2 transfer, H5 playback, and the global `REPLICATE_POC_MAX_SUBMISSIONS=1` ceiling.
+5. Submit one task and confirm the Worker produces a labeled local demo without any Replicate prediction.
+6. Confirm the worker is running and polling without database, FFmpeg, or R2 errors.
+7. Set `REPLICATE_ENABLED=True` in both Railway services and redeploy them only when the Replicate account is ready.
+8. Submit one authorized adult full-body photo in standard mode and confirm one MiniMax prediction, signed webhook receipt, R2 transfer, and H5 playback.
+9. Verify the shared user limit of five real predictions per UTC day and the Wan global limit of three per UTC day; quota overflow must produce a labeled local demo without another prediction.
 
-Never automatically resubmit a task in `submission_unknown`. Inspect the task, Replicate dashboard, and billing before changing the submission ceiling.
+Never automatically resubmit or locally downgrade a task in `submission_unknown`. Inspect the task, Replicate dashboard, and billing before resolving it.
 
 ## 6. Post-PoC checks
 

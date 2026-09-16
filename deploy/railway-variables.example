@@ -27,16 +27,23 @@ MAX_GENERATED_VIDEO_BYTES=262144000
 VIDEO_WORKER_POLL_SECONDS=2
 VIDEO_WORKER_MAX_ATTEMPTS=5
 VIDEO_CLEANUP_INTERVAL_SECONDS=60
+APP_USER_DAILY_REAL_SUBMISSIONS=5
+APP_WAN_DAILY_GLOBAL_SUBMISSIONS=3
+LOCAL_DEMO_ENABLED=True
+LOCAL_DEMO_FFMPEG_PATH=/usr/bin/ffmpeg
+LOCAL_DEMO_TIMEOUT_SECONDS=180
 
 # Deploy with false first. Change to true only after the HTTPS webhook check passes.
 REPLICATE_ENABLED=False
 REPLICATE_API_TOKEN=replace-with-replicate-token
+REPLICATE_STANDARD_MODEL=minimax/video-01
+REPLICATE_ADVANCED_MODEL=wan-video/wan-2.7-r2v
 REPLICATE_R2V_MODEL=wan-video/wan-2.7-r2v
 REPLICATE_WEBHOOK_URL=https://api.example.com/api/v1/webhooks/replicate
 REPLICATE_WEBHOOK_SIGNING_SECRET=whsec_replace-with-signing-secret
 REPLICATE_REQUEST_TIMEOUT_SECONDS=30
 REPLICATE_WEBHOOK_TOLERANCE_SECONDS=300
-REPLICATE_POC_MAX_SUBMISSIONS=1
+REPLICATE_POC_MAX_SUBMISSIONS=0
 
 # Keep the existing /app/generations API available without sending work to Ark.
 # The Replicate PoC uses /app/video-tasks and is controlled separately above.

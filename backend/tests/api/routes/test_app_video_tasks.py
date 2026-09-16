@@ -62,7 +62,7 @@ class FakeProvider:
         if self.api_error is not None:
             raise self.api_error
         return VideoTaskSubmission(
-            provider_task_id="prediction-poc-1",
+            provider_task_id=f"prediction-poc-{len(self.calls)}",
             status=VideoTaskStatus.PENDING,
         )
 
@@ -169,6 +169,9 @@ def test_mocked_upload_prediction_webhook_worker_and_playback_flow(
     assert create_response.status_code == 202
     created = create_response.json()
     assert created["status"] == "pending"
+    assert created["mode"] == "advanced"
+    assert created["execution_type"] == "wan"
+    assert created["is_demo"] is False
     assert created["resolution"] == "720p"
     assert created["aspect_ratio"] == "9:16"
     assert len(provider.calls) == 1
@@ -346,10 +349,19 @@ def test_video_task_enforces_poc_submission_ceiling(
 ) -> None:
     provider = FakeProvider()
     _enable_mock_replicate(monkeypatch, provider)
-    monkeypatch.setattr(settings, "REPLICATE_POC_MAX_SUBMISSIONS", 0)
+    monkeypatch.setattr(settings, "REPLICATE_POC_MAX_SUBMISSIONS", 1)
     headers, _login = app_authentication_headers(client=client)
     upload = _upload_image(client, headers)
 
+    accepted = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-poc-budget-first"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "duration": 5,
+        },
+    )
     response = client.post(
         f"{settings.API_V1_STR}/app/video-tasks",
         headers={**headers, "Idempotency-Key": "h5-poc-budget-limit"},
@@ -360,11 +372,12 @@ def test_video_task_enforces_poc_submission_ceiling(
         },
     )
 
-    assert response.status_code == 409
-    assert (
-        response.json()["detail"] == "Replicate PoC submission limit has been reached"
-    )
-    assert provider.calls == []
+    assert accepted.status_code == 202
+    assert response.status_code == 202
+    assert response.json()["status"] == "rendering_demo"
+    assert response.json()["execution_type"] == "local_demo"
+    assert response.json()["fallback_reason"] == "poc_submission_limit"
+    assert len(provider.calls) == 1
 
 
 def test_provider_rejection_without_prediction_does_not_consume_poc_budget(
@@ -393,7 +406,9 @@ def test_provider_rejection_without_prediction_does_not_consume_poc_budget(
         json=body,
     )
     assert rejected.status_code == 202
-    assert rejected.json()["status"] == "failed"
+    assert rejected.json()["status"] == "rendering_demo"
+    assert rejected.json()["execution_type"] == "local_demo"
+    assert rejected.json()["fallback_reason"] == "provider_insufficient_credit"
 
     provider.api_error = None
     accepted = client.post(
@@ -405,3 +420,197 @@ def test_provider_rejection_without_prediction_does_not_consume_poc_budget(
     assert accepted.status_code == 202
     assert accepted.json()["status"] == "pending"
     assert len(provider.calls) == 2
+
+
+def test_standard_mode_uses_minimax_and_rejects_ten_seconds(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider()
+    _enable_mock_replicate(monkeypatch, provider)
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+
+    created = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-standard-minimax"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "standard",
+            "duration": 5,
+        },
+    )
+    invalid = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-standard-invalid-duration"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "standard",
+            "duration": 10,
+        },
+    )
+
+    assert created.status_code == 202
+    assert created.json()["mode"] == "standard"
+    assert created.json()["execution_type"] == "minimax"
+    assert created.json()["is_demo"] is False
+    assert provider.calls[0]["model"] == settings.REPLICATE_STANDARD_MODEL
+    assert invalid.status_code == 422
+    assert len(provider.calls) == 1
+
+
+def test_disabled_replicate_routes_to_local_demo_without_provider_call(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "REPLICATE_ENABLED", False)
+    monkeypatch.setattr(settings, "LOCAL_DEMO_ENABLED", True)
+    monkeypatch.setattr(
+        app_video_tasks_module,
+        "get_replicate_video_client",
+        lambda: pytest.fail("Replicate client must not be created for local demo"),
+    )
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-disabled-local-demo"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "standard",
+            "duration": 5,
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "rendering_demo"
+    assert response.json()["execution_type"] == "local_demo"
+    assert response.json()["is_demo"] is True
+    assert response.json()["fallback_reason"] == "replicate_disabled"
+
+
+def test_user_daily_real_quota_is_shared_by_both_modes(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider()
+    _enable_mock_replicate(monkeypatch, provider)
+    monkeypatch.setattr(settings, "APP_USER_DAILY_REAL_SUBMISSIONS", 1)
+    monkeypatch.setattr(settings, "APP_WAN_DAILY_GLOBAL_SUBMISSIONS", 10)
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+
+    first = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-user-quota-first"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "standard",
+            "duration": 5,
+        },
+    )
+    second = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-user-quota-second"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "advanced",
+            "duration": 5,
+        },
+    )
+
+    assert first.json()["execution_type"] == "minimax"
+    assert second.json()["execution_type"] == "local_demo"
+    assert second.json()["fallback_reason"] == "user_daily_quota"
+    assert len(provider.calls) == 1
+
+
+def test_wan_daily_global_quota_applies_across_users(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider()
+    _enable_mock_replicate(monkeypatch, provider)
+    monkeypatch.setattr(settings, "APP_USER_DAILY_REAL_SUBMISSIONS", 5)
+    monkeypatch.setattr(settings, "APP_WAN_DAILY_GLOBAL_SUBMISSIONS", 1)
+    first_headers, _login = app_authentication_headers(client=client)
+    second_headers, _other_login = app_authentication_headers(client=client)
+    first_upload = _upload_image(client, first_headers)
+    second_upload = _upload_image(client, second_headers)
+
+    first = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**first_headers, "Idempotency-Key": "h5-wan-global-first"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [first_upload["id"]],
+            "mode": "advanced",
+            "duration": 5,
+        },
+    )
+    second = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**second_headers, "Idempotency-Key": "h5-wan-global-second"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [second_upload["id"]],
+            "mode": "advanced",
+            "duration": 5,
+        },
+    )
+
+    assert first.json()["execution_type"] == "wan"
+    assert second.json()["execution_type"] == "local_demo"
+    assert second.json()["fallback_reason"] == "wan_daily_global_quota"
+    assert len(provider.calls) == 1
+
+
+def test_failed_provider_webhook_routes_existing_task_to_local_demo(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider()
+    secret = _enable_mock_replicate(monkeypatch, provider)
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+    created = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "h5-webhook-fallback"},
+        json={
+            "template_id": "dance",
+            "upload_ids": [upload["id"]],
+            "mode": "advanced",
+            "duration": 5,
+        },
+    ).json()
+    webhook_body = json.dumps(
+        {
+            "id": "prediction-poc-1",
+            "status": "failed",
+            "output": None,
+            "error": "provider capacity exhausted",
+        },
+        separators=(",", ":"),
+    ).encode()
+
+    webhook_response = client.post(
+        f"{settings.API_V1_STR}/webhooks/replicate?task_id={created['id']}",
+        content=webhook_body,
+        headers=_webhook_headers(secret, webhook_body, "event-fallback-1"),
+    )
+    task_response = client.get(
+        f"{settings.API_V1_STR}/app/video-tasks/{created['id']}",
+        headers=headers,
+    )
+
+    assert webhook_response.status_code == 204
+    assert task_response.json()["status"] == "rendering_demo"
+    assert task_response.json()["execution_type"] == "local_demo"
+    assert task_response.json()["is_demo"] is True
+    assert task_response.json()["fallback_reason"] == "provider_failed"

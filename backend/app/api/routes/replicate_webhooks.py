@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from app.api.deps import SessionDep
+from app.core.config import settings
 from app.models import AppVideoTask, AppVideoTaskWebhookEvent
 from app.services.replicate_video import (
     ReplicateAPIError,
@@ -20,7 +21,14 @@ from app.services.replicate_webhook import (
 from app.services.video_generation import VideoTaskStatus
 
 router = APIRouter(prefix="/webhooks/replicate", tags=["replicate webhooks"])
-TERMINAL_PROVIDER_STATUSES = {"saving", "succeeded", "failed", "canceled", "expired"}
+TERMINAL_PROVIDER_STATUSES = {
+    "rendering_demo",
+    "saving",
+    "succeeded",
+    "failed",
+    "canceled",
+    "expired",
+}
 
 
 @router.post("", status_code=204)
@@ -101,9 +109,26 @@ async def receive_replicate_webhook(
                 )
                 task.next_attempt_at = now
         elif result.status == VideoTaskStatus.FAILED:
-            task.status = "failed"
-            task.error = result.error or "Replicate video generation failed"
-            task.completed_at = now
+            if settings.LOCAL_DEMO_ENABLED:
+                task.status = "rendering_demo"
+                task.execution_type = "local_demo"
+                task.is_demo = True
+                task.fallback_reason = "provider_failed"
+                task.error = None
+                task.next_attempt_at = now
+                task.metrics_json = json.dumps(
+                    {
+                        "fallback_provider_error": result.error
+                        or "Replicate video generation failed",
+                        "provider_metrics": result.metrics,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            else:
+                task.status = "failed"
+                task.error = result.error or "Replicate video generation failed"
+                task.completed_at = now
         elif result.status == VideoTaskStatus.CANCELED:
             task.status = "canceled"
             task.error = result.error

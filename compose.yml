@@ -27,15 +27,22 @@ x-app-environment: &app-environment
   VIDEO_WORKER_POLL_SECONDS: ${VIDEO_WORKER_POLL_SECONDS:-2}
   VIDEO_WORKER_MAX_ATTEMPTS: ${VIDEO_WORKER_MAX_ATTEMPTS:-5}
   VIDEO_CLEANUP_INTERVAL_SECONDS: ${VIDEO_CLEANUP_INTERVAL_SECONDS:-60}
+  APP_USER_DAILY_REAL_SUBMISSIONS: ${APP_USER_DAILY_REAL_SUBMISSIONS:-5}
+  APP_WAN_DAILY_GLOBAL_SUBMISSIONS: ${APP_WAN_DAILY_GLOBAL_SUBMISSIONS:-3}
+  LOCAL_DEMO_ENABLED: ${LOCAL_DEMO_ENABLED:-true}
+  LOCAL_DEMO_FFMPEG_PATH: ${LOCAL_DEMO_FFMPEG_PATH:-/usr/bin/ffmpeg}
+  LOCAL_DEMO_TIMEOUT_SECONDS: ${LOCAL_DEMO_TIMEOUT_SECONDS:-180}
   REPLICATE_ENABLED: ${REPLICATE_ENABLED:-false}
   REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+  REPLICATE_STANDARD_MODEL: ${REPLICATE_STANDARD_MODEL:-minimax/video-01}
+  REPLICATE_ADVANCED_MODEL: ${REPLICATE_ADVANCED_MODEL:-wan-video/wan-2.7-r2v}
   REPLICATE_R2V_MODEL: ${REPLICATE_R2V_MODEL:-wan-video/wan-2.7-r2v}
   REPLICATE_ANIMATE_MODEL: ${REPLICATE_ANIMATE_MODEL:-wan-video/wan-2.2-animate-animation}
   REPLICATE_WEBHOOK_URL: ${REPLICATE_WEBHOOK_URL:-}
   REPLICATE_WEBHOOK_SIGNING_SECRET: ${REPLICATE_WEBHOOK_SIGNING_SECRET:-}
   REPLICATE_REQUEST_TIMEOUT_SECONDS: ${REPLICATE_REQUEST_TIMEOUT_SECONDS:-30}
   REPLICATE_WEBHOOK_TOLERANCE_SECONDS: ${REPLICATE_WEBHOOK_TOLERANCE_SECONDS:-300}
-  REPLICATE_POC_MAX_SUBMISSIONS: ${REPLICATE_POC_MAX_SUBMISSIONS:-1}
+  REPLICATE_POC_MAX_SUBMISSIONS: ${REPLICATE_POC_MAX_SUBMISSIONS:-0}
   APP_GENERATION_PROVIDER: ${APP_GENERATION_PROVIDER:-local}
   APP_GENERATION_LOCAL_DELAY_SECONDS: ${APP_GENERATION_LOCAL_DELAY_SECONDS:-1.5}
   APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-}
@@ -102,6 +109,8 @@ services:
         condition: service_healthy
         restart: true
     environment: *app-environment
+    volumes:
+      - app-upload-data:/app/backend/uploads
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
@@ -130,6 +139,8 @@ services:
         condition: service_healthy
         restart: true
     environment: *app-environment
+    volumes:
+      - app-upload-data:/app/backend/uploads
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -137,3 +148,4 @@ services:
 
 volumes:
   app-db-data:
+  app-upload-data:

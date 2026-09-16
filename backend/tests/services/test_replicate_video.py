@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from app.services.replicate_video import (
+    MINIMAX_VIDEO_01_MODEL,
     SEEDANCE_R2V_MODEL,
     ReplicateAPIError,
     ReplicateVideoClient,
@@ -78,6 +79,58 @@ async def test_wan_r2v_rejects_fifteen_seconds() -> None:
                 reference_image_urls=["https://private-oss.example/person.jpg"],
                 prompt="The person walks forward.",
                 duration=15,
+            )
+
+
+@pytest.mark.anyio
+async def test_minimax_video_01_uses_uploaded_image_as_first_frame() -> None:
+    captured_request: httpx.Request | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(
+            201,
+            json={"id": "prediction-minimax", "status": "starting"},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+        client = ReplicateVideoClient(
+            api_token="test-token",
+            http_client=http_client,
+        )
+        submission = await client.submit_reference_to_video(
+            reference_image_urls=["https://private-r2.example/person.jpg?signed=1"],
+            prompt="A single adult person performs a natural full-body dance.",
+            duration=5,
+            model=MINIMAX_VIDEO_01_MODEL,
+        )
+
+    assert submission.provider_task_id == "prediction-minimax"
+    assert captured_request is not None
+    assert captured_request.url.path == (
+        "/v1/models/minimax/video-01/predictions"
+    )
+    assert json.loads(captured_request.content)["input"] == {
+        "prompt": "A single adult person performs a natural full-body dance.",
+        "prompt_optimizer": True,
+        "first_frame_image": "https://private-r2.example/person.jpg?signed=1",
+    }
+
+
+@pytest.mark.anyio
+async def test_minimax_video_01_rejects_ten_second_product_request() -> None:
+    async with httpx.AsyncClient() as http_client:
+        client = ReplicateVideoClient(
+            api_token="test-token",
+            http_client=http_client,
+        )
+        with pytest.raises(ValueError, match="five-second"):
+            await client.submit_reference_to_video(
+                reference_image_urls=["https://private-r2.example/person.jpg"],
+                prompt="The person dances.",
+                duration=10,
+                model=MINIMAX_VIDEO_01_MODEL,
             )
 
 

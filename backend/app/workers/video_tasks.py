@@ -1,12 +1,15 @@
+import json
 import logging
+import subprocess
 import tempfile
 import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlmodel import Session, col, select
 
 from app.core.config import settings
@@ -17,6 +20,8 @@ from app.services.storage import ImageStorage, ImageStorageError, get_image_stor
 logger = logging.getLogger(__name__)
 WORKER_LOCK_TIMEOUT = timedelta(minutes=10)
 DOWNLOAD_TIMEOUT = httpx.Timeout(120.0, connect=15.0)
+LocalDemoRenderer = Callable[[Path, Path, int], None]
+ProviderVideoNormalizer = Callable[[Path, Path, int], None]
 
 
 class VideoOutputError(RuntimeError):
@@ -29,8 +34,13 @@ def _claim_video_task(session: Session) -> uuid.UUID | None:
     statement = (
         select(AppVideoTask)
         .where(
-            AppVideoTask.status == "saving",
-            col(AppVideoTask.provider_output_url).is_not(None),
+            or_(
+                and_(
+                    col(AppVideoTask.status) == "saving",
+                    col(AppVideoTask.provider_output_url).is_not(None),
+                ),
+                col(AppVideoTask.status) == "rendering_demo",
+            ),
             or_(
                 col(AppVideoTask.next_attempt_at).is_(None),
                 col(AppVideoTask.next_attempt_at) <= now,
@@ -103,6 +113,99 @@ def _download_video(
     return content_type
 
 
+def _validate_local_video(path: Path) -> None:
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as video_file:
+            header = video_file.read(12)
+    except OSError as exc:
+        raise VideoOutputError("Local demo output could not be read") from exc
+    if size < 12 or header[4:8] != b"ftyp":
+        raise VideoOutputError("Local demo output is not a valid MP4 file")
+    if size > settings.MAX_GENERATED_VIDEO_BYTES:
+        raise VideoOutputError("Local demo output exceeds the size limit")
+
+
+def _run_ffmpeg(command: list[str], *, operation: str) -> None:
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            timeout=settings.LOCAL_DEMO_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:
+        raise VideoOutputError("FFmpeg is not installed for local video rendering") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise VideoOutputError(f"FFmpeg timed out while {operation}") from exc
+    except subprocess.CalledProcessError as exc:
+        raise VideoOutputError(f"FFmpeg failed while {operation}") from exc
+
+
+def render_local_demo(source: Path, output: Path, duration: int) -> None:
+    motion_filter = (
+        "scale=720:1280:force_original_aspect_ratio=increase,"
+        "crop=720:1280,"
+        "zoompan=z='min(zoom+0.0008,1.08)':"
+        "x='iw/2-(iw/zoom/2)+sin(on/18)*4':"
+        "y='ih/2-(ih/zoom/2)+cos(on/22)*4':"
+        "d=1:s=720x1280:fps=25,format=yuv420p"
+    )
+    _run_ffmpeg(
+        [
+            settings.LOCAL_DEMO_FFMPEG_PATH,
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            str(source),
+            "-vf",
+            motion_filter,
+            "-t",
+            str(duration),
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-movflags",
+            "+faststart",
+            str(output),
+        ],
+        operation="rendering a local demo",
+    )
+    _validate_local_video(output)
+
+
+def normalize_provider_video(source: Path, output: Path, duration: int) -> None:
+    video_filter = (
+        "scale=720:1280:force_original_aspect_ratio=increase,"
+        "crop=720:1280,fps=25,format=yuv420p"
+    )
+    _run_ffmpeg(
+        [
+            settings.LOCAL_DEMO_FFMPEG_PATH,
+            "-y",
+            "-i",
+            str(source),
+            "-vf",
+            video_filter,
+            "-t",
+            str(duration),
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-movflags",
+            "+faststart",
+            str(output),
+        ],
+        operation="normalizing a provider video",
+    )
+    _validate_local_video(output)
+
+
 def _record_worker_failure(
     session: Session, task: AppVideoTask, exc: Exception
 ) -> None:
@@ -125,6 +228,8 @@ def process_next_video_task(
     *,
     storage: ImageStorage | None = None,
     http_client: httpx.Client | None = None,
+    local_demo_renderer: LocalDemoRenderer = render_local_demo,
+    provider_video_normalizer: ProviderVideoNormalizer = normalize_provider_video,
 ) -> bool:
     with Session(engine) as session:
         task_id = _claim_video_task(session)
@@ -137,33 +242,84 @@ def process_next_video_task(
         follow_redirects=True,
     )
     media_storage = storage or get_image_storage()
-    temp_path: Path | None = None
+    temp_paths: list[Path] = []
     try:
         with Session(engine) as session:
             task = session.get(AppVideoTask, task_id)
             if task is None:
                 return True
-            if not task.provider_output_url:
-                task.status = "failed"
-                task.error = "Replicate output URL is missing"
-                task.worker_locked_at = None
-                task.completed_at = datetime.now(UTC)
-                task.updated_at = task.completed_at
-                session.add(task)
-                session.commit()
-                return True
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
-                temp_path = Path(temp_file.name)
             try:
-                content_type = _download_video(
-                    url=task.provider_output_url,
-                    target=temp_path,
-                    http_client=client,
-                )
+                if task.status == "rendering_demo":
+                    try:
+                        upload_ids = json.loads(task.upload_ids_json)
+                        upload_id = uuid.UUID(upload_ids[0])
+                    except (IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                        raise VideoOutputError(
+                            "Local demo task has an invalid source upload"
+                        ) from exc
+                    upload = session.get(AppUpload, upload_id)
+                    if (
+                        upload is None
+                        or upload.app_user_id != task.app_user_id
+                        or upload.status != "active"
+                        or upload.expires_at <= datetime.now(UTC)
+                    ):
+                        raise VideoOutputError(
+                            "Local demo source upload is unavailable"
+                        )
+                    source_image = media_storage.read_app_image(upload.url)
+                    suffix = ".png" if source_image.content_type == "image/png" else ".jpg"
+                    with tempfile.NamedTemporaryFile(
+                        suffix=suffix,
+                        delete=False,
+                    ) as source_file:
+                        source_path = Path(source_file.name)
+                        source_file.write(source_image.content)
+                    temp_paths.append(source_path)
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".mp4",
+                        delete=False,
+                    ) as output_file:
+                        output_path = Path(output_file.name)
+                    temp_paths.append(output_path)
+                    local_demo_renderer(source_path, output_path, task.duration)
+                    _validate_local_video(output_path)
+                    content_type = "video/mp4"
+                    video_path = output_path
+                else:
+                    if not task.provider_output_url:
+                        raise VideoOutputError("Replicate output URL is missing")
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".mp4",
+                        delete=False,
+                    ) as downloaded_file:
+                        downloaded_path = Path(downloaded_file.name)
+                    temp_paths.append(downloaded_path)
+                    content_type = _download_video(
+                        url=task.provider_output_url,
+                        target=downloaded_path,
+                        http_client=client,
+                    )
+                    video_path = downloaded_path
+                    if task.mode == "standard":
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".mp4",
+                            delete=False,
+                        ) as normalized_file:
+                            normalized_path = Path(normalized_file.name)
+                        temp_paths.append(normalized_path)
+                        provider_video_normalizer(
+                            downloaded_path,
+                            normalized_path,
+                            task.duration,
+                        )
+                        _validate_local_video(normalized_path)
+                        video_path = normalized_path
+                        content_type = "video/mp4"
                 stored = media_storage.store_video_file(
                     app_user_id=task.app_user_id,
                     task_id=task.id,
-                    file_path=temp_path,
+                    file_path=video_path,
                     content_type=content_type,
                 )
             except (
@@ -196,7 +352,7 @@ def process_next_video_task(
             session.commit()
             return True
     finally:
-        if temp_path is not None:
+        for temp_path in temp_paths:
             temp_path.unlink(missing_ok=True)
         if owns_http_client:
             client.close()

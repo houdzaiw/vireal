@@ -15,12 +15,15 @@ from app.services.video_generation import (
 
 REPLICATE_API_BASE_URL = "https://api.replicate.com/v1"
 WAN_R2V_MODEL = "wan-video/wan-2.7-r2v"
+MINIMAX_VIDEO_01_MODEL = "minimax/video-01"
 SEEDANCE_R2V_MODEL = "bytedance/seedance-2.0"
 WAN_ANIMATE_MODEL = "wan-video/wan-2.2-animate-animation"
 
 _MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _PREDICTION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
-_SUPPORTED_R2V_MODELS = frozenset({WAN_R2V_MODEL, SEEDANCE_R2V_MODEL})
+_SUPPORTED_R2V_MODELS = frozenset(
+    {WAN_R2V_MODEL, MINIMAX_VIDEO_01_MODEL, SEEDANCE_R2V_MODEL}
+)
 _SUPPORTED_ANIMATE_MODELS = frozenset({WAN_ANIMATE_MODEL})
 
 
@@ -130,6 +133,12 @@ class ReplicateVideoClient:
                 negative_prompt=negative_prompt,
                 seed=seed,
             )
+        elif selected_model == MINIMAX_VIDEO_01_MODEL:
+            prediction_input = _build_minimax_video_01_input(
+                reference_image_urls=provider_reference_image_urls,
+                prompt=prompt,
+                duration=duration,
+            )
         else:
             prediction_input = _build_seedance_r2v_input(
                 reference_image_urls=provider_reference_image_urls,
@@ -238,7 +247,7 @@ def get_replicate_video_client() -> ReplicateVideoClient:
         raise ReplicateConfigurationError("Replicate API token is required")
     return ReplicateVideoClient(
         api_token=settings.REPLICATE_API_TOKEN,
-        r2v_model=settings.REPLICATE_R2V_MODEL,
+        r2v_model=settings.REPLICATE_ADVANCED_MODEL,
         animate_model=settings.REPLICATE_ANIMATE_MODEL,
         webhook_url=(
             str(settings.REPLICATE_WEBHOOK_URL)
@@ -314,6 +323,23 @@ def _build_seedance_r2v_input(
     if seed is not None:
         prediction_input["seed"] = seed
     return prediction_input
+
+
+def _build_minimax_video_01_input(
+    *,
+    reference_image_urls: Sequence[str],
+    prompt: str,
+    duration: int,
+) -> dict[str, Any]:
+    if len(reference_image_urls) != 1:
+        raise ValueError("MiniMax Video-01 requires exactly one first-frame image")
+    if duration != 5:
+        raise ValueError("MiniMax standard mode only accepts a five-second request")
+    return {
+        "prompt": prompt.strip(),
+        "prompt_optimizer": True,
+        "first_frame_image": reference_image_urls[0],
+    }
 
 
 def _validate_model(model: str, *, supported: frozenset[str], kind: str) -> None:

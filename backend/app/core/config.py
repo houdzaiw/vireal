@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     VIDEO_CLEANUP_INTERVAL_SECONDS: float = 60.0
     REPLICATE_ENABLED: bool = False
     REPLICATE_API_TOKEN: str | None = None
+    REPLICATE_STANDARD_MODEL: str = "minimax/video-01"
+    REPLICATE_ADVANCED_MODEL: str = "wan-video/wan-2.7-r2v"
+    # Retained for older deployments; new video tasks use the mode-specific fields.
     REPLICATE_R2V_MODEL: str = "wan-video/wan-2.7-r2v"
     REPLICATE_ANIMATE_MODEL: str = "wan-video/wan-2.2-animate-animation"
     REPLICATE_WEBHOOK_URL: HttpUrl | None = None
@@ -60,6 +63,11 @@ class Settings(BaseSettings):
     REPLICATE_REQUEST_TIMEOUT_SECONDS: float = 30.0
     REPLICATE_WEBHOOK_TOLERANCE_SECONDS: int = 5 * 60
     REPLICATE_POC_MAX_SUBMISSIONS: int = 0
+    APP_USER_DAILY_REAL_SUBMISSIONS: int = 5
+    APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 3
+    LOCAL_DEMO_ENABLED: bool = True
+    LOCAL_DEMO_FFMPEG_PATH: str = "/usr/bin/ffmpeg"
+    LOCAL_DEMO_TIMEOUT_SECONDS: int = 180
     PAYMENT_WEBHOOK_VERIFICATION_MODE: Literal["local", "shared_secret"] = "local"
     PAYMENT_WEBHOOK_SHARED_SECRET: str | None = None
     FRONTEND_HOST: str = "http://localhost:5173"
@@ -137,8 +145,8 @@ class Settings(BaseSettings):
             )
         if self.APP_IMAGE_STORAGE_BACKEND != "r2":
             raise ValueError("Replicate video generation requires Cloudflare R2")
-        if self.REPLICATE_POC_MAX_SUBMISSIONS < 1:
-            raise ValueError("REPLICATE_POC_MAX_SUBMISSIONS must be at least 1")
+        if self.REPLICATE_POC_MAX_SUBMISSIONS < 0:
+            raise ValueError("REPLICATE_POC_MAX_SUBMISSIONS must not be negative")
         if self.REPLICATE_WEBHOOK_TOLERANCE_SECONDS < 1:
             raise ValueError("REPLICATE_WEBHOOK_TOLERANCE_SECONDS must be positive")
         return self
@@ -155,6 +163,14 @@ class Settings(BaseSettings):
             raise ValueError("VIDEO_WORKER_MAX_ATTEMPTS must be positive")
         if self.VIDEO_CLEANUP_INTERVAL_SECONDS <= 0:
             raise ValueError("VIDEO_CLEANUP_INTERVAL_SECONDS must be positive")
+        if self.APP_USER_DAILY_REAL_SUBMISSIONS < 1:
+            raise ValueError("APP_USER_DAILY_REAL_SUBMISSIONS must be positive")
+        if self.APP_WAN_DAILY_GLOBAL_SUBMISSIONS < 1:
+            raise ValueError("APP_WAN_DAILY_GLOBAL_SUBMISSIONS must be positive")
+        if not self.LOCAL_DEMO_FFMPEG_PATH.strip():
+            raise ValueError("LOCAL_DEMO_FFMPEG_PATH must not be empty")
+        if self.LOCAL_DEMO_TIMEOUT_SECONDS < 1:
+            raise ValueError("LOCAL_DEMO_TIMEOUT_SECONDS must be positive")
         return self
 
     @field_validator("REPLICATE_WEBHOOK_SIGNING_SECRET")
