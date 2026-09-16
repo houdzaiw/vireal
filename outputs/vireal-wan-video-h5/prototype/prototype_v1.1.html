@@ -1121,8 +1121,9 @@
       task.executionType = payload.execution_type || task.executionType || null;
       task.isDemo = typeof payload.is_demo === 'boolean' ? payload.is_demo : Boolean(task.isDemo);
       task.fallbackReason = payload.fallback_reason || task.fallbackReason || null;
-      if (Number.isInteger(payload.user_real_remaining)) state.userRealRemaining = payload.user_real_remaining;
-      if (Number.isInteger(payload.wan_global_remaining)) state.wanGlobalRemaining = payload.wan_global_remaining;
+      const quota = payload.quota || payload;
+      if (Number.isInteger(quota.user_real_remaining)) state.userRealRemaining = quota.user_real_remaining;
+      if (Number.isInteger(quota.wan_global_remaining)) state.wanGlobalRemaining = quota.wan_global_remaining;
       state.mode = task.mode;
       state.duration = task.duration;
       persistVideoTask(task);
@@ -1242,7 +1243,7 @@
           body: JSON.stringify({
             template_id: 'dance',
             mode: state.mode,
-            upload_id: upload.uploadId,
+            upload_ids: [upload.uploadId],
             duration: state.duration
           })
         });
@@ -1269,7 +1270,9 @@
         if (shouldPollVideoTask(payload.status)) {
           videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
         }
-        showToast('真实任务已提交，本次体验免费');
+        showToast(payload.execution_type === 'local_demo'
+          ? '真实服务暂不可用，正在制作演示结果'
+          : '真实任务已提交，本次体验免费');
       } catch (error) {
         if (isExpiredBackendSession(error)) return clearExpiredBackendSession();
         showToast(`生成任务提交失败：${backendErrorMessage(error)}`, true);

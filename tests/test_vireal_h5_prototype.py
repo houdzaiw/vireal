@@ -59,9 +59,14 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def test_video_task_request_sends_mode(self) -> None:
         self.assertIn("mode: state.mode", self.html)
 
+    def test_video_task_request_uses_upload_ids_array_contract(self) -> None:
+        self.assertIn("upload_ids: [upload.uploadId]", self.html)
+        self.assertNotIn("upload_id: upload.uploadId", self.html)
+
     def test_task_persists_execution_metadata(self) -> None:
         self.assertIn("executionType: payload.execution_type", self.html)
         self.assertIn("isDemo: Boolean(payload.is_demo)", self.html)
+        self.assertIn("const quota = payload.quota || payload", self.html)
 
     def test_demo_rendering_state_and_badge_exist(self) -> None:
         self.assertIn("rendering_demo", self.html)
