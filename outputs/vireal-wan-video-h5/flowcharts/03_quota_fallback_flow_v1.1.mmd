@@ -1,0 +1,65 @@
+flowchart TD
+    request([创建视频任务])
+    validate{身份 图片 参数有效?}
+    idem{幂等键已存在?}
+    same{请求参数一致?}
+    returnExisting[返回原任务]
+    conflict[返回四零九冲突]
+    lockUser[锁定用户 UTC 日配额]
+    userQuota{用户真实额度剩余?}
+    advanced{高级模式?}
+    lockWan[锁定 Wan 全站 UTC 日配额]
+    wanQuota{Wan 全站额度剩余?}
+    reserve[预留真实生成额度]
+    create[创建一次 Replicate prediction]
+    result{创建结果}
+    consume[预留转为已消费]
+    unknown[保持预留并标记 submission_unknown]
+    classify{明确失败类型}
+    safety[释放预留并标记失败]
+    release[释放预留]
+    local[进入本地动画队列]
+    providerEnd{外部任务终态}
+    save[进入真实结果保存]
+    demoAfterFail[真实额度已消费并进入本地动画]
+    done([返回当前任务状态])
+
+    request --> validate
+    validate -->|否| safety
+    validate -->|是| idem
+    idem -->|是| same
+    same -->|是| returnExisting
+    same -->|否| conflict
+    idem -->|否| lockUser
+    lockUser --> userQuota
+    userQuota -->|否| local
+    userQuota -->|是| advanced
+    advanced -->|否| reserve
+    advanced -->|是| lockWan
+    lockWan --> wanQuota
+    wanQuota -->|否| local
+    wanQuota -->|是| reserve
+    reserve --> create
+    create --> result
+    result -->|prediction ID 已返回| consume
+    result -->|网络结果不明确| unknown
+    result -->|创建前明确失败| classify
+    classify -->|安全或输入拒绝| safety
+    classify -->|余额 限流 服务或配置错误| release
+    release --> local
+    consume --> providerEnd
+    providerEnd -->|成功| save
+    providerEnd -->|明确失败且允许降级| demoAfterFail
+    save --> done
+    demoAfterFail --> local
+    local --> done
+    unknown --> done
+    safety --> done
+    returnExisting --> done
+    conflict --> done
+
+    style local fill:#FFECBD,stroke:#FFC943
+    style unknown fill:#FFECBD,stroke:#FFC943
+    style safety fill:#FFCDC2,stroke:#FF7556
+    style consume fill:#CDF4D3,stroke:#66D575
+
