@@ -1,13 +1,14 @@
 # Vireal 双模式视频 H5 产品文档
 
-当前评审版本：v1.1（尚未部署）
+当前开发基线：v1.1（产品评审已通过，尚未部署）
 
 ## 交付物
 
-- `prd/prd_v1.0.html`：最终产品需求文档，包含 Mermaid 流程图与 Focus 模式原型切片。
+- `prd/prd_v1.1.html`：当前双模式最终产品需求文档，包含 Mermaid 流程图与 Focus 模式原型切片。
+- `prd/prd_v1.0.html`：历史 Wan 单模式产品需求文档。
 - `prototype/prototype_v1.1.html`：当前双模式单文件 Tailwind Web/H5 高保真交互原型。
 - `prototype/prototype_v1.0.html`：历史参考版本，不再作为 Pages 构建入口。
-- `flowcharts/*.mmd`：核心用户路径、生成时序、失败返币、PayPal、媒体生命周期与系统架构。
+- `flowcharts/*_v1.1.mmd`：双模式用户路径、生成时序、配额降级、任务状态、媒体生命周期与系统架构。
 - `annex/requirements_baseline_v1.0.md`：经确认的需求基线。
 - `annex/technical_design_v1.0.md`：与现有 FastAPI 项目对齐的系统、数据、接口和异步任务设计。
 - `annex/wan_poc_plan_v1.0.md`：Wan 双人/单人动作的分阶段付费 PoC 计划与验收口径。
@@ -30,7 +31,7 @@
 
 生产构建会把 API Origin 注入页面，并默认启用真实后端模式。本地原型文件仍可继续使用查询参数覆盖配置。
 
-> v1.1 已表达新的 `mode`、`upload_id`、执行类型、额度和演示降级合同。在匹配的后端实现完成并通过测试前，不得部署 v1.1；当前构建切换仅用于本地验收。
+> v1.1 已表达新的 `mode`、`upload_ids`、执行类型、额度和演示降级合同。在匹配的后端实现、数据库迁移和 Worker 完成并通过测试前，不得部署 v1.1；当前构建切换仅用于本地验收。
 
 Cloudflare Pages 项目配置：
 
@@ -59,4 +60,4 @@ python3 -m http.server 5173 --directory dist/vireal-pages
 
 ## 版本规则
 
-历史版本不得覆盖。v1.1 原型通过产品评审后，再更新 Mermaid 流程图、后端实现计划、PRD 内嵌切片和版本记录。
+历史版本不得覆盖。v1.1 原型、Mermaid 流程图和最终 PRD 已完成；后续改动应新增版本文件，并同步更新实现计划、测试与版本记录。

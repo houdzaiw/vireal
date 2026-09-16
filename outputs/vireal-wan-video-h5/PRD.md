@@ -5,9 +5,9 @@
 | 项目 | 内容 |
 |---|---|
 | 产品 | Vireal 国际版 H5 |
-| 版本 | v1.1（需求骨架） |
-| 日期 | 2026-09-15 |
-| 状态 | H5 v1.1 原型已实现，待产品评审与流程图补全 |
+| 版本 | v1.1（最终 PRD） |
+| 日期 | 2026-09-16 |
+| 状态 | 产品评审已通过，开发就绪，尚未授权生产发布 |
 | 基线版本 | v1.0 Wan Video H5 |
 | 本次主题 | MiniMax 普通模式、Wan 高级模式及本地动画降级 |
 
@@ -15,7 +15,7 @@
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| v1.1 | 2026-09-15 | 新增双模式、真实生成配额和自有 Worker 动画降级方案 |
+| v1.1 | 2026-09-16 | 新增双模式、真实生成配额和自有 Worker 动画降级方案 |
 
 ## 2. 需求背景
 
@@ -362,33 +362,47 @@
 5. 摘要区显示模式、时长、720P、9:16、静音、免费体验及剩余真实生成额度；
 6. 真实结果和本地动画结果使用同一播放器、下载入口和作品卡片，本地动画额外显示“演示结果”。
 
-当前评审原型：`prototype/prototype_v1.1.html`。原型通过产品评审后再进入流程图步骤，尚未授权生产部署。
+当前评审原型：`prototype/prototype_v1.1.html`。产品评审和流程图已经完成；在匹配的 API、数据库迁移、Worker 与自动化测试完成前，尚未授权生产部署。可视化最终版见 `prd/prd_v1.1.html`。
 
 ### 7.2 后端任务模型
 
-待补充模型路由、配额计数、任务状态、幂等边界和所有权校验。
+- 创建任务使用 `upload_ids` 数组、`mode`、`duration` 和稳定的 `Idempotency-Key`；服务端校验上传所有权、有效期、模式与时长。
+- 用户两种模式合计每个 UTC 自然日最多创建 5 次真实 prediction；高级模式 Wan 全站每天最多 3 次。
+- 配额预留与 prediction ID 落库需要事务保护；只有确认创建成功的外部 prediction 才消费额度。
+- 任务统一返回 `mode`、`execution_type`、`is_demo` 和 `fallback_reason`，并支持 `rendering_demo` 与 `submission_unknown`。
+- 同一幂等键参数不一致时返回 409；结果不明确时禁止自动重提或直接降级。
 
 ### 7.3 Replicate 模型适配
 
-待补充 MiniMax `first_frame_image` 输入、Wan 输入、Webhook 和输出统一协议。
+- 普通模式路由到 `minimax/video-01`，使用短期 R2 签名地址作为 `first_frame_image`，输出经 Worker 裁剪为 5 秒。
+- 高级模式路由到 `wan-video/wan-2.7-r2v`，使用固定单人跳舞提示词，支持 5/10 秒。
+- 每个外部任务使用携带内部任务 ID 的 HTTPS Webhook；回调验证签名、时间窗口和 Webhook ID，并快速返回 2xx。
+- Webhook 只更新任务状态，视频下载、校验、转码和 R2 转存均由后台 Worker 执行。
 
 ### 7.4 本地动画 Worker
 
-待补充竖屏适配、简单动画效果、MP4 编码、R2 转存、重试和清理策略。
+- 本地动画由 PostgreSQL Worker 基于用户原图生成轻微推近、平移和缩放效果，不调用外部生成模型。
+- 输出统一为 720p、9:16、静音、H.264、`yuv420p` MP4；时长与所选模式规则一致。
+- Worker 使用 `FOR UPDATE SKIP LOCKED` 领取任务，仅重试下载、转码、R2 写入和清理，不重新创建 prediction。
+- 所有真实和演示结果均转存私有 R2，默认 24 小时后清理；成功页面使用 5 分钟签名播放地址。
 
 ### 7.5 隐私与内容边界
 
-待补充上传声明、第三方处理披露、结果标识以及输入输出安全处理。
+- 上传区常驻显示图片权利、第三方 AI 处理和 24 小时保留说明，不增加阻断式勾选框。
+- API Token、Replicate Token、Webhook Secret、R2 Secret 和签名 URL 不得进入前端源码、埋点或普通日志。
+- `execution_type=local_demo` 时，结果页、作品列表和下载区必须显示不可隐藏的“演示结果”，且不得标注为 MiniMax 或 Wan 生成。
+- 无效、越权、过期或安全拒绝的输入直接失败，不得通过本地动画掩盖问题。
 
 ## 8. 业务流程图
 
-待步骤 5 输出 Mermaid 流程图，至少包含：
+已完成并纳入 `prd/prd_v1.1.html`：
 
-1. 双模式生成主流程；
-2. 用户级与全站配额判断；
-3. 第三方真实生成与本地动画降级；
-4. Webhook、Worker、R2 和 H5 状态时序；
-5. 24 小时媒体生命周期。
+1. `flowcharts/01_core_user_flow_v1.1.mmd`：双模式核心用户流程；
+2. `flowcharts/02_generation_sequence_v1.1.mmd`：H5、API、Replicate、Webhook、Worker 与 R2 时序；
+3. `flowcharts/03_quota_fallback_flow_v1.1.mmd`：用户级/全站配额及本地降级；
+4. `flowcharts/04_video_task_state_v1.1.mmd`：视频任务状态机；
+5. `flowcharts/05_media_lifecycle_v1.1.mmd`：图片和视频 24 小时生命周期；
+6. `flowcharts/06_system_architecture_v1.1.mmd`：部署与安全边界。
 
 ## 9. 异常与边界处理
 
@@ -404,7 +418,7 @@
 
 ## 10. 数据追踪与埋点
 
-待补充事件名称和属性，覆盖：模式选择、时长选择、上传成功、真实任务创建、额度拦截、降级原因、生成结果、播放、下载、过期和错误类型。
+核心事件包括 `generation_mode_selected`、`duration_selected`、`upload_verified`、`video_task_created`、`prediction_created`、`generation_fallback_started`、`video_task_succeeded`、`video_play_started`、`video_downloaded`、`media_expired` 和 `video_task_failed`。公共属性仅保留任务 ID、模式、时长、执行类型、降级原因、错误分类和阶段耗时，不记录用户原图、密钥或签名 URL。
 
 ## 11. 未来演进规划
 
@@ -416,7 +430,9 @@
 
 ## 12. 附件
 
+- v1.1 最终 HTML PRD：`prd/prd_v1.1.html`
 - 当前评审 H5 原型：`prototype/prototype_v1.1.html`
+- v1.1 Mermaid 流程图：`flowcharts/*_v1.1.mmd`
 - 历史参考 H5 原型：`prototype/prototype_v1.0.html`
 - 现有技术设计：`annex/technical_design_v1.0.md`
 - 现有需求基线：`annex/requirements_baseline_v1.0.md`
