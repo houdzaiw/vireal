@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App 服务端与后台管理系统 PRD v1.0</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #617087;
+      --line: #dfe5ee;
+      --brand: #2563eb;
+      --brand-soft: #eaf1ff;
+      --ok: #0f766e;
+      --warn: #b45309;
+      --danger: #b42318;
+      --shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 22px;
+      background: #101828;
+      color: #f8fafc;
+      overflow: auto;
+    }
+
+    aside h2 {
+      margin: 0 0 18px;
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    aside a {
+      display: block;
+      margin: 8px 0;
+      padding: 8px 10px;
+      color: #dbeafe;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    aside a:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    main {
+      width: 100%;
+      max-width: 1180px;
+      padding: 36px 42px 80px;
+    }
+
+    header {
+      margin-bottom: 28px;
+      padding: 30px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 34px;
+      line-height: 1.22;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 24px;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 12px;
+      font-size: 18px;
+      line-height: 1.4;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    section {
+      margin-bottom: 24px;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 18px 20px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: #eef2f7;
+      border-radius: 4px;
+      color: #0f172a;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .meta-item {
+      padding: 12px 14px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .meta-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .p0 {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+
+    .p1 {
+      background: #fef3c7;
+      color: var(--warn);
+    }
+
+    .p2 {
+      background: #dbeafe;
+      color: var(--brand);
+    }
+
+    .note {
+      padding: 14px 16px;
+      background: #f8fafc;
+      border-left: 4px solid var(--brand);
+      color: #334155;
+      border-radius: 6px;
+    }
+
+    .placeholder {
+      padding: 20px;
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      color: var(--muted);
+    }
+
+    .module {
+      margin: 18px 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fcfdff;
+    }
+
+    .module h3 {
+      margin-top: 0;
+    }
+
+    .version-select {
+      float: right;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .history-banner {
+      margin-bottom: 18px;
+      padding: 14px 16px;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      background: #fff7ed;
+      color: #9a3412;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .history-banner a {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        display: block;
+      }
+
+      aside {
+        position: relative;
+        height: auto;
+      }
+
+      main {
+        padding: 24px 16px 60px;
+      }
+
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      header,
+      section {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <h2>PRD 导航</h2>
+      <a href="#info">项目信息与版本记录</a>
+      <a href="#background">一、需求背景</a>
+      <a href="#goals">二、需求目标</a>
+      <a href="#users">三、用户与使用场景</a>
+      <a href="#features">四、需求功能清单</a>
+      <a href="#solution">五、详细方案</a>
+      <a href="#flow">六、业务流程图</a>
+      <a href="#edge">七、异常与边界处理</a>
+      <a href="#tracking">八、数据追踪与埋点</a>
+      <a href="#roadmap">九、未来演进规划</a>
+      <a href="#annex">十、附件</a>
+    </aside>
+
+    <main>
+      <div class="history-banner">
+        您正在查看 v1.0 初稿快照。最新版为 <a href="prd_final_v1.0.html">v1.0 最终版</a>，其中已补充原型切片、流程图和详细方案。
+      </div>
+      <header>
+        <select id="versionSelect" class="version-select" aria-label="版本切换">
+          <option value="prd_v1.0.html" selected>v1.0 初稿快照</option>
+          <option value="prd_final_v1.0.html">v1.0 最终版</option>
+        </select>
+        <p class="eyebrow">Product Requirements Document</p>
+        <h1>App 服务端与后台管理系统 PRD v1.0</h1>
+        <p>本 PRD 面向第一版本地/内网可运行的服务端与后台管理系统，目标是在较短周期内跑通移动 App 设备号登录、用户资料、动态内容、图片上传、订单回调、后台管理与 key-value 配置能力。</p>
+        <div class="meta-grid">
+          <div class="meta-item"><strong>推荐技术底座</strong>FastAPI Full-Stack Template 二次开发，保留 FastAPI、PostgreSQL、Docker Compose、React 后台。</div>
+          <div class="meta-item"><strong>项目拆分策略</strong>服务端与后台管理放在 server 项目；移动 App 单独项目，只调用 API。</div>
+          <div class="meta-item"><strong>第一版原则</strong>快速上线、功能可用、逻辑清晰，暂不追求复杂权限、多租户、高可用和精细运营。</div>
+          <div class="meta-item"><strong>账号体系原则</strong>后台管理员与 App 用户完全独立，不共用用户表。</div>
+        </div>
+      </header>
+
+      <section id="info">
+        <h2>项目信息与版本记录</h2>
+        <table>
+          <tbody>
+            <tr>
+              <th>项目名称</th>
+              <td>App 服务端与后台管理系统</td>
+              <th>文档版本</th>
+              <td>v1.0</td>
+            </tr>
+            <tr>
+              <th>创建日期</th>
+              <td>2026-08-22</td>
+              <th>当前阶段</th>
+              <td>第一版需求定义</td>
+            </tr>
+            <tr>
+              <th>目标平台</th>
+              <td>移动 App、Web 后台管理系统、服务端 API</td>
+              <th>部署阶段</th>
+              <td>本地/内网先跑通</td>
+            </tr>
+            <tr>
+              <th>主要使用方</th>
+              <td>App 用户、后台管理员、支付平台通知服务</td>
+              <th>暂不覆盖</th>
+              <td>复杂角色权限、多租户、内容审核流、对象存储、公开生产高可用部署</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>版本记录</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>版本</th>
+              <th>日期</th>
+              <th>变更说明</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>v1.0</td>
+              <td>2026-08-22</td>
+              <td>建立第一版需求范围，明确技术选型、账号体系、App API、后台管理、支付回调与配置管理方向。</td>
+              <td><span class="badge">待确认</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="background">
+        <h2>一、需求背景</h2>
+        <p>项目需要为移动 App 提供一套稳定、可快速开发的服务端 API，同时需要一个后台管理系统用于查看和管理 App 用户、用户生成内容、订单状态以及运营配置。开发者具备 Python 开发能力，希望尽量复用成熟脚手架，减少登录、数据库、Docker、前后端联调等基础工程的搭建成本。</p>
+        <p>现阶段最大的痛点不是复杂业务，而是需要快速形成一套能跑通闭环的基础平台：App 可以无注册成本进入，用户可以发布文字和图片动态，后台可以处理异常用户和内容，支付平台的订阅或内购状态可以同步到后端，运营配置可以在 App 启动时下发。</p>
+
+        <h3>为什么现在做</h3>
+        <ul>
+          <li>移动 App 需要尽快进入可用验证阶段，不能被复杂账号体系和后台工程拖慢。</li>
+          <li>设备号登录能够降低第一版注册门槛，适合快速验证内容和支付链路。</li>
+          <li>后台管理系统需要尽早存在，否则用户内容、订单、配置和异常状态无法闭环处理。</li>
+          <li>Apple IAP 和 Google Play 支付状态需要由服务端统一记录，避免只依赖客户端状态造成订单不一致。</li>
+        </ul>
+
+        <h3>技术选型判断</h3>
+        <p>使用 FastAPI Full-Stack Template 二次开发是合理的。它提供 FastAPI 后端、PostgreSQL、Docker Compose、React 管理前端、JWT 登录、基础用户管理和测试结构，适合作为后台管理和 API 服务底座。需要注意的是，模板原生用户体系主要面向账号密码登录，应保留给后台管理员使用；App 用户需要单独建表，并通过设备 UUID 登录。</p>
+      </section>
+
+      <section id="goals">
+        <h2>二、需求目标</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>目标类型</th>
+              <th>描述</th>
+              <th>衡量指标</th>
+              <th>目标值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>上线效率</td>
+              <td>基于成熟模板快速搭建服务端和后台管理系统，减少基础工程开发量。</td>
+              <td>本地/内网环境完整启动并完成核心链路验证</td>
+              <td>第一版交付时 Docker Compose 可启动后端、数据库和后台前端</td>
+            </tr>
+            <tr>
+              <td>App 低门槛进入</td>
+              <td>App 用户无需账号密码，使用设备 UUID 快速登录，设备号变化即创建新用户。</td>
+              <td>设备登录成功率、登录接口响应稳定性</td>
+              <td>正常设备号请求 100% 可创建或返回 App 用户</td>
+            </tr>
+            <tr>
+              <td>内容闭环</td>
+              <td>支持用户发布文字和图片动态，后台可查看、删除或禁用违规内容。</td>
+              <td>动态发布、列表展示、后台删除流程是否跑通</td>
+              <td>发布后立即展示；删除后 App API 不再返回</td>
+            </tr>
+            <tr>
+              <td>订单可信记录</td>
+              <td>后端接收 Apple IAP 和 Google Play 相关通知或校验结果，更新订单状态。</td>
+              <td>支付通知入库率、订单状态更新准确性</td>
+              <td>支付回调可落库，可在后台查看最新订单状态</td>
+            </tr>
+            <tr>
+              <td>运营配置下发</td>
+              <td>后台维护简单 key-value 配置，App 启动时拉取启用配置。</td>
+              <td>配置新增、修改、启停和 App 拉取结果一致性</td>
+              <td>App 启动接口返回所有启用配置</td>
+            </tr>
+            <tr>
+              <td>管理可控</td>
+              <td>第一版后台只设置一个管理员角色，但可完成用户、内容、订单、配置的基础管理。</td>
+              <td>后台核心菜单可用率</td>
+              <td>管理员登录后可完成所有 P0 管理动作</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="users">
+        <h2>三、用户与使用场景</h2>
+
+        <h3>典型用户</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>用户类型</th>
+              <th>身份说明</th>
+              <th>核心诉求</th>
+              <th>主要入口</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>App 用户</td>
+              <td>移动端真实使用者，无账号密码，通过设备 UUID 识别。</td>
+              <td>快速进入 App，维护头像昵称，发布和浏览文字/图片动态。</td>
+              <td>移动 App API</td>
+            </tr>
+            <tr>
+              <td>后台管理员</td>
+              <td>内部运营或开发维护人员，使用账号密码登录后台。</td>
+              <td>查看用户、管理内容、处理订单状态、维护运营配置。</td>
+              <td>React 后台管理系统</td>
+            </tr>
+            <tr>
+              <td>支付平台通知服务</td>
+              <td>Apple App Store Server Notifications、Google Play 相关通知服务。</td>
+              <td>向后端推送订单、订阅或支付状态变化。</td>
+              <td>服务端 webhook/API</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>User Journey Map：App 用户</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>阶段</th>
+              <th>用户触点</th>
+              <th>用户行为</th>
+              <th>痛点/情绪</th>
+              <th>产品机会点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>首次打开</td>
+              <td>App 启动页</td>
+              <td>App 读取设备 UUID，请求设备号登录接口。</td>
+              <td>不想填写账号密码，希望立即进入。</td>
+              <td>后端根据设备 UUID 自动创建 App 用户并返回长期 token。</td>
+            </tr>
+            <tr>
+              <td>初始化配置</td>
+              <td>App 启动流程</td>
+              <td>登录成功后拉取 key-value 配置。</td>
+              <td>用户无感知，但配置错误会影响功能开关和体验。</td>
+              <td>后台提供可启停配置，App 只接收启用配置。</td>
+            </tr>
+            <tr>
+              <td>完善资料</td>
+              <td>个人资料页</td>
+              <td>上传头像，修改昵称。</td>
+              <td>希望操作简单，保存后立即生效。</td>
+              <td>头像本地存储，资料接口返回最新头像 URL 和昵称。</td>
+            </tr>
+            <tr>
+              <td>发布动态</td>
+              <td>发布页</td>
+              <td>输入文字，选择一张或多张图片，提交发布。</td>
+              <td>担心上传失败或发布后看不到。</td>
+              <td>服务端先完成图片存储再创建动态，发布成功后立即在列表展示。</td>
+            </tr>
+            <tr>
+              <td>浏览动态</td>
+              <td>动态流</td>
+              <td>查看自己和他人发布的内容。</td>
+              <td>如果违规内容或已删内容仍展示，会破坏体验。</td>
+              <td>App API 默认过滤已删除、禁用用户、禁用内容。</td>
+            </tr>
+            <tr>
+              <td>支付后使用</td>
+              <td>支付页、订单状态页</td>
+              <td>完成 Apple IAP 或 Google Play 支付，等待权益或订单状态更新。</td>
+              <td>客户端支付成功但服务端未同步会造成不信任。</td>
+              <td>后端记录订单并接收平台通知，后台可排查订单状态。</td>
+            </tr>
+            <tr>
+              <td>退出或换设备</td>
+              <td>App 设置页、新设备</td>
+              <td>退出登录或设备 UUID 变化。</td>
+              <td>第一版接受新设备产生新账号。</td>
+              <td>服务端以设备 UUID 为身份边界，不提供账号找回。</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>User Journey Map：后台管理员</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>阶段</th>
+              <th>用户触点</th>
+              <th>用户行为</th>
+              <th>痛点/情绪</th>
+              <th>产品机会点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>登录后台</td>
+              <td>React 后台登录页</td>
+              <td>输入管理员账号密码，进入后台。</td>
+              <td>第一版只需要稳定登录，不需要复杂角色。</td>
+              <td>复用模板账号密码登录和 JWT 机制。</td>
+            </tr>
+            <tr>
+              <td>查看用户</td>
+              <td>App 用户管理页</td>
+              <td>搜索、查看 App 用户资料、设备号、状态和创建时间。</td>
+              <td>需要快速定位异常用户。</td>
+              <td>支持按用户 ID、昵称、设备号、状态筛选。</td>
+            </tr>
+            <tr>
+              <td>处理内容</td>
+              <td>动态内容管理页</td>
+              <td>查看用户动态，删除违规动态，禁用用户。</td>
+              <td>希望处理后 App 端立即不展示。</td>
+              <td>使用软删除和状态过滤，确保前台列表不返回已处理内容。</td>
+            </tr>
+            <tr>
+              <td>排查订单</td>
+              <td>订单管理页</td>
+              <td>查看 Apple/Google 订单、平台交易号、状态、更新时间。</td>
+              <td>支付问题需要可追踪证据。</td>
+              <td>保存原始通知摘要、状态变更时间和错误信息。</td>
+            </tr>
+            <tr>
+              <td>维护配置</td>
+              <td>运营配置页</td>
+              <td>新增、修改、启停 key-value 配置。</td>
+              <td>希望不用发版就调整简单参数。</td>
+              <td>App 启动拉取所有启用配置，后台修改后立即生效。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="features">
+        <h2>四、需求功能清单</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>功能点</th>
+              <th>优先级</th>
+              <th>基础逻辑</th>
+              <th>前置条件</th>
+              <th>数据流向</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>项目底座</td>
+              <td>FastAPI 模板二次开发</td>
+              <td><span class="status p0">P0</span></td>
+              <td>保留模板后端、数据库、Docker、React 后台；将原用户体系定位为后台管理员体系。</td>
+              <td>初始化模板项目，确认环境变量、数据库连接和本地启动命令。</td>
+              <td>开发者启动 Docker Compose，后端连接 PostgreSQL，后台前端调用后端 API。</td>
+            </tr>
+            <tr>
+              <td>后台账号</td>
+              <td>管理员账号密码登录</td>
+              <td><span class="status p0">P0</span></td>
+              <td>第一版仅一个管理员角色，管理员可访问所有后台功能。</td>
+              <td>创建初始超级管理员账号。</td>
+              <td>后台登录页提交账号密码，后端校验后返回管理端 token。</td>
+            </tr>
+            <tr>
+              <td>App 登录</td>
+              <td>设备 UUID 登录</td>
+              <td><span class="status p0">P0</span></td>
+              <td>App 提交设备 UUID；若不存在则创建新 App 用户；若存在则返回原 App 用户。设备号变化即创建新用户。</td>
+              <td>App 能稳定生成或读取设备 UUID。</td>
+              <td>App -> 设备登录接口 -> app_users/app_devices -> 返回长期 token 和用户资料。</td>
+            </tr>
+            <tr>
+              <td>App 用户资料</td>
+              <td>修改头像、昵称</td>
+              <td><span class="status p0">P0</span></td>
+              <td>App 用户只能修改自己的头像和昵称；后台不能代改用户资料。</td>
+              <td>App 用户已登录。</td>
+              <td>App 上传头像到本地文件目录，后端保存文件路径并更新 app_users。</td>
+            </tr>
+            <tr>
+              <td>图片存储</td>
+              <td>本地文件存储</td>
+              <td><span class="status p0">P0</span></td>
+              <td>第一版头像和动态图片存储在服务端本地目录，后端提供可访问 URL。</td>
+              <td>部署环境挂载上传目录，限制文件类型和大小。</td>
+              <td>App -> 上传接口 -> 本地 uploads 目录 -> 文件元数据入库。</td>
+            </tr>
+            <tr>
+              <td>动态内容</td>
+              <td>发布文字/图片动态</td>
+              <td><span class="status p0">P0</span></td>
+              <td>用户发布后立即展示，不走审核；内容支持文字和图片组合。</td>
+              <td>App 用户已登录，上传内容满足长度和图片限制。</td>
+              <td>App -> 发布接口 -> contents/content_images -> 动态流接口返回。</td>
+            </tr>
+            <tr>
+              <td>动态内容</td>
+              <td>动态列表与详情</td>
+              <td><span class="status p0">P0</span></td>
+              <td>列表默认排除已删除内容、禁用用户内容和禁用内容，不显示删除占位。</td>
+              <td>存在已发布内容。</td>
+              <td>App -> 列表接口 -> 按时间分页返回内容、作者资料和图片 URL。</td>
+            </tr>
+            <tr>
+              <td>后台用户管理</td>
+              <td>查看、禁用、删除 App 用户</td>
+              <td><span class="status p0">P0</span></td>
+              <td>后台可查看用户状态和基础资料；禁用后用户不能继续发布；删除使用软删除。</td>
+              <td>管理员已登录。</td>
+              <td>后台 -> 管理 API -> 更新 app_users 状态；App API 根据状态拦截或过滤。</td>
+            </tr>
+            <tr>
+              <td>后台内容管理</td>
+              <td>查看、删除动态</td>
+              <td><span class="status p0">P0</span></td>
+              <td>后台删除动态后，App 列表和详情不再返回该内容；不保留“已删除”占位。</td>
+              <td>管理员已登录，动态存在。</td>
+              <td>后台 -> 内容管理 API -> 更新 contents.deleted_at/status -> App 查询过滤。</td>
+            </tr>
+            <tr>
+              <td>订单</td>
+              <td>Apple IAP 与 Google Play 支付通知接收</td>
+              <td><span class="status p0">P0</span></td>
+              <td>后端提供平台通知入口，记录原始通知摘要，更新订单状态。第一版重点是状态可落库、可查看。</td>
+              <td>配置 Apple/Google 通知地址和必要密钥；本地/内网阶段可先用模拟通知验证。</td>
+              <td>Apple/Google -> webhook -> orders/order_events -> 后台订单页展示。</td>
+            </tr>
+            <tr>
+              <td>后台订单管理</td>
+              <td>订单状态查看</td>
+              <td><span class="status p0">P0</span></td>
+              <td>后台可查看订单号、平台、用户、金额或商品、状态、最近更新时间和错误信息。</td>
+              <td>存在订单记录或支付通知。</td>
+              <td>后台 -> 订单管理 API -> orders/order_events。</td>
+            </tr>
+            <tr>
+              <td>运营配置</td>
+              <td>key-value 配置管理</td>
+              <td><span class="status p0">P0</span></td>
+              <td>后台可新增、编辑、启用、停用配置；App 启动时拉取所有启用配置。</td>
+              <td>管理员已登录。</td>
+              <td>后台 -> configs 表；App 启动 -> 配置接口 -> 返回启用配置。</td>
+            </tr>
+            <tr>
+              <td>安全与限制</td>
+              <td>基础接口鉴权与输入校验</td>
+              <td><span class="status p1">P1</span></td>
+              <td>管理端和 App 端 token 分开；关键接口校验文件类型、图片大小、昵称长度、内容长度。</td>
+              <td>后端定义统一错误结构。</td>
+              <td>客户端请求 -> 鉴权依赖 -> 业务接口 -> 统一错误响应。</td>
+            </tr>
+            <tr>
+              <td>日志</td>
+              <td>关键业务日志</td>
+              <td><span class="status p1">P1</span></td>
+              <td>记录登录、内容删除、用户禁用、订单通知处理、配置变更等关键操作。</td>
+              <td>确定日志落点，第一版可先用应用日志和数据库事件表。</td>
+              <td>业务操作 -> 日志/事件记录 -> 后台排查。</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>建议数据模型草案</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>表名</th>
+              <th>用途</th>
+              <th>核心字段</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>admin_users</code></td>
+              <td>后台管理员账号</td>
+              <td>email、hashed_password、is_active、created_at</td>
+              <td>可复用模板 User 表并重命名或语义约束为后台管理员。</td>
+            </tr>
+            <tr>
+              <td><code>app_users</code></td>
+              <td>App 用户主体</td>
+              <td>id、nickname、avatar_url、status、created_at、deleted_at</td>
+              <td>不与后台管理员共表。</td>
+            </tr>
+            <tr>
+              <td><code>app_devices</code></td>
+              <td>设备与 App 用户绑定</td>
+              <td>device_uuid_hash、app_user_id、platform、last_login_at</td>
+              <td>建议存储设备号哈希，降低原始设备标识泄露风险。</td>
+            </tr>
+            <tr>
+              <td><code>contents</code></td>
+              <td>用户动态</td>
+              <td>app_user_id、text、status、created_at、deleted_at</td>
+              <td>发布即展示；删除使用软删除。</td>
+            </tr>
+            <tr>
+              <td><code>content_images</code></td>
+              <td>动态图片</td>
+              <td>content_id、file_path、url、sort_order、created_at</td>
+              <td>第一版本地文件存储。</td>
+            </tr>
+            <tr>
+              <td><code>orders</code></td>
+              <td>订单主表</td>
+              <td>app_user_id、platform、product_id、transaction_id、status、paid_at</td>
+              <td>兼容 Apple IAP 与 Google Play。</td>
+            </tr>
+            <tr>
+              <td><code>order_events</code></td>
+              <td>支付通知事件</td>
+              <td>order_id、platform、event_type、payload_digest、processed_at、error_message</td>
+              <td>用于排查订单状态更新过程。</td>
+            </tr>
+            <tr>
+              <td><code>app_configs</code></td>
+              <td>运营配置</td>
+              <td>key、value、value_type、is_enabled、description、updated_at</td>
+              <td>App 启动拉取所有启用配置。</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>建议 API 草案</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>端</th>
+              <th>接口</th>
+              <th>方法</th>
+              <th>用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>App</td>
+              <td><code>/api/v1/app/auth/device-login</code></td>
+              <td>POST</td>
+              <td>设备号登录，返回 App 用户 token 和资料。</td>
+            </tr>
+            <tr>
+              <td>App</td>
+              <td><code>/api/v1/app/users/me</code></td>
+              <td>GET/PATCH</td>
+              <td>查看或修改当前 App 用户头像、昵称。</td>
+            </tr>
+            <tr>
+              <td>App</td>
+              <td><code>/api/v1/app/uploads/images</code></td>
+              <td>POST</td>
+              <td>上传头像或动态图片到本地存储。</td>
+            </tr>
+            <tr>
+              <td>App</td>
+              <td><code>/api/v1/app/contents</code></td>
+              <td>GET/POST</td>
+              <td>获取动态流或发布动态。</td>
+            </tr>
+            <tr>
+              <td>App</td>
+              <td><code>/api/v1/app/configs</code></td>
+              <td>GET</td>
+              <td>App 启动拉取启用配置。</td>
+            </tr>
+            <tr>
+              <td>Webhook</td>
+              <td><code>/api/v1/webhooks/apple-iap</code></td>
+              <td>POST</td>
+              <td>接收 Apple IAP 相关通知。</td>
+            </tr>
+            <tr>
+              <td>Webhook</td>
+              <td><code>/api/v1/webhooks/google-play</code></td>
+              <td>POST</td>
+              <td>接收 Google Play 支付相关通知。</td>
+            </tr>
+            <tr>
+              <td>后台</td>
+              <td><code>/api/v1/admin/app-users</code></td>
+              <td>GET/PATCH/DELETE</td>
+              <td>查看、禁用、软删除 App 用户。</td>
+            </tr>
+            <tr>
+              <td>后台</td>
+              <td><code>/api/v1/admin/contents</code></td>
+              <td>GET/DELETE</td>
+              <td>查看和删除用户动态。</td>
+            </tr>
+            <tr>
+              <td>后台</td>
+              <td><code>/api/v1/admin/orders</code></td>
+              <td>GET</td>
+              <td>查看订单状态和支付事件。</td>
+            </tr>
+            <tr>
+              <td>后台</td>
+              <td><code>/api/v1/admin/configs</code></td>
+              <td>GET/POST/PATCH/DELETE</td>
+              <td>维护 key-value 运营配置。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="solution">
+        <h2>五、详细方案</h2>
+        <div class="note">
+          本章节将在原型确认后补充每个功能模块的交互流程图、规则描述和 iframe 原型沙盒切片。当前版本先记录基础业务逻辑，避免在未看到界面前过早固化交互细节。
+        </div>
+
+        <div class="module">
+          <h3>模块 1：App 设备号登录</h3>
+          <p><strong>当前基础规则：</strong>App 提交设备 UUID 和平台信息；服务端按设备 UUID 查找绑定关系，不存在则创建 App 用户和设备记录；返回长期 App token。用户主动退出后客户端删除 token，服务端可记录退出时间。第一版不支持账号找回，换设备或设备号变化即生成新用户。</p>
+          <div class="placeholder">待原型确认后补充：设备号登录流程图、异常提示、专注模式原型切片。</div>
+        </div>
+
+        <div class="module">
+          <h3>模块 2：头像昵称修改</h3>
+          <p><strong>当前基础规则：</strong>App 用户只能修改自己的头像和昵称；头像文件本地保存，数据库保存可访问 URL；昵称需限制长度并过滤空值。后台不提供代改资料能力。</p>
+          <div class="placeholder">待原型确认后补充：资料页交互、上传失败提示、保存成功反馈。</div>
+        </div>
+
+        <div class="module">
+          <h3>模块 3：动态发布与浏览</h3>
+          <p><strong>当前基础规则：</strong>动态支持文字和图片，发布后立即进入动态流；后台删除后 App API 不再返回；不展示“内容已删除”占位。禁用用户后，该用户不能继续发布，其内容是否全部隐藏需在原型阶段进一步确认，默认隐藏。</p>
+          <div class="placeholder">待原型确认后补充：发布页、动态流、图片预览、失败重试和删除后的展示逻辑。</div>
+        </div>
+
+        <div class="module">
+          <h3>模块 4：后台管理</h3>
+          <p><strong>当前基础规则：</strong>管理员账号密码登录后台；第一版只有一个管理员角色。后台包含 App 用户管理、动态内容管理、订单状态查看、运营配置管理四个核心菜单。</p>
+          <div class="placeholder">待原型确认后补充：后台列表、筛选、删除确认、禁用确认、配置编辑弹窗。</div>
+        </div>
+
+        <div class="module">
+          <h3>模块 5：支付回调与订单状态</h3>
+          <p><strong>当前基础规则：</strong>后端接收 Apple IAP 和 Google Play 通知，记录平台、交易号、商品 ID、状态和事件摘要。第一版本地/内网可先通过模拟通知验证流程；真实生产接入时再补齐签名校验、通知重放处理和平台 API 二次校验。</p>
+          <div class="placeholder">待原型确认后补充：订单详情页、通知事件列表、异常状态说明。</div>
+        </div>
+
+        <div class="module">
+          <h3>模块 6：key-value 配置</h3>
+          <p><strong>当前基础规则：</strong>后台维护 key、value、类型、启用状态和描述；App 启动时拉取所有启用配置。第一版不做灰度、不做版本化、不做按地区或 App 版本差异下发。</p>
+          <div class="placeholder">待原型确认后补充：配置列表、编辑状态、启停反馈和 App 拉取异常处理。</div>
+        </div>
+      </section>
+
+      <section id="flow">
+        <h2>六、业务流程图</h2>
+        <div class="placeholder">
+          待原型确认后补充 Mermaid 流程图。预计包含：App 启动与设备登录流程、动态发布流程、后台删除内容流程、Apple/Google 支付通知处理流程、配置下发流程。
+        </div>
+      </section>
+
+      <section id="edge">
+        <h2>七、异常与边界处理</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>场景</th>
+              <th>处理规则</th>
+              <th>第一版要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>设备 UUID 为空或格式异常</td>
+              <td>拒绝登录，返回明确错误码和错误信息。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>设备 UUID 变化</td>
+              <td>视为新设备和新用户，不做账号找回。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>App 用户被禁用</td>
+              <td>禁止发布动态；登录和资料接口可返回用户状态，App 端据此拦截。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>图片上传失败</td>
+              <td>返回失败原因；不创建依赖该图片的动态。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>图片类型或大小不合法</td>
+              <td>限制为常见图片类型，并设置大小上限。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>动态已删除</td>
+              <td>App 列表和详情不返回，不显示占位。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>支付通知重复</td>
+              <td>按平台交易号或事件 ID 做幂等处理。</td>
+              <td>建议处理</td>
+            </tr>
+            <tr>
+              <td>支付通知无法匹配订单</td>
+              <td>记录异常事件，后台可查看，后续可人工排查。</td>
+              <td>建议处理</td>
+            </tr>
+            <tr>
+              <td>配置为空</td>
+              <td>App 配置接口返回空对象或空数组，App 使用默认值。</td>
+              <td>必须处理</td>
+            </tr>
+            <tr>
+              <td>后台误删内容</td>
+              <td>第一版使用软删除，数据库保留记录，暂不提供恢复入口。</td>
+              <td>建议处理</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="tracking">
+        <h2>八、数据追踪与埋点</h2>
+        <p>第一版以服务端业务日志和数据库记录为主，不强制接入第三方埋点平台。建议保留以下关键事件，便于排查和后续增长分析。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>事件</th>
+              <th>触发时机</th>
+              <th>关键字段</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>app_device_login</code></td>
+              <td>App 设备号登录成功或失败</td>
+              <td>app_user_id、device_uuid_hash、platform、result、error_code</td>
+            </tr>
+            <tr>
+              <td><code>profile_updated</code></td>
+              <td>头像或昵称修改成功</td>
+              <td>app_user_id、changed_fields、updated_at</td>
+            </tr>
+            <tr>
+              <td><code>content_created</code></td>
+              <td>动态发布成功</td>
+              <td>content_id、app_user_id、image_count、text_length</td>
+            </tr>
+            <tr>
+              <td><code>content_deleted_by_admin</code></td>
+              <td>后台删除动态</td>
+              <td>content_id、admin_user_id、deleted_at</td>
+            </tr>
+            <tr>
+              <td><code>app_user_disabled_by_admin</code></td>
+              <td>后台禁用用户</td>
+              <td>app_user_id、admin_user_id、reason、updated_at</td>
+            </tr>
+            <tr>
+              <td><code>payment_event_received</code></td>
+              <td>收到 Apple/Google 支付通知</td>
+              <td>platform、transaction_id、event_type、process_result</td>
+            </tr>
+            <tr>
+              <td><code>config_changed</code></td>
+              <td>后台新增、修改、启停配置</td>
+              <td>config_key、admin_user_id、change_type、updated_at</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="roadmap">
+        <h2>九、未来演进规划</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>阶段</th>
+              <th>方向</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>v1.0</td>
+              <td>本地/内网跑通核心闭环</td>
+              <td>设备登录、资料修改、动态发布、后台管理、订单通知、配置拉取。</td>
+            </tr>
+            <tr>
+              <td>v1.1</td>
+              <td>支付真实性与幂等增强</td>
+              <td>补齐 Apple/Google 生产级签名校验、通知重放防护、交易二次校验。</td>
+            </tr>
+            <tr>
+              <td>v1.2</td>
+              <td>图片存储升级</td>
+              <td>从本地文件迁移到对象存储，支持 CDN、缩略图和清理策略。</td>
+            </tr>
+            <tr>
+              <td>v1.3</td>
+              <td>内容治理</td>
+              <td>增加内容审核、举报、恢复、批量处理和操作原因记录。</td>
+            </tr>
+            <tr>
+              <td>v1.4</td>
+              <td>后台权限</td>
+              <td>增加多角色权限，如超级管理员、运营、客服、只读账号。</td>
+            </tr>
+            <tr>
+              <td>v2.0</td>
+              <td>账号体系升级</td>
+              <td>视业务需要增加 Apple/Google 登录、手机号登录、账号绑定和找回能力。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="annex">
+        <h2>十、附件</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>附件</th>
+              <th>状态</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>原型文件</td>
+              <td>待生成</td>
+              <td>将在下一步输出到 <code>prototype/prototype_v1.0.html</code>。</td>
+            </tr>
+            <tr>
+              <td>Mermaid 流程图</td>
+              <td>待生成</td>
+              <td>将在原型确认后输出到 <code>flowcharts/</code>。</td>
+            </tr>
+            <tr>
+              <td>数据字典</td>
+              <td>待补充</td>
+              <td>建议在实现前将最终数据库字段、索引、状态枚举整理为独立附件。</td>
+            </tr>
+            <tr>
+              <td>支付平台接入资料</td>
+              <td>待补充</td>
+              <td>需要补充 Apple IAP 与 Google Play 的通知地址、密钥、商品 ID 和测试账号。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script>
+    document.getElementById('versionSelect').addEventListener('change', (event) => {
+      if (event.target.value) window.location.href = event.target.value;
+    });
+  </script>
+</body>
+</html>

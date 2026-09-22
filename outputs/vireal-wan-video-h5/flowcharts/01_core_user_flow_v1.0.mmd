@@ -1,0 +1,43 @@
+flowchart LR
+    visit([访问落地页])
+    region{服务地区开放?}
+    browse[浏览产品介绍]
+    blocked([地区暂未开放])
+    login[Apple Google 邮箱登录]
+    choose[选择动作模板]
+    upload[/上传一至两张照片/]
+    consent{授权声明确认?}
+    duration[选择时长]
+    balance{金币充足?}
+    checkout[购买金币]
+    submit[提交生成]
+    background[后台异步处理]
+    result{生成成功?}
+    works[作品记录]
+    refund[全额返还金币]
+    expire([播放下载或到期删除])
+
+    visit --> region
+    region -->|否| browse
+    browse --> blocked
+    region -->|是| login
+    login --> choose
+    choose --> upload
+    upload --> consent
+    consent -->|否| upload
+    consent -->|是| duration
+    duration --> balance
+    balance -->|否| checkout
+    checkout --> duration
+    balance -->|是| submit
+    submit -.-> background
+    background --> result
+    result -->|成功| works
+    result -->|失败| refund
+    refund --> works
+    works --> expire
+
+    style blocked fill:#FFCDC2,stroke:#FF7556
+    style refund fill:#CDF4D3,stroke:#66D575
+    style works fill:#C6FAF6,stroke:#5AD8CC
+

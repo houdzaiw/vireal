@@ -1,0 +1,46 @@
+flowchart LR
+    subgraph cloudflare [Cloudflare]
+        pages[Pages H5]
+        edge[DNS CDN WAF]
+        r2[(Private R2)]
+    end
+
+    subgraph railway [Railway]
+        api[FastAPI API and Webhook]
+        worker[PostgreSQL Video Worker]
+        ffmpeg[FFmpeg Runtime]
+    end
+
+    subgraph database [Neon]
+        postgres[(PostgreSQL)]
+    end
+
+    subgraph replicate [Replicate]
+        minimax[MiniMax Video-01]
+        wan[Wan 2.7 R2V]
+    end
+
+    user[International H5 User]
+
+    user -->|HTTPS| edge
+    edge --> pages
+    pages -->|App API HTTPS| api
+    api -->|Users uploads tasks quotas events| postgres
+    api -->|Private upload and signed URLs| r2
+    api -->|Standard prediction| minimax
+    api -->|Advanced prediction| wan
+    minimax -->|Signed Webhook| api
+    wan -->|Signed Webhook| api
+    worker -->|SKIP LOCKED polling| postgres
+    worker -->|Read source and write MP4| r2
+    worker -->|Download temporary output| minimax
+    worker -->|Download temporary output| wan
+    worker -->|Local demo rendering| ffmpeg
+    ffmpeg --> worker
+    api -->|Five minute playback URL| pages
+
+    style pages fill:#C6FAF6,stroke:#5AD8CC
+    style r2 fill:#C6FAF6,stroke:#5AD8CC
+    style worker fill:#FFECBD,stroke:#FFC943
+    style postgres fill:#CDF4D3,stroke:#66D575
+

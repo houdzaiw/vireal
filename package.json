@@ -1,0 +1,17 @@
+{
+  "name": "vireal-h5",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bash scripts/build-vireal-pages.sh",
+    "test": "python3 -m unittest tests/test_vireal_h5_prototype.py"
+  },
+  "dependencies": {
+    "@clerk/clerk-js": "^6.32.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3"
+  }
+}

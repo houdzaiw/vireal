@@ -1,0 +1,36 @@
+flowchart LR
+    upload([上传原图])
+    privateInput[(私有输入对象)]
+    moderate[自动内容审核]
+    accepted{审核通过?}
+    reject[拒绝并返币]
+    generate[生成视频]
+    privateOutput[(私有输出对象)]
+    available[作品可访问]
+    deleteAction{用户主动删除?}
+    revoke[立即撤销访问]
+    expiry{到达二十四小时?}
+    purge[物理删除输入与输出]
+    audit[(非媒体审计记录)]
+    done([媒体生命周期结束])
+
+    upload --> privateInput
+    privateInput --> moderate
+    moderate --> accepted
+    accepted -->|否| reject
+    accepted -->|是| generate
+    generate --> privateOutput
+    privateOutput --> available
+    available --> deleteAction
+    deleteAction -->|是| revoke
+    deleteAction -->|否| expiry
+    revoke --> purge
+    expiry -->|是| purge
+    expiry -->|否| available
+    purge --> audit
+    audit --> done
+
+    style reject fill:#FFCDC2,stroke:#FF7556
+    style purge fill:#CDF4D3,stroke:#66D575
+    style audit fill:#D9D9D9,stroke:#B3B3B3
+

@@ -1,0 +1,52 @@
+sequenceDiagram
+    title 双模式视频生成与演示降级时序
+    actor User as 用户
+    participant H5
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    participant R2 as Cloudflare R2
+    participant Replicate
+    participant Worker as Railway Worker
+
+    User->>H5: 上传一张全身照
+    H5->>API: 上传图片并携带 App Token
+    API->>R2: 写入私有输入对象
+    API->>DB: 保存上传记录和二十四小时到期时间
+    API-->>H5: 返回 upload ID
+    User->>H5: 选择模式和时长并点击免费生成
+    H5->>API: 创建任务并携带 Idempotency-Key
+    API->>DB: 校验幂等键并锁定配额行
+
+    alt 真实生成额度可用
+        API->>R2: 创建一小时输入签名地址
+        API->>Replicate: 创建 MiniMax 或 Wan prediction
+        Replicate-->>API: 返回 prediction ID
+        API->>DB: 记录执行类型并消费真实额度
+        API-->>H5: 返回 pending 或 running
+        Replicate->>API: 发送签名 Webhook
+        API->>DB: 幂等写入 saving 与临时输出地址
+    else 额度耗尽或创建前明确可降级错误
+        API->>DB: 写入 rendering_demo 和降级原因
+        API-->>H5: 返回演示生成状态
+    end
+
+    Worker->>DB: 使用 SKIP LOCKED 领取任务
+    alt Replicate 输出
+        Worker->>Replicate: 流式下载临时视频
+        Worker->>Worker: 校验并裁剪或统一封装
+    else 本地演示动画
+        Worker->>R2: 读取用户原图
+        Worker->>Worker: 使用 FFmpeg 生成静音简单动画
+    end
+    Worker->>R2: 写入私有 MP4 输出
+    Worker->>DB: 标记 succeeded 和二十四小时到期时间
+
+    loop 直到终态
+        H5->>API: 每三秒查询任务
+        API-->>H5: 返回状态与执行类型
+    end
+    H5->>API: 成功后查询播放地址
+    API->>R2: 创建五分钟播放签名地址
+    API-->>H5: 返回 playback URL
+    H5-->>User: 同一播放器展示真实或演示结果
+
