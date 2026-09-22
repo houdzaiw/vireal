@@ -3,10 +3,16 @@ import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import select
 
 from app import crud
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import (
+    SessionDep,
+    get_current_active_superuser,
+    require_cloudflare_access,
+)
 from app.api.routes.app_contents import serialize_app_content
+from app.core.config import settings
 from app.models import (
     AppAdminOperationLog,
     AppAdminOperationLogPublic,
@@ -25,17 +31,25 @@ from app.models import (
     AppOrderEventsPublic,
     AppOrderPublic,
     AppOrdersPublic,
+    AppUser,
     AppUserAdminPublic,
+    AppUserIdentity,
+    AppUserPublic,
     AppUsersPublic,
     AppUserStatusUpdate,
     Message,
     User,
 )
+from app.services.app_identity import identity_providers, revoke_local_app_sessions
+from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
 
 router = APIRouter(
     prefix="/admin/app",
     tags=["admin app"],
-    dependencies=[Depends(get_current_active_superuser)],
+    dependencies=[
+        Depends(require_cloudflare_access),
+        Depends(get_current_active_superuser),
+    ],
 )
 
 
@@ -53,6 +67,29 @@ def serialize_admin_generation(generation: AppGeneration) -> AppGenerationAdminP
     if generation.deleted_at:
         app_generation.status = "deleted"
     return app_generation
+
+
+def serialize_admin_app_user(
+    app_user: AppUser,
+    identity: AppUserIdentity | None,
+) -> AppUserAdminPublic:
+    public_user = AppUserPublic.model_validate(app_user)
+    return AppUserAdminPublic(
+        **public_user.model_dump(),
+        email=identity.primary_email if identity else None,
+        email_verified=identity.email_verified if identity else None,
+        auth_providers=identity_providers(identity) if identity else [],
+        last_login_at=identity.last_login_at if identity else None,
+        login_count=identity.login_count if identity else 0,
+    )
+
+
+def app_user_identity(
+    *, session: SessionDep, app_user_id: uuid.UUID
+) -> AppUserIdentity | None:
+    return session.exec(
+        select(AppUserIdentity).where(AppUserIdentity.app_user_id == app_user_id)
+    ).first()
 
 
 def _normalize_config_create(config_in: AppConfigCreate) -> AppConfigCreate:
@@ -126,15 +163,25 @@ def read_app_users(
     skip: int = 0,
     limit: int = 100,
     status: Literal["active", "disabled", "deleted"] | None = None,
+    account_type: Literal["clerk", "legacy_test"] | None = "clerk",
+    q: str | None = None,
 ) -> Any:
     """
     Retrieve App users for admin management.
     """
     app_users, count = crud.list_app_users_for_admin(
-        session=session, skip=skip, limit=limit, status=status
+        session=session,
+        skip=skip,
+        limit=limit,
+        status=status,
+        account_type=account_type,
+        query=q,
     )
     return AppUsersPublic(
-        data=[AppUserAdminPublic.model_validate(app_user) for app_user in app_users],
+        data=[
+            serialize_admin_app_user(app_user, identity)
+            for app_user, identity in app_users
+        ],
         count=count,
     )
 
@@ -157,6 +204,21 @@ def update_app_user_status(
     updated_user = crud.update_app_user_status(
         session=session, app_user=app_user, status=status_in.status
     )
+    identity = app_user_identity(session=session, app_user_id=app_user_id)
+    revoked_sessions = 0
+    revocation_error: str | None = None
+    if (
+        status_in.status == "disabled"
+        and identity is not None
+        and settings.APP_AUTH_MODE in {"dual", "clerk"}
+    ):
+        revoke_local_app_sessions(session=session, app_user_id=app_user_id)
+        try:
+            revoked_sessions = get_clerk_auth_service().revoke_user_sessions(
+                identity.subject
+            )
+        except ClerkAPIError as exc:
+            revocation_error = str(exc)
     log_admin_operation(
         session=session,
         current_admin=current_admin,
@@ -167,9 +229,11 @@ def update_app_user_status(
         details={
             "previous_status": previous_status,
             "new_status": status_in.status,
+            "revoked_sessions": revoked_sessions,
+            "revocation_error": revocation_error,
         },
     )
-    return updated_user
+    return serialize_admin_app_user(updated_user, identity)
 
 
 @router.delete("/users/{app_user_id}", response_model=Message)
@@ -185,6 +249,17 @@ def delete_app_user(
     if not app_user:
         raise HTTPException(status_code=404, detail="App user not found")
     previous_status = app_user.status
+    identity = app_user_identity(session=session, app_user_id=app_user_id)
+    revoked_sessions = 0
+    revocation_error: str | None = None
+    if identity is not None and settings.APP_AUTH_MODE in {"dual", "clerk"}:
+        revoke_local_app_sessions(session=session, app_user_id=app_user_id)
+        try:
+            revoked_sessions = get_clerk_auth_service().revoke_user_sessions(
+                identity.subject
+            )
+        except ClerkAPIError as exc:
+            revocation_error = str(exc)
     crud.soft_delete_app_user(session=session, app_user=app_user)
     log_admin_operation(
         session=session,
@@ -196,6 +271,8 @@ def delete_app_user(
         details={
             "previous_status": previous_status,
             "nickname": app_user.nickname,
+            "revoked_sessions": revoked_sessions,
+            "revocation_error": revocation_error,
         },
     )
     return Message(message="App user deleted successfully")
@@ -271,10 +348,7 @@ def read_app_generations(
         provider=provider,
     )
     return AppGenerationsAdminPublic(
-        data=[
-            serialize_admin_generation(generation)
-            for generation in generations
-        ],
+        data=[serialize_admin_generation(generation) for generation in generations],
         count=count,
     )
 

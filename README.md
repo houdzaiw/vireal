@@ -4,7 +4,7 @@ Vireal 是一个基于 FastAPI full-stack template 二次开发的 App 后端和
 
 ## 当前能力
 
-- App 设备号登录，App 用户与后台管理员独立账号体系。
+- H5 使用 Clerk 正式认证，支持邀请制邮箱验证码、Google 和 Apple；App 用户与后台管理员独立账号体系。
 - App 用户资料修改，支持昵称和头像。
 - 图片上传支持本地文件和私有 Cloudflare R2；R2 模式通过稳定应用 URL 加短期签名跳转提供访问，并可为 Replicate 生成独立签名 URL。
 - 双模式视频闭环：MiniMax Video-01 普通模式、Wan 2.7 高级模式、签名 Webhook、每日额度、PostgreSQL Worker、本地动画降级、私有 R2 播放和 24 小时清理。
@@ -51,22 +51,27 @@ Mailpit: http://localhost:8025
 PostgreSQL: localhost:5432
 ```
 
-## H5 R2 实链路验证
+## H5 真实登录与 R2 实链路验证
 
-当前原型页面位于 `../outputs/vireal-wan-video-h5/prototype/prototype_v1.1.html`。不要直接使用 `file://` 打开进行真实 API 验证；应通过 HTTP 提供页面，并启用 `backend=1` 测试模式：
+统一 `main` 分支中的 H5 位于 `h5/outputs/vireal-wan-video-h5/prototype/prototype_v1.1.html`。不要直接使用 `file://` 打开进行真实 API 验证；通过构建脚本注入 Clerk Publishable Key 和 API 地址：
 
 ```bash
-cd ../outputs/vireal-wan-video-h5/prototype
-python3 -m http.server 5173
+cd h5
+VIREAL_API_BASE_URL=http://localhost:8000 \
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_replace-me \
+bash scripts/build-vireal-pages.sh
+python3 -m http.server 5173 --directory dist/vireal-pages
 ```
 
 然后访问：
 
 ```text
-http://localhost:5173/prototype_v1.1.html?backend=1&api=http://localhost:8000
+http://localhost:5173/
 ```
 
-测试模式会使用设备登录、真实上传和带 App Token 的私有图片读取。后端通过同源代理读取图片，因此本地上传验证不依赖 R2 Bucket CORS。普通模式使用 MiniMax 首帧图并固定 5 秒，高级模式使用 Wan 并支持 5/10 秒；两者均固定单人跳舞、720P、9:16、静音。当 Replicate 关闭、真实额度耗尽或供应商明确不可用时，Worker 会从用户原图生成带“演示结果”标识的本地 MP4，不调用外部模型。
+H5 使用 Clerk Session Token 调用 `/app/auth/session` 初始化本地用户，然后进行真实上传和私有图片读取。每个 Clerk Session 在数据库中单独登记；H5 退出时先调用 `/app/auth/logout` 即时撤销本地会话，再完成 Clerk `signOut()`。生产必须设置 `APP_AUTH_MODE=clerk`，此时设备登录接口返回 410。后端通过同源代理读取图片，因此本地上传验证不依赖 R2 Bucket CORS。普通模式使用 MiniMax 首帧图并固定 5 秒，高级模式使用 Wan 并支持 5/10 秒；两者均固定单人跳舞、720P、9:16、静音。当 Replicate 关闭、真实额度耗尽或供应商明确不可用时，Worker 会从用户原图生成带“演示结果”标识的本地 MP4，不调用外部模型。
+
+Clerk 的普通 Session Token 必须增加 `{"aud":"vireal-api"}` 自定义 claim。Railway 保存 `CLERK_SECRET_KEY`，Pages 只保存 `VITE_CLERK_PUBLISHABLE_KEY`，不得互换或下发服务端 Secret。管理台的登录、用户、Items 和 Vireal 管理接口在生产环境都要求 Cloudflare Access JWT；超级管理员密码是第二层验证。
 
 H5 会每 3 秒查询任务状态，并在刷新页面后从 `sessionStorage` 恢复当前任务。成功后使用 5 分钟有效的 R2 签名地址播放视频；签名密钥和 Replicate Token 不会进入浏览器。
 
@@ -101,7 +106,7 @@ REPLICATE_API_TOKEN=<server-side-token>
 REPLICATE_STANDARD_MODEL=minimax/video-01
 REPLICATE_ADVANCED_MODEL=wan-video/wan-2.7-r2v
 REPLICATE_R2V_MODEL=wan-video/wan-2.7-r2v
-REPLICATE_WEBHOOK_URL=https://api.example.com/api/v1/webhooks/replicate
+REPLICATE_WEBHOOK_URL=https://api.usevireal.com/api/v1/webhooks/replicate
 REPLICATE_WEBHOOK_SIGNING_SECRET=whsec_<signing-secret>
 REPLICATE_REQUEST_TIMEOUT_SECONDS=30
 REPLICATE_WEBHOOK_TOLERANCE_SECONDS=300

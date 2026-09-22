@@ -50,6 +50,27 @@ const columns: ColumnDef<AppUserAdminPublic>[] = [
     cell: ({ row }) => <CopyId id={row.original.id} />,
   },
   {
+    accessorKey: "email",
+    header: "Email",
+    cell: ({ row }) => (
+      <span className="font-medium">
+        {row.original.email || "Legacy test user"}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "auth_providers",
+    header: "Login methods",
+    cell: ({ row }) => {
+      const providers = row.original.auth_providers ?? []
+      return (
+        <span className="text-muted-foreground">
+          {providers.length > 0 ? providers.join(", ") : "device"}
+        </span>
+      )
+    },
+  },
+  {
     accessorKey: "nickname",
     header: "Nickname",
     cell: ({ row }) => (
@@ -59,13 +80,13 @@ const columns: ColumnDef<AppUserAdminPublic>[] = [
     ),
   },
   {
-    accessorKey: "avatar_url",
-    header: "Avatar",
-    cell: ({ row }) => (
-      <span className="block max-w-48 truncate text-muted-foreground">
-        {row.original.avatar_url || "N/A"}
-      </span>
-    ),
+    accessorKey: "last_login_at",
+    header: "Last login",
+    cell: ({ row }) => <DateTime value={row.original.last_login_at} />,
+  },
+  {
+    accessorKey: "login_count",
+    header: "Logins",
   },
   {
     accessorKey: "status",
@@ -95,7 +116,7 @@ function AppUsersTableContent() {
     return (
       <EmptyState
         title="No App users yet"
-        description="Users will appear here after the App device login API is used."
+        description="Invited users will appear here after their first Clerk sign-in."
       />
     )
   }
@@ -122,7 +143,7 @@ function AppUsers() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="App Users"
-        description="Manage mobile App users and account availability."
+        description="Review invited users, login methods, recent access, and account availability."
       />
       <AppUsersTable />
     </div>

@@ -308,7 +308,7 @@ def test_admin_list_and_soft_delete_app_user(
     app_user = login_data["app_user"]
 
     list_response = client.get(
-        f"{settings.API_V1_STR}/admin/app/users",
+        f"{settings.API_V1_STR}/admin/app/users?account_type=legacy_test",
         headers=superuser_token_headers,
     )
 
@@ -320,11 +320,11 @@ def test_admin_list_and_soft_delete_app_user(
         headers=superuser_token_headers,
     )
     default_list_response = client.get(
-        f"{settings.API_V1_STR}/admin/app/users",
+        f"{settings.API_V1_STR}/admin/app/users?account_type=legacy_test",
         headers=superuser_token_headers,
     )
     deleted_list_response = client.get(
-        f"{settings.API_V1_STR}/admin/app/users?status=deleted",
+        f"{settings.API_V1_STR}/admin/app/users?status=deleted&account_type=legacy_test",
         headers=superuser_token_headers,
     )
 

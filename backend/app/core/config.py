@@ -21,10 +21,24 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str
-    # 60 minutes * 24 hours * 8 days = 8 days
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    # Keep production administrator sessions bounded to one working day.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
     # App device login is intentionally long-lived for the first mobile MVP.
     APP_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 3650
+    APP_AUTH_MODE: Literal["device", "dual", "clerk"] = "device"
+    CLERK_ISSUER_URL: HttpUrl | None = None
+    CLERK_JWKS_URL: HttpUrl | None = None
+    CLERK_AUDIENCE: str | None = None
+    CLERK_SECRET_KEY: str | None = None
+    CLERK_AUTHORIZED_PARTIES: list[HttpUrl] = []
+    CLERK_API_BASE_URL: HttpUrl = HttpUrl("https://api.clerk.com/v1")
+    ADMIN_PUBLIC_SIGNUP_ENABLED: bool = False
+    ADMIN_LOGIN_MAX_FAILURES: int = 5
+    ADMIN_LOGIN_WINDOW_SECONDS: int = 15 * 60
+    CLOUDFLARE_ACCESS_REQUIRED: bool = False
+    CLOUDFLARE_ACCESS_TEAM_DOMAIN: HttpUrl | None = None
+    CLOUDFLARE_ACCESS_AUD: str | None = None
+    PUBLIC_API_DOCS_ENABLED: bool = False
     APP_IMAGE_STORAGE_BACKEND: Literal["local", "r2"] = "local"
     LOCAL_UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_IMAGE_BYTES: int = 5 * 1024 * 1024
@@ -149,6 +163,42 @@ class Settings(BaseSettings):
             raise ValueError("REPLICATE_POC_MAX_SUBMISSIONS must not be negative")
         if self.REPLICATE_WEBHOOK_TOLERANCE_SECONDS < 1:
             raise ValueError("REPLICATE_WEBHOOK_TOLERANCE_SECONDS must be positive")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_clerk_configuration(self) -> Self:
+        if self.APP_AUTH_MODE == "device":
+            return self
+        required_values = {
+            "CLERK_ISSUER_URL": self.CLERK_ISSUER_URL,
+            "CLERK_JWKS_URL": self.CLERK_JWKS_URL,
+            "CLERK_AUDIENCE": self.CLERK_AUDIENCE,
+            "CLERK_SECRET_KEY": self.CLERK_SECRET_KEY,
+        }
+        missing = [name for name, value in required_values.items() if not value]
+        if missing:
+            raise ValueError("Clerk authentication requires: " + ", ".join(missing))
+        if not self.CLERK_AUTHORIZED_PARTIES:
+            raise ValueError("Clerk authentication requires CLERK_AUTHORIZED_PARTIES")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_cloudflare_access_configuration(self) -> Self:
+        if not self.CLOUDFLARE_ACCESS_REQUIRED:
+            return self
+        if not self.CLOUDFLARE_ACCESS_TEAM_DOMAIN or not self.CLOUDFLARE_ACCESS_AUD:
+            raise ValueError(
+                "Cloudflare Access requires CLOUDFLARE_ACCESS_TEAM_DOMAIN and "
+                "CLOUDFLARE_ACCESS_AUD"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_admin_login_configuration(self) -> Self:
+        if self.ADMIN_LOGIN_MAX_FAILURES < 1:
+            raise ValueError("ADMIN_LOGIN_MAX_FAILURES must be positive")
+        if self.ADMIN_LOGIN_WINDOW_SECONDS < 1:
+            raise ValueError("ADMIN_LOGIN_WINDOW_SECONDS must be positive")
         return self
 
     @model_validator(mode="after")

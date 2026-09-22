@@ -2,8 +2,28 @@
 # Keep FASTAPI_ENV unset in production so default-secret checks stay enabled.
 
 PROJECT_NAME=Vireal
-FRONTEND_HOST=https://app.example.com
-BACKEND_CORS_ORIGINS=["https://app.example.com"]
+FRONTEND_HOST=https://app.usevireal.com
+BACKEND_CORS_ORIGINS=["https://app.usevireal.com","https://admin.usevireal.com"]
+
+# Clerk production authentication. Use dual only during the backend-first rollout;
+# switch to clerk before the production H5 is released.
+# Configure the regular Clerk session token with {"aud":"vireal-api"}.
+APP_AUTH_MODE=clerk
+CLERK_ISSUER_URL=https://your-clerk-instance.clerk.accounts.dev
+CLERK_JWKS_URL=https://your-clerk-instance.clerk.accounts.dev/.well-known/jwks.json
+CLERK_AUDIENCE=vireal-api
+CLERK_SECRET_KEY=sk_live_replace-with-clerk-secret
+CLERK_AUTHORIZED_PARTIES=["https://app.usevireal.com"]
+
+# The admin UI is served by this same Railway service at admin.usevireal.com.
+# Cloudflare Access adds its signed assertion before the request reaches FastAPI.
+CLOUDFLARE_ACCESS_REQUIRED=true
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+CLOUDFLARE_ACCESS_AUD=replace-with-access-application-audience
+ADMIN_PUBLIC_SIGNUP_ENABLED=false
+ADMIN_LOGIN_MAX_FAILURES=5
+ADMIN_LOGIN_WINDOW_SECONDS=900
+PUBLIC_API_DOCS_ENABLED=false
 
 SECRET_KEY=replace-with-a-long-random-secret
 FIRST_SUPERUSER=admin@example.com
@@ -39,7 +59,7 @@ REPLICATE_API_TOKEN=replace-with-replicate-token
 REPLICATE_STANDARD_MODEL=minimax/video-01
 REPLICATE_ADVANCED_MODEL=wan-video/wan-2.7-r2v
 REPLICATE_R2V_MODEL=wan-video/wan-2.7-r2v
-REPLICATE_WEBHOOK_URL=https://api.example.com/api/v1/webhooks/replicate
+REPLICATE_WEBHOOK_URL=https://api.usevireal.com/api/v1/webhooks/replicate
 REPLICATE_WEBHOOK_SIGNING_SECRET=whsec_replace-with-signing-secret
 REPLICATE_REQUEST_TIMEOUT_SECONDS=30
 REPLICATE_WEBHOOK_TOLERANCE_SECONDS=300
@@ -49,7 +69,7 @@ REPLICATE_POC_MAX_SUBMISSIONS=0
 # The Replicate PoC uses /app/video-tasks and is controlled separately above.
 APP_GENERATION_PROVIDER=local
 APP_GENERATION_LOCAL_DELAY_SECONDS=1.5
-APP_PUBLIC_BASE_URL=https://api.example.com
+APP_PUBLIC_BASE_URL=https://api.usevireal.com
 ARK_API_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
 ARK_API_KEY=
 ARK_SEEDANCE_MODEL=doubao-seedance-2-0-260128

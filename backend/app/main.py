@@ -22,7 +22,21 @@ if settings.SENTRY_DSN and settings.FASTAPI_ENV != "development":
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url=(
+        f"{settings.API_V1_STR}/openapi.json"
+        if settings.FASTAPI_ENV == "development" or settings.PUBLIC_API_DOCS_ENABLED
+        else None
+    ),
+    docs_url=(
+        "/docs"
+        if settings.FASTAPI_ENV == "development" or settings.PUBLIC_API_DOCS_ENABLED
+        else None
+    ),
+    redoc_url=(
+        "/redoc"
+        if settings.FASTAPI_ENV == "development" or settings.PUBLIC_API_DOCS_ENABLED
+        else None
+    ),
     generate_unique_id_function=custom_generate_unique_id,
 )
 

@@ -6,31 +6,32 @@ This runbook deploys the current FastAPI and PostgreSQL worker implementation wi
 
 | Component | Provider | Production address |
 | --- | --- | --- |
-| H5 | Cloudflare Pages | `https://app.example.com` |
-| API and Replicate webhook | Railway `vireal-api` | `https://api.example.com` |
+| H5 | Cloudflare Pages | `https://app.usevireal.com` |
+| API and Replicate webhook | Railway `vireal-api` | `https://api.usevireal.com` |
+| Protected administration | Railway `vireal-api` + Cloudflare Access | `https://admin.usevireal.com` |
 | Video persistence and cleanup | Railway `vireal-video-worker` | Private service, no domain |
 | Database | Neon PostgreSQL | Private credentials through `DATABASE_URL` |
 | Images and videos | Cloudflare R2 | Private S3 endpoint |
 
-The workspace currently contains two Git checkouts of the same GitHub repository. Cloudflare Pages uses the outer repository's `master` branch, which contains `outputs/vireal-wan-video-h5`. Railway uses the nested `server` repository's `main` branch, which contains the backend.
+The production `main` branch is the single deployment source. Railway builds the
+backend from the repository root, while Cloudflare Pages builds the H5 from the
+`h5/` directory imported into the same branch.
 
-Replace `example.com` in every step with the real production domain before enabling Replicate.
+The production domain is `usevireal.com`.
 
 ## Domain registration and hostnames
 
-Register the production domain with Cloudflare Registrar when the desired name and
-top-level domain are supported, and keep Cloudflare DNS authoritative. Check live
-availability before purchase; suggested candidates, in order, are `vireal.app`,
-`vireal.video`, and `getvireal.com`.
+Keep the registered `usevireal.com` domain on Cloudflare DNS and Registrar.
 
 Use these hostnames:
 
 | Hostname | Purpose |
 | --- | --- |
-| `app.example.com` | Cloudflare Pages H5 |
-| `api.example.com` | Railway API and exact Replicate webhook origin |
-| `www.example.com` | Redirect to the root marketing domain |
-| `example.com` | Marketing site or redirect to the H5 |
+| `app.usevireal.com` | Cloudflare Pages H5 |
+| `api.usevireal.com` | Railway API and exact Replicate webhook origin |
+| `admin.usevireal.com` | Same Railway API image, protected by Cloudflare Access |
+| `www.usevireal.com` | Redirect to the root marketing domain |
+| `usevireal.com` | Marketing site or redirect to the H5 |
 
 Do not create a public hostname for the video worker or a public R2 custom domain.
 Use the provider-generated `*.pages.dev` and `*.up.railway.app` addresses only for
@@ -86,7 +87,13 @@ Restart policy: ALWAYS
 Public target port: 8000
 ```
 
-Only this service receives a public domain. Run migrations here only; do not configure a pre-deploy command on the worker.
+Bind both `api.usevireal.com` and `admin.usevireal.com` to this service. Run
+migrations here only; do not configure a pre-deploy command on the worker. The
+admin frontend uses relative `/api` requests, so Cloudflare Access protects both
+the page and its same-origin API calls and FastAPI can verify the forwarded Access
+JWT. FastAPI requires that assertion on the admin login, users, items, and Vireal
+admin routes. Add a Cloudflare rule that blocks non-`/api/` paths on
+`api.usevireal.com`.
 
 ### vireal-video-worker
 
@@ -103,18 +110,28 @@ The worker needs outbound HTTPS access to Replicate and R2 and the same `DATABAS
 Connect the GitHub repository to Cloudflare Pages and configure:
 
 ```text
-Production branch: master
-Root directory: /
+Production branch: main
+Root directory: /h5
 Build command: bash scripts/build-vireal-pages.sh
 Build output directory: dist/vireal-pages
-VIREAL_API_BASE_URL: https://api.example.com
+VIREAL_API_BASE_URL: https://api.usevireal.com
+VITE_CLERK_PUBLISHABLE_KEY: pk_live_replace-with-clerk-publishable-key
 ```
 
-Bind `app.example.com` as the Pages custom domain. The generated page uses the injected API origin and enables real backend mode without query parameters.
+Bind `app.usevireal.com` as the Pages custom domain. The generated page uses the injected API origin and enables real backend mode without query parameters.
+
+Before the H5 release, finish the Clerk production instance:
+
+1. Enable restricted sign-ups in invite-only mode.
+2. Enable email one-time-code, Google, and Apple sign-in.
+3. Add `https://app.usevireal.com` to the allowed origins and callback URLs.
+4. Customize the normal Clerk session token claims with
+   `{"aud":"vireal-api"}`. The backend rejects tokens without this audience.
+5. Put the live publishable key in Pages only. Put the secret key in Railway only.
 
 ## 4. API domain and Cloudflare DNS
 
-1. In Railway, add `api.example.com` to `vireal-api` and select target port 8000.
+1. In Railway, add both `api.usevireal.com` and `admin.usevireal.com` to `vireal-api` and select target port 8000.
 2. Add both the CNAME and TXT verification records shown by Railway to Cloudflare DNS.
 3. Use the Cloudflare proxy on the first-level `api` subdomain and set SSL/TLS mode to `Full`, as required by Railway's proxied-domain setup.
 4. Do not create a Cloudflare redirect rule for `/api/v1/webhooks/replicate`.
@@ -123,9 +140,13 @@ Bind `app.example.com` as the Pages custom domain. The generated page uses the i
 Set these final origins in both Railway services:
 
 ```env
-FRONTEND_HOST=https://app.example.com
-BACKEND_CORS_ORIGINS=["https://app.example.com"]
-REPLICATE_WEBHOOK_URL=https://api.example.com/api/v1/webhooks/replicate
+FRONTEND_HOST=https://app.usevireal.com
+BACKEND_CORS_ORIGINS=["https://app.usevireal.com","https://admin.usevireal.com"]
+REPLICATE_WEBHOOK_URL=https://api.usevireal.com/api/v1/webhooks/replicate
+APP_AUTH_MODE=clerk
+CLERK_AUTHORIZED_PARTIES=["https://app.usevireal.com"]
+CLOUDFLARE_ACCESS_REQUIRED=true
+PUBLIC_API_DOCS_ENABLED=false
 ```
 
 Do not add arbitrary `*.pages.dev` preview origins to CORS. Use the custom H5 domain for real API verification.
@@ -137,17 +158,26 @@ Do not add arbitrary `*.pages.dev` preview origins to CORS. Use the custom H5 do
 3. Run the edge checks:
 
    ```bash
-   H5_URL=https://app.example.com \
-   API_URL=https://api.example.com \
+   H5_URL=https://app.usevireal.com \
+   API_URL=https://api.usevireal.com \
    bash scripts/verify-production.sh
    ```
 
-4. Verify device login, authenticated upload, R2 private read, and a direct unsigned R2 denial.
-5. Submit one task and confirm the Worker produces a labeled local demo without any Replicate prediction.
-6. Confirm the worker is running and polling without database, FFmpeg, or R2 errors.
-7. Set `REPLICATE_ENABLED=True` in both Railway services and redeploy them only when the Replicate account is ready.
-8. Submit one authorized adult full-body photo in standard mode and confirm one MiniMax prediction, signed webhook receipt, R2 transfer, and H5 playback.
-9. Verify the shared user limit of five real predictions per UTC day and the Wan global limit of three per UTC day; quota overflow must produce a labeled local demo without another prediction.
+4. Confirm `/device-login` returns 410, `/docs` returns 404, and the deployed H5
+   source contains no fixed OTP or legacy device-token code.
+5. With an invited account, verify email code, Google, and Apple sign-in. Confirm
+   refresh restores the session and sign-out calls `/app/auth/logout`; replaying
+   the previous token must return 403 immediately.
+6. Confirm the first login creates exactly one Clerk AppUser and that the admin UI
+   shows email, providers, registration time, recent login, and login count.
+7. Disable the user in the Access-protected admin UI and confirm the H5 receives
+   403 on its next API call.
+8. Verify authenticated upload, R2 private read, and a direct unsigned R2 denial.
+9. Submit one task and confirm the Worker produces a labeled local demo without any Replicate prediction.
+10. Confirm the worker is running and polling without database, FFmpeg, or R2 errors.
+11. Set `REPLICATE_ENABLED=True` in both Railway services and redeploy them only when the Replicate account is ready.
+12. Submit one authorized adult full-body photo in standard mode and confirm one MiniMax prediction, signed webhook receipt, R2 transfer, and H5 playback.
+13. Verify the shared user limit of five real predictions per UTC day and the Wan global limit of three per UTC day; quota overflow must produce a labeled local demo without another prediction.
 
 Never automatically resubmit or locally downgrade a task in `submission_unknown`. Inspect the task, Replicate dashboard, and billing before resolving it.
 

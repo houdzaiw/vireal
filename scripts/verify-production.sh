@@ -28,11 +28,40 @@ if [[ "$h5_html" != *"name=\"vireal-backend-mode\" content=\"1\""* ]]; then
   echo "H5 production backend mode is not enabled" >&2
   exit 1
 fi
+if [[ "$h5_html" != *"name=\"clerk-publishable-key\" content=\"pk_live_"* ]]; then
+  echo "H5 does not contain a Clerk production publishable key" >&2
+  exit 1
+fi
+for forbidden_marker in "123456" "device-login" "virealAppAccessToken"; do
+  if [[ "$h5_html" == *"$forbidden_marker"* ]]; then
+    echo "H5 still contains legacy authentication marker: $forbidden_marker" >&2
+    exit 1
+  fi
+done
 
 echo "Checking API health"
 health_body="$(curl --fail --silent --show-error "$api_url/api/v1/utils/health-check/")"
 if [[ "$health_body" != "true" ]]; then
   echo "Unexpected API health response: $health_body" >&2
+  exit 1
+fi
+
+echo "Checking production authentication and documentation policy"
+device_login_status="$(curl --silent --show-error --output /dev/null \
+  --request POST \
+  --header 'Content-Type: application/json' \
+  --data '{"device_uuid":"production-policy-check","platform":"ios"}' \
+  --write-out '%{http_code}' \
+  "$api_url/api/v1/app/auth/device-login")"
+if [[ "$device_login_status" != "410" ]]; then
+  echo "Production device login must return HTTP 410; received $device_login_status" >&2
+  exit 1
+fi
+
+docs_status="$(curl --silent --show-error --output /dev/null \
+  --write-out '%{http_code}' "$api_url/docs")"
+if [[ "$docs_status" != "404" ]]; then
+  echo "Public API docs must return HTTP 404; received $docs_status" >&2
   exit 1
 fi
 

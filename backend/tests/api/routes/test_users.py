@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 from sqlmodel import Session, select
 
 from app import crud
@@ -316,7 +317,10 @@ def test_update_password_me_same_password_error(
     )
 
 
-def test_register_user(client: TestClient, db: Session) -> None:
+def test_register_user(
+    client: TestClient, db: Session, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "ADMIN_PUBLIC_SIGNUP_ENABLED", True)
     username = random_email()
     password = random_lower_string()
     full_name = random_lower_string()
@@ -339,7 +343,10 @@ def test_register_user(client: TestClient, db: Session) -> None:
     assert verified
 
 
-def test_register_user_already_exists_error(client: TestClient) -> None:
+def test_register_user_already_exists_error(
+    client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "ADMIN_PUBLIC_SIGNUP_ENABLED", True)
     password = random_lower_string()
     full_name = random_lower_string()
     data = {
@@ -353,6 +360,22 @@ def test_register_user_already_exists_error(client: TestClient) -> None:
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "The user with this email already exists in the system"
+
+
+def test_register_user_is_hidden_when_public_signup_disabled(
+    client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "ADMIN_PUBLIC_SIGNUP_ENABLED", False)
+    r = client.post(
+        f"{settings.API_V1_STR}/users/signup",
+        json={
+            "email": random_email(),
+            "password": random_lower_string(),
+            "full_name": random_lower_string(),
+        },
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Public registration is disabled"
 
 
 def test_update_user(

@@ -18,6 +18,8 @@ from app.models import (
     AppOrderEvent,
     AppUpload,
     AppUser,
+    AppUserIdentity,
+    AppUserSession,
     AppVideoTask,
     AppVideoTaskWebhookEvent,
     Item,
@@ -62,6 +64,10 @@ def db() -> Generator[Session]:
         statement = delete(AppUpload)
         session.execute(statement)
         statement = delete(AppDevice)
+        session.execute(statement)
+        statement = delete(AppUserSession)
+        session.execute(statement)
+        statement = delete(AppUserIdentity)
         session.execute(statement)
         statement = delete(AppUser)
         session.execute(statement)

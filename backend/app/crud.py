@@ -2,8 +2,9 @@ import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 from app.core.security import get_password_hash, verify_password
@@ -22,6 +23,7 @@ from app.models import (
     AppOrderCreate,
     AppOrderEvent,
     AppUser,
+    AppUserIdentity,
     AppUserProfileUpdate,
     Item,
     ItemCreate,
@@ -176,10 +178,7 @@ def list_active_app_contents(
         col(AppUser.deleted_at).is_(None),
     )
     count_statement = (
-        select(func.count())
-        .select_from(AppContent)
-        .join(AppUser)
-        .where(*base_filters)
+        select(func.count()).select_from(AppContent).join(AppUser).where(*base_filters)
     )
     count = session.exec(count_statement).one()
     statement = (
@@ -381,22 +380,43 @@ def list_app_users_for_admin(
     skip: int = 0,
     limit: int = 100,
     status: str | None = None,
-) -> tuple[list[AppUser], int]:
+    account_type: str | None = "clerk",
+    query: str | None = None,
+) -> tuple[list[tuple[AppUser, AppUserIdentity | None]], int]:
     filters: list[Any] = []
     if status:
         filters.append(AppUser.status == status)
     else:
         filters.append(col(AppUser.deleted_at).is_(None))
-    count_statement = select(func.count()).select_from(AppUser).where(*filters)
+    if account_type:
+        filters.append(AppUser.account_type == account_type)
+    if query:
+        search = f"%{query.strip()}%"
+        filters.append(
+            or_(
+                col(AppUser.nickname).ilike(search),
+                col(AppUserIdentity.primary_email).ilike(search),
+            )
+        )
+    count_statement = (
+        select(func.count())
+        .select_from(AppUser)
+        .outerjoin(AppUserIdentity)
+        .where(*filters)
+    )
     count = session.exec(count_statement).one()
     statement = (
-        select(AppUser)
+        select(AppUser, AppUserIdentity)
+        .outerjoin(AppUserIdentity)
         .where(*filters)
         .order_by(col(AppUser.created_at).desc())
         .offset(skip)
         .limit(limit)
     )
-    app_users = list(session.exec(statement).all())
+    app_users = [
+        (row[0], cast(AppUserIdentity | None, row[1]))
+        for row in session.exec(statement).all()
+    ]
     return app_users, count
 
 
@@ -467,9 +487,7 @@ def get_app_content_for_admin(
     return session.exec(statement).first()
 
 
-def soft_delete_app_content(
-    *, session: Session, content: AppContent
-) -> AppContent:
+def soft_delete_app_content(*, session: Session, content: AppContent) -> AppContent:
     now = datetime.now(UTC)
     content.status = "deleted"
     content.deleted_at = now
@@ -489,9 +507,7 @@ def get_app_config_by_key(*, session: Session, key: str) -> AppConfig | None:
     return session.exec(statement).first()
 
 
-def create_app_config(
-    *, session: Session, config_in: AppConfigCreate
-) -> AppConfig:
+def create_app_config(*, session: Session, config_in: AppConfigCreate) -> AppConfig:
     db_config = AppConfig.model_validate(config_in)
     session.add(db_config)
     session.commit()

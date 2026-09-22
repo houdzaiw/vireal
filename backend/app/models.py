@@ -75,6 +75,7 @@ class AppUserBase(SQLModel):
     nickname: str | None = Field(default=None, max_length=50)
     avatar_url: str | None = Field(default=None, max_length=2048)
     status: str = Field(default="active", max_length=20, index=True)
+    account_type: str = Field(default="legacy_test", max_length=20, index=True)
 
 
 class AppUser(AppUserBase, table=True):
@@ -108,6 +109,12 @@ class AppUser(AppUserBase, table=True):
     video_tasks: list[AppVideoTask] = Relationship(
         back_populates="app_user", cascade_delete=True
     )
+    identities: list[AppUserIdentity] = Relationship(
+        back_populates="app_user", cascade_delete=True
+    )
+    sessions: list[AppUserSession] = Relationship(
+        back_populates="app_user", cascade_delete=True
+    )
 
 
 class AppDevice(SQLModel, table=True):
@@ -130,9 +137,94 @@ class AppDevice(SQLModel, table=True):
     app_user: AppUser | None = Relationship(back_populates="devices")
 
 
+class AppUserIdentity(SQLModel, table=True):
+    __tablename__ = "app_user_identity"
+    __table_args__ = (
+        UniqueConstraint(
+            "issuer",
+            "subject",
+            name="uq_app_user_identity_issuer_subject",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id",
+        nullable=False,
+        ondelete="CASCADE",
+        unique=True,
+        index=True,
+    )
+    issuer: str = Field(max_length=2048)
+    subject: str = Field(max_length=255, index=True)
+    primary_email: str = Field(max_length=255, index=True)
+    email_verified: bool = False
+    providers_json: str = Field(default="[]", sa_type=Text)
+    last_login_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
+    )
+    login_count: int = 0
+    last_session_id_hash: str | None = Field(default=None, max_length=64)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    app_user: AppUser | None = Relationship(back_populates="identities")
+
+
+class AppUserSession(SQLModel, table=True):
+    __tablename__ = "app_user_session"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id",
+        nullable=False,
+        ondelete="CASCADE",
+        index=True,
+    )
+    session_id_hash: str = Field(unique=True, index=True, max_length=64)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    last_seen_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    revoked_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
+    )
+    app_user: AppUser | None = Relationship(back_populates="sessions")
+
+
 class AppUserPublic(AppUserBase):
     id: uuid.UUID
     created_at: datetime | None = None
+
+
+class AppUserIdentityPublic(SQLModel):
+    email: EmailStr
+    email_verified: bool
+    auth_providers: list[Literal["email", "google", "apple"]]
+    last_login_at: datetime | None = None
+    login_count: int = 0
+
+
+class AppUserWithIdentityPublic(AppUserPublic):
+    identity: AppUserIdentityPublic | None = None
+
+
+class AppAuthSessionResponse(SQLModel):
+    app_user: AppUserWithIdentityPublic
+    is_new_user: bool
 
 
 class AppDeviceLoginRequest(SQLModel):
@@ -493,6 +585,13 @@ class AppGenerationsAdminPublic(SQLModel):
 
 
 class AppUserAdminPublic(AppUserPublic):
+    email: EmailStr | None = None
+    email_verified: bool | None = None
+    auth_providers: list[Literal["email", "google", "apple"]] = Field(
+        default_factory=list
+    )
+    last_login_at: datetime | None = None
+    login_count: int = 0
     updated_at: datetime | None = None
     deleted_at: datetime | None = None
 

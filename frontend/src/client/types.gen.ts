@@ -63,6 +63,17 @@ export type AppAdminOperationLogsPublic = {
 };
 
 /**
+ * AppAuthSessionResponse
+ */
+export type AppAuthSessionResponse = {
+    app_user: AppUserWithIdentityPublic;
+    /**
+     * Is New User
+     */
+    is_new_user: boolean;
+};
+
+/**
  * AppConfigCreate
  */
 export type AppConfigCreate = {
@@ -754,6 +765,10 @@ export type AppOrdersPublic = {
  */
 export type AppUploadPublic = {
     /**
+     * Id
+     */
+    id: string;
+    /**
      * Url
      */
     url: string;
@@ -765,6 +780,10 @@ export type AppUploadPublic = {
      * Size
      */
     size: number;
+    /**
+     * Expires At
+     */
+    expires_at: string;
 };
 
 /**
@@ -784,6 +803,10 @@ export type AppUserAdminPublic = {
      */
     status?: string;
     /**
+     * Account Type
+     */
+    account_type?: string;
+    /**
      * Id
      */
     id: string;
@@ -792,6 +815,26 @@ export type AppUserAdminPublic = {
      */
     created_at?: string | null;
     /**
+     * Email
+     */
+    email?: string | null;
+    /**
+     * Email Verified
+     */
+    email_verified?: boolean | null;
+    /**
+     * Auth Providers
+     */
+    auth_providers?: Array<'email' | 'google' | 'apple'>;
+    /**
+     * Last Login At
+     */
+    last_login_at?: string | null;
+    /**
+     * Login Count
+     */
+    login_count?: number;
+    /**
      * Updated At
      */
     updated_at?: string | null;
@@ -799,6 +842,32 @@ export type AppUserAdminPublic = {
      * Deleted At
      */
     deleted_at?: string | null;
+};
+
+/**
+ * AppUserIdentityPublic
+ */
+export type AppUserIdentityPublic = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Email Verified
+     */
+    email_verified: boolean;
+    /**
+     * Auth Providers
+     */
+    auth_providers: Array<'email' | 'google' | 'apple'>;
+    /**
+     * Last Login At
+     */
+    last_login_at?: string | null;
+    /**
+     * Login Count
+     */
+    login_count?: number;
 };
 
 /**
@@ -832,6 +901,10 @@ export type AppUserPublic = {
      */
     status?: string;
     /**
+     * Account Type
+     */
+    account_type?: string;
+    /**
      * Id
      */
     id: string;
@@ -852,6 +925,37 @@ export type AppUserStatusUpdate = {
 };
 
 /**
+ * AppUserWithIdentityPublic
+ */
+export type AppUserWithIdentityPublic = {
+    /**
+     * Nickname
+     */
+    nickname?: string | null;
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
+    /**
+     * Status
+     */
+    status?: string;
+    /**
+     * Account Type
+     */
+    account_type?: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    identity?: AppUserIdentityPublic | null;
+};
+
+/**
  * AppUsersPublic
  */
 export type AppUsersPublic = {
@@ -866,6 +970,123 @@ export type AppUsersPublic = {
 };
 
 /**
+ * AppVideoTaskCreate
+ */
+export type AppVideoTaskCreate = {
+    /**
+     * Template Id
+     */
+    template_id: 'dance';
+    /**
+     * Upload Ids
+     */
+    upload_ids: [
+        string
+    ];
+    /**
+     * Mode
+     */
+    mode?: 'standard' | 'advanced';
+    /**
+     * Duration
+     */
+    duration: 5 | 10;
+};
+
+/**
+ * AppVideoTaskPublic
+ */
+export type AppVideoTaskPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Template Id
+     */
+    template_id: string;
+    /**
+     * Status
+     */
+    status: 'submitting' | 'pending' | 'running' | 'rendering_demo' | 'saving' | 'succeeded' | 'failed' | 'canceled' | 'submission_unknown' | 'expired';
+    /**
+     * Mode
+     */
+    mode: 'standard' | 'advanced';
+    /**
+     * Execution Type
+     */
+    execution_type: 'minimax' | 'wan' | 'local_demo';
+    /**
+     * Is Demo
+     */
+    is_demo: boolean;
+    /**
+     * Fallback Reason
+     */
+    fallback_reason?: string | null;
+    /**
+     * Duration
+     */
+    duration: number;
+    /**
+     * Resolution
+     */
+    resolution: string;
+    /**
+     * Aspect Ratio
+     */
+    aspect_ratio: string;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Playback Url
+     */
+    playback_url?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Completed At
+     */
+    completed_at?: string | null;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    quota?: AppVideoTaskQuotaPublic | null;
+};
+
+/**
+ * AppVideoTaskQuotaPublic
+ */
+export type AppVideoTaskQuotaPublic = {
+    /**
+     * User Real Limit
+     */
+    user_real_limit: number;
+    /**
+     * User Real Remaining
+     */
+    user_real_remaining: number;
+    /**
+     * Wan Global Limit
+     */
+    wan_global_limit: number;
+    /**
+     * Wan Global Remaining
+     */
+    wan_global_remaining: number;
+    /**
+     * Resets At
+     */
+    resets_at: string;
+};
+
+/**
  * Body_app uploads-upload_app_image
  */
 export type Body_app_uploads_upload_app_image = {
@@ -873,6 +1094,36 @@ export type Body_app_uploads_upload_app_image = {
      * File
      */
     file: Blob | File;
+};
+
+/**
+ * Body_login-admin_login_access_token
+ */
+export type Body_login_admin_login_access_token = {
+    /**
+     * Grant Type
+     */
+    grant_type?: string | null;
+    /**
+     * Username
+     */
+    username: string;
+    /**
+     * Password
+     */
+    password: string;
+    /**
+     * Scope
+     */
+    scope?: string;
+    /**
+     * Client Id
+     */
+    client_id?: string | null;
+    /**
+     * Client Secret
+     */
+    client_secret?: string | null;
 };
 
 /**
@@ -1285,6 +1536,31 @@ export type loginLoginAccessTokenResponses = {
 };
 
 export type loginLoginAccessTokenResponse = loginLoginAccessTokenResponses[keyof loginLoginAccessTokenResponses];
+
+export type loginAdminLoginAccessTokenData = {
+    body: Body_login_admin_login_access_token;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/login/access-token';
+};
+
+export type loginAdminLoginAccessTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type loginAdminLoginAccessTokenError = loginAdminLoginAccessTokenErrors[keyof loginAdminLoginAccessTokenErrors];
+
+export type loginAdminLoginAccessTokenResponses = {
+    /**
+     * Successful Response
+     */
+    200: Token;
+};
+
+export type loginAdminLoginAccessTokenResponse = loginAdminLoginAccessTokenResponses[keyof loginAdminLoginAccessTokenResponses];
 
 export type loginTestTokenData = {
     body?: never;
@@ -1865,6 +2141,38 @@ export type appAuthDeviceLoginResponses = {
 
 export type appAuthDeviceLoginResponse = appAuthDeviceLoginResponses[keyof appAuthDeviceLoginResponses];
 
+export type appAuthInitializeClerkSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/auth/session';
+};
+
+export type appAuthInitializeClerkSessionResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppAuthSessionResponse;
+};
+
+export type appAuthInitializeClerkSessionResponse = appAuthInitializeClerkSessionResponses[keyof appAuthInitializeClerkSessionResponses];
+
+export type appAuthLogoutClerkSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/auth/logout';
+};
+
+export type appAuthLogoutClerkSessionResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type appAuthLogoutClerkSessionResponse = appAuthLogoutClerkSessionResponses[keyof appAuthLogoutClerkSessionResponses];
+
 export type appAuthTestAppTokenData = {
     body?: never;
     path?: never;
@@ -1892,7 +2200,7 @@ export type appUsersReadAppUserMeResponses = {
     /**
      * Successful Response
      */
-    200: AppUserPublic;
+    200: AppUserWithIdentityPublic;
 };
 
 export type appUsersReadAppUserMeResponse = appUsersReadAppUserMeResponses[keyof appUsersReadAppUserMeResponses];
@@ -1917,7 +2225,7 @@ export type appUsersUpdateAppUserMeResponses = {
     /**
      * Successful Response
      */
-    200: AppUserPublic;
+    200: AppUserWithIdentityPublic;
 };
 
 export type appUsersUpdateAppUserMeResponse = appUsersUpdateAppUserMeResponses[keyof appUsersUpdateAppUserMeResponses];
@@ -2280,6 +2588,67 @@ export type appOrdersReadOrderResponses = {
 
 export type appOrdersReadOrderResponse = appOrdersReadOrderResponses[keyof appOrdersReadOrderResponses];
 
+export type appVideoTasksCreateVideoTaskData = {
+    body: AppVideoTaskCreate;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/video-tasks';
+};
+
+export type appVideoTasksCreateVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksCreateVideoTaskError = appVideoTasksCreateVideoTaskErrors[keyof appVideoTasksCreateVideoTaskErrors];
+
+export type appVideoTasksCreateVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    202: AppVideoTaskPublic;
+};
+
+export type appVideoTasksCreateVideoTaskResponse = appVideoTasksCreateVideoTaskResponses[keyof appVideoTasksCreateVideoTaskResponses];
+
+export type appVideoTasksReadVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/video-tasks/{task_id}';
+};
+
+export type appVideoTasksReadVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksReadVideoTaskError = appVideoTasksReadVideoTaskErrors[keyof appVideoTasksReadVideoTaskErrors];
+
+export type appVideoTasksReadVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppVideoTaskPublic;
+};
+
+export type appVideoTasksReadVideoTaskResponse = appVideoTasksReadVideoTaskResponses[keyof appVideoTasksReadVideoTaskResponses];
+
 export type adminAppReadAppUsersData = {
     body?: never;
     path?: never;
@@ -2296,6 +2665,14 @@ export type adminAppReadAppUsersData = {
          * Status
          */
         status?: 'active' | 'disabled' | 'deleted' | null;
+        /**
+         * Account Type
+         */
+        account_type?: 'clerk' | 'legacy_test' | null;
+        /**
+         * Q
+         */
+        q?: string | null;
     };
     url: '/api/v1/admin/app/users';
 };
@@ -2868,6 +3245,36 @@ export type paymentWebhooksReceiveGooglePlayCallbackResponses = {
 };
 
 export type paymentWebhooksReceiveGooglePlayCallbackResponse = paymentWebhooksReceiveGooglePlayCallbackResponses[keyof paymentWebhooksReceiveGooglePlayCallbackResponses];
+
+export type replicateWebhooksReceiveReplicateWebhookData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    url: '/api/v1/webhooks/replicate';
+};
+
+export type replicateWebhooksReceiveReplicateWebhookErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type replicateWebhooksReceiveReplicateWebhookError = replicateWebhooksReceiveReplicateWebhookErrors[keyof replicateWebhooksReceiveReplicateWebhookErrors];
+
+export type replicateWebhooksReceiveReplicateWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type replicateWebhooksReceiveReplicateWebhookResponse = replicateWebhooksReceiveReplicateWebhookResponses[keyof replicateWebhooksReceiveReplicateWebhookResponses];
 
 export type privateCreateUserData = {
     body: PrivateUserCreate;

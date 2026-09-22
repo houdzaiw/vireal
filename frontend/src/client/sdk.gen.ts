@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthInitializeClerkSessionData, appAuthInitializeClerkSessionResponses, appAuthLogoutClerkSessionData, appAuthLogoutClerkSessionResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, appVideoTasksCreateVideoTaskData, appVideoTasksCreateVideoTaskErrors, appVideoTasksCreateVideoTaskResponses, appVideoTasksReadVideoTaskData, appVideoTasksReadVideoTaskErrors, appVideoTasksReadVideoTaskResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginAdminLoginAccessTokenData, loginAdminLoginAccessTokenErrors, loginAdminLoginAccessTokenResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, replicateWebhooksReceiveReplicateWebhookData, replicateWebhooksReceiveReplicateWebhookErrors, replicateWebhooksReceiveReplicateWebhookResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -29,6 +29,24 @@ export class LoginService {
             ...urlSearchParamsBodySerializer,
             responseType: 'json',
             url: '/api/v1/login/access-token',
+            ...options,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Admin Login Access Token
+     *
+     * Issue a short-lived token only to a superuser behind Cloudflare Access.
+     */
+    public static adminLoginAccessToken<ThrowOnError extends boolean = true>(options: Options<loginAdminLoginAccessTokenData, ThrowOnError>) {
+        return (options.client ?? client).post<loginAdminLoginAccessTokenResponses, loginAdminLoginAccessTokenErrors, ThrowOnError>({
+            ...urlSearchParamsBodySerializer,
+            responseType: 'json',
+            url: '/api/v1/admin/login/access-token',
             ...options,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -383,6 +401,34 @@ export class AppAuthService {
     }
 
     /**
+     * Initialize Clerk Session
+     *
+     * Create or refresh the local App identity for a verified Clerk session.
+     */
+    public static initializeClerkSession<ThrowOnError extends boolean = true>(options?: Options<appAuthInitializeClerkSessionData, ThrowOnError>) {
+        return (options?.client ?? client).post<appAuthInitializeClerkSessionResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/auth/session',
+            ...options
+        });
+    }
+
+    /**
+     * Logout Clerk Session
+     *
+     * Immediately invalidate the current Clerk session for Vireal APIs.
+     */
+    public static logoutClerkSession<ThrowOnError extends boolean = true>(options?: Options<appAuthLogoutClerkSessionData, ThrowOnError>) {
+        return (options?.client ?? client).post<appAuthLogoutClerkSessionResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/auth/logout',
+            ...options
+        });
+    }
+
+    /**
      * Test App Token
      *
      * Test an App access token.
@@ -435,7 +481,7 @@ export class AppUploadsService {
     /**
      * Upload App Image
      *
-     * Store an App image and return a public URL.
+     * Store an App image and return a stable application URL.
      */
     public static uploadAppImage<ThrowOnError extends boolean = true>(options: Options<appUploadsUploadAppImageData, ThrowOnError>) {
         return (options.client ?? client).post<appUploadsUploadAppImageResponses, appUploadsUploadAppImageErrors, ThrowOnError>({
@@ -639,6 +685,36 @@ export class AppOrdersService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/app/orders/{order_id}',
+            ...options
+        });
+    }
+}
+
+export class AppVideoTasksService {
+    /**
+     * Create Video Task
+     */
+    public static createVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksCreateVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).post<appVideoTasksCreateVideoTaskResponses, appVideoTasksCreateVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/video-tasks',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Read Video Task
+     */
+    public static readVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksReadVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).get<appVideoTasksReadVideoTaskResponses, appVideoTasksReadVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/video-tasks/{task_id}',
             ...options
         });
     }
@@ -915,6 +991,15 @@ export class PaymentWebhooksService {
                 ...options.headers
             }
         });
+    }
+}
+
+export class ReplicateWebhooksService {
+    /**
+     * Receive Replicate Webhook
+     */
+    public static receiveReplicateWebhook<ThrowOnError extends boolean = true>(options: Options<replicateWebhooksReceiveReplicateWebhookData, ThrowOnError>) {
+        return (options.client ?? client).post<replicateWebhooksReceiveReplicateWebhookResponses, replicateWebhooksReceiveReplicateWebhookErrors, ThrowOnError>({ url: '/api/v1/webhooks/replicate', ...options });
     }
 }
 
