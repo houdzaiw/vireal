@@ -1,0 +1,1458 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071b1b" />
+  <meta name="vireal-api-base-url" content="__VIREAL_API_BASE_URL__" />
+  <meta name="vireal-backend-mode" content="__VIREAL_BACKEND_MODE__" />
+  <meta name="clerk-publishable-key" content="__VIREAL_CLERK_PUBLISHABLE_KEY__" />
+  <title>Vireal · 双模式视频生成 v1.1</title>
+  <link rel="stylesheet" href="/assets/vireal.css" />
+  <script defer src="/assets/vireal-auth.js"></script>
+  <style>
+    :root {
+      --ink: #071b1b;
+      --muted: #63716d;
+      --mint: #43e2b0;
+      --mint-dark: #126c58;
+      --coral: #ff876f;
+      --cream: #f5f3ed;
+      --paper: #fffdf8;
+      --line: rgba(7, 27, 27, .12);
+      --safe-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 5% 0%, rgba(67, 226, 176, .22), transparent 28rem),
+        radial-gradient(circle at 100% 15%, rgba(255, 135, 111, .14), transparent 26rem),
+        var(--cream);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+    button, input, select { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .noise {
+      position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .15;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E");
+    }
+    .glass { background: rgba(255, 253, 248, .82); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    .screen { display: none; animation: enter .28s ease-out; }
+    .screen.active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes pulseRing { 0%,100% { box-shadow: 0 0 0 0 rgba(67,226,176,.32); } 50% { box-shadow: 0 0 0 12px rgba(67,226,176,0); } }
+    @keyframes drift { 0%,100% { transform: translate3d(0,0,0) rotate(-2deg); } 50% { transform: translate3d(0,-9px,0) rotate(1deg); } }
+    .hero-grid {
+      background-image: linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+    .person {
+      position: relative; width: 52px; height: 126px; border-radius: 40% 40% 18px 18px;
+      background: linear-gradient(165deg, #ffe7c6 0 22%, #213b3a 23% 58%, #162624 59% 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 12px 24px rgba(0,0,0,.2);
+    }
+    .person::before { content: ""; position: absolute; width: 38px; height: 38px; border-radius: 50%; background: #e9b98c; top: -25px; left: 7px; box-shadow: inset -7px -2px 0 rgba(75,40,27,.18); }
+    .person.alt { background: linear-gradient(165deg, #f1c8a1 0 22%, #ff876f 23% 58%, #6c3028 59% 100%); }
+    .person.dance { transform: rotate(8deg); animation: drift 3s ease-in-out infinite; }
+    .template-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+    .template-card:hover { transform: translateY(-3px); box-shadow: 0 18px 42px rgba(7,27,27,.11); }
+    .template-card.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink), 0 18px 42px rgba(7,27,27,.12); }
+    .duration-btn.selected { background: var(--ink); color: white; border-color: var(--ink); }
+    .generation-mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 18px; background: #f3f5f3; }
+    .generation-mode-btn { min-height: 52px; border-radius: 14px; color: var(--muted); font-size: 13px; font-weight: 800; transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
+    .generation-mode-btn[aria-pressed="true"] { background: var(--ink); color: white; box-shadow: 0 8px 22px rgba(7,27,27,.16); }
+    .generation-mode-btn:focus-visible { outline: 3px solid rgba(67,226,176,.6); outline-offset: 2px; }
+    .duration-option:disabled { cursor: not-allowed; opacity: .38; background: #eef0ee; color: var(--muted); border-color: transparent; }
+    .upload-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+    .upload-zone:hover { border-color: var(--mint-dark); background: rgba(67,226,176,.06); }
+    .upload-zone.error { border-color: #dc5444; background: #fff4f1; animation: shake .2s ease-in-out 2; }
+    .backend-mode-banner { background: linear-gradient(90deg, #071b1b, #126c58); }
+    .backend-upload-card { min-height: 210px; }
+    .backend-upload-image { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; }
+    .backend-upload-status { color: var(--mint-dark); }
+    .backend-upload-status.error { color: #b42318; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+    .ring-progress { background: conic-gradient(var(--mint) var(--progress, 42%), rgba(255,255,255,.12) 0); }
+    .focus-locked { opacity: .26 !important; filter: grayscale(.8); pointer-events: none !important; user-select: none; }
+    body.focus-mode .review-trigger, body.focus-mode .app-header, body.focus-mode .mobile-nav { display: none !important; }
+    body.focus-mode .screen-shell { padding-top: 18px; }
+    .focus-banner { display: none; }
+    body.focus-mode .focus-banner { display: flex; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { scrollbar-width: none; }
+    .modal-backdrop { background: rgba(3,16,16,.68); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    .toast { transform: translate(-50%, 130%); opacity: 0; transition: .3s cubic-bezier(.2,.8,.2,1); }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .skeleton { background: linear-gradient(100deg, rgba(255,255,255,.08) 30%, rgba(255,255,255,.18) 50%, rgba(255,255,255,.08) 70%); background-size: 400%; animation: shimmer 1.6s infinite; }
+    @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+    @media (max-width: 767px) {
+      body { background: var(--cream); }
+      .screen-shell { padding-bottom: 98px; }
+      .desktop-only { display: none !important; }
+      .hero-copy { min-height: auto; }
+      .modal-card { border-radius: 24px 24px 0 0; margin-top: auto; width: 100%; max-height: 90vh; overflow: auto; }
+    }
+    @media (min-width: 768px) {
+      .mobile-only { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+
+  <div id="focusBanner" class="focus-banner fixed top-2 left-1/2 z-[80] -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white shadow-soft">
+    <span class="inline-block h-2 w-2 rounded-full bg-mint"></span>
+    <span id="focusLabel">专注演示模式</span>
+  </div>
+
+  <div id="backendModeBanner" class="backend-mode-banner fixed left-1/2 top-2 z-[79] hidden -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold text-white shadow-soft">
+    <span class="inline-block h-2 w-2 rounded-full bg-mint"></span>
+    <span>Replicate + R2 实链路测试 · API <span id="backendApiHost">localhost:8000</span></span>
+  </div>
+
+  <header class="app-header sticky top-0 z-40 border-b border-black/5 glass">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:h-18 md:px-8">
+      <button class="flex items-center gap-3" data-route="home" aria-label="Vireal 首页">
+        <span class="grid h-9 w-9 place-items-center rounded-xl bg-ink text-mint shadow-lg shadow-black/10">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5 10.7 18a1.5 1.5 0 0 0 2.65 0L20 5.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M8.1 5.5 12 13l3.9-7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="text-lg font-black tracking-[-.03em]">Vireal</span>
+        <span class="hidden rounded-full border border-black/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[.15em] text-gray-500 sm:inline">Beta</span>
+      </button>
+
+      <nav class="desktop-only flex items-center gap-1 rounded-full border border-black/5 bg-white/60 p-1 text-sm font-semibold" aria-label="主导航">
+        <button class="nav-link rounded-full px-4 py-2 hover:bg-white" data-route="home" data-i18n="navDiscover">发现</button>
+        <button class="nav-link rounded-full px-4 py-2 hover:bg-white" data-route="create" data-i18n="navCreate">创作</button>
+        <button class="nav-link rounded-full px-4 py-2 hover:bg-white" data-route="works" data-i18n="navWorks">作品</button>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <button id="langToggle" class="grid h-10 min-w-10 place-items-center rounded-full border border-black/10 bg-white px-3 text-xs font-extrabold hover:bg-gray-50" aria-label="切换语言">中</button>
+        <button id="coinButton" class="hidden items-center gap-2 rounded-full bg-ink px-3.5 py-2.5 text-sm font-bold text-white shadow-lg shadow-black/10 sm:flex" data-route="wallet">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="#43e2b0" stroke-width="2"/><path d="M9 8.5h4.2a2.2 2.2 0 0 1 0 4.4H9m3 0v3M12 6v2.5" stroke="#43e2b0" stroke-width="2" stroke-linecap="round"/></svg>
+          <span id="coinBalanceTop">30</span>
+        </button>
+        <button id="accountButton" class="grid h-10 min-w-10 place-items-center rounded-full bg-white text-sm font-extrabold shadow-sm ring-1 ring-black/10" data-route="login">登录</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="screen-shell mx-auto min-h-[calc(100vh-64px)] max-w-7xl px-4 py-6 md:px-8 md:py-9">
+    <!-- Landing / discovery -->
+    <section id="screen-home" class="screen" data-screen="home" data-focus-zone="home">
+      <div class="overflow-hidden rounded-[32px] bg-ink text-white shadow-soft md:rounded-[42px]">
+        <div class="grid lg:grid-cols-[1.08fr_.92fr]">
+          <div class="hero-copy relative flex min-h-[570px] flex-col justify-center px-6 py-12 sm:px-10 lg:px-16">
+            <div class="absolute left-10 top-8 h-32 w-32 rounded-full bg-mint/10 blur-3xl"></div>
+            <div class="relative">
+              <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-white/80">
+                <span class="h-2 w-2 rounded-full bg-mint"></span>
+                <span data-i18n="privacyTag">仅自己可见 · 24 小时自动删除</span>
+              </div>
+              <h1 class="max-w-2xl text-4xl font-black leading-[1.06] tracking-[-.055em] sm:text-5xl lg:text-[68px]">
+                <span data-i18n="heroA">让一张照片，</span><br />
+                <span class="text-mint" data-i18n="heroB">动成一段记忆。</span>
+              </h1>
+              <p class="mt-6 max-w-xl text-base leading-7 text-white/65 sm:text-lg" data-i18n="heroDesc">上传已授权的成年人全身照，选择动作和时长。无需提示词，几分钟生成私有静音短视频。</p>
+              <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button class="group inline-flex h-13 items-center justify-center gap-2 rounded-full bg-mint px-6 font-extrabold text-ink transition hover:-translate-y-0.5 hover:bg-white" data-route="create">
+                  <span data-i18n="startCreate">开始创作</span>
+                  <svg class="transition group-hover:translate-x-1" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="inline-flex h-13 items-center justify-center gap-2 rounded-full border border-white/20 px-6 font-bold text-white transition hover:bg-white/10" data-scroll="templates">
+                  <span class="grid h-7 w-7 place-items-center rounded-full bg-white/10">▶</span>
+                  <span data-i18n="viewTemplates">查看动作模板</span>
+                </button>
+              </div>
+              <div class="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/55">
+                <span class="flex items-center gap-2"><b class="text-mint">✓</b> 720P · 9:16</span>
+                <span id="heroDurationSpec" class="flex items-center gap-2"><b class="text-mint">✓</b> 5 / 10 sec</span>
+                <span id="heroAudioSpec" class="flex items-center gap-2"><b class="text-mint">✓</b> Silent output</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-grid relative min-h-[430px] overflow-hidden border-t border-white/10 lg:min-h-[570px] lg:border-l lg:border-t-0">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(67,226,176,.18),transparent_58%)]"></div>
+            <div class="absolute left-[10%] top-[10%] rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold backdrop-blur">IMAGE → VIDEO</div>
+            <div class="absolute right-[8%] top-[18%] h-20 w-20 rounded-full bg-coral blur-2xl opacity-50"></div>
+            <div class="absolute left-1/2 top-1/2 h-[330px] w-[230px] -translate-x-1/2 -translate-y-1/2 rotate-3 rounded-[30px] bg-white/10 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-sm">
+              <div class="relative flex h-full items-center justify-center overflow-hidden rounded-[23px] bg-gradient-to-b from-[#d9f1e8] via-[#8db6a9] to-[#1c3532]">
+                <div class="absolute left-5 top-5 rounded-full bg-black/30 px-3 py-1.5 text-[10px] font-bold backdrop-blur">00:05</div>
+                <div id="heroAudioIcon" class="absolute right-5 top-5 grid h-7 w-7 place-items-center rounded-full bg-white/20">∅</div>
+                <div class="flex items-end gap-[-8px] pt-16">
+                  <div class="person dance"></div>
+                </div>
+                <div class="absolute bottom-5 left-5 right-5 flex items-center gap-3 rounded-2xl bg-white/15 p-3 backdrop-blur-md">
+                  <span class="grid h-9 w-9 place-items-center rounded-full bg-white text-ink">▶</span>
+                  <div class="flex-1"><div class="h-1 rounded-full bg-white/25"><div class="h-1 w-1/3 rounded-full bg-mint"></div></div><div id="heroModelLabel" class="mt-2 text-[9px] font-bold tracking-wider text-white/70">DANCE · MINIMAX / WAN</div></div>
+                </div>
+              </div>
+            </div>
+            <div class="absolute bottom-[8%] left-[8%] rotate-[-5deg] rounded-2xl bg-white p-4 text-ink shadow-xl">
+              <div class="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Ready in</div>
+              <div class="mt-1 text-xl font-black">≈ 3 min</div>
+            </div>
+            <div class="absolute bottom-[12%] right-[7%] rotate-3 rounded-2xl border border-white/15 bg-white/10 p-4 text-white shadow-xl backdrop-blur">
+              <div class="flex items-center gap-2 text-xs font-bold"><span class="grid h-7 w-7 place-items-center rounded-full bg-mint text-ink">✓</span> Private by default</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid gap-3 sm:grid-cols-3">
+        <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-mint/20 text-mint-dark">01</span><div><b class="text-sm">Choose</b><p class="text-xs text-gray-500">选择固定动作</p></div></div>
+        <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-coral/20 text-[#a84232]">02</span><div><b class="text-sm">Upload</b><p id="homeUploadCount" class="text-xs text-gray-500">上传 1 张全身照</p></div></div>
+        <div class="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/65 p-4"><span class="grid h-10 w-10 place-items-center rounded-xl bg-ink/10 text-ink">03</span><div><b class="text-sm">Create</b><p class="text-xs text-gray-500">离开页面也会继续</p></div></div>
+      </div>
+
+      <div id="templates" class="scroll-mt-24 py-16 md:py-24" data-focus-zone="templates home">
+        <div class="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div><span class="text-xs font-black uppercase tracking-[.22em] text-mint-dark">Curated motions</span><h2 class="mt-2 text-3xl font-black tracking-[-.04em] sm:text-4xl" data-i18n="templatesTitle">动作已调好，只等你的照片</h2></div>
+          <p class="max-w-md text-sm leading-6 text-gray-500" data-i18n="templatesDesc">固定单人跳舞提示词，提供普通与高级两种生成模式。</p>
+        </div>
+        <div id="homeTemplateGrid" class="grid max-w-sm gap-4"></div>
+      </div>
+
+      <div class="rounded-[28px] border border-black/5 bg-white p-6 shadow-card sm:p-8" data-focus-zone="privacy home">
+        <div class="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+          <div class="flex items-start gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-ink text-mint"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 14v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><div><h3 class="font-black">你的照片，不会变成公开内容</h3><p id="privacyStorageCopy" class="mt-1 max-w-2xl text-sm leading-6 text-gray-500">原图和视频存储在新加坡区域，仅你本人可访问。用户删除后立即失效，最迟 24 小时完成物理清理。</p></div></div>
+          <button class="rounded-full border border-black/10 px-5 py-3 text-sm font-extrabold hover:bg-gray-50" data-modal="privacy">查看隐私说明</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Login -->
+    <section id="screen-login" class="screen" data-screen="login" data-focus-zone="login">
+      <div class="mx-auto grid min-h-[670px] max-w-5xl overflow-hidden rounded-[30px] bg-white shadow-soft lg:grid-cols-[.92fr_1.08fr]">
+        <div class="relative hidden overflow-hidden bg-ink p-10 text-white lg:flex lg:flex-col lg:justify-between">
+          <div class="absolute -right-16 top-24 h-56 w-56 rounded-full bg-mint/25 blur-3xl"></div>
+          <div class="relative flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-mint text-ink font-black">V</span><b class="text-xl">Vireal</b></div>
+          <div class="relative">
+            <p class="text-xs font-black uppercase tracking-[.2em] text-mint">Private creative space</p>
+            <h2 class="mt-4 text-4xl font-black leading-tight tracking-[-.04em]">登录后，让照片开始呼吸。</h2>
+            <p class="mt-5 text-sm leading-7 text-white/60">首期服务面向中国大陆以外用户。新用户将获得 30 金币，可免费生成一次 5 秒视频。</p>
+          </div>
+          <div class="relative flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4"><span class="grid h-10 w-10 place-items-center rounded-full bg-white/10">24h</span><p class="text-xs leading-5 text-white/60">素材和作品到期自动清理<br/><b class="text-white">No public feed. No training.</b></p></div>
+        </div>
+        <div class="flex items-center justify-center p-6 sm:p-10 lg:p-14">
+          <div class="w-full max-w-sm">
+            <button class="mb-8 inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-ink" data-route="home"><span>←</span> 返回</button>
+            <div class="mb-8">
+              <div class="mobile-only mb-6 flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-ink text-mint font-black">V</span><b class="text-xl">Vireal</b></div>
+              <h1 class="text-3xl font-black tracking-[-.04em]">欢迎来到 Vireal</h1>
+              <p id="deviceHint" class="mt-3 text-sm leading-6 text-gray-500">选择一种方式登录。首次登录赠送 30 金币。</p>
+            </div>
+            <div id="clerkSignIn" class="min-h-[360px] rounded-2xl border border-black/5 bg-white"></div>
+            <div id="clerkStatus" class="mt-3 text-center text-xs text-gray-500">正在加载安全登录…</div>
+            <p class="mt-7 text-center text-[11px] leading-5 text-gray-400">继续即表示你已阅读并同意《服务条款》和《隐私政策》，并确认使用者年满 18 周岁。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Create -->
+    <section id="screen-create" class="screen" data-screen="create" data-focus-zone="create upload mode duration generation">
+      <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div><p class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Create studio</p><h1 class="mt-2 text-3xl font-black tracking-[-.04em] md:text-4xl">创建一段动作视频</h1><p class="mt-2 text-sm text-gray-500">无需写提示词，按步骤准备好照片即可。</p></div>
+        <div class="flex items-center gap-2 text-xs font-bold text-gray-400"><span class="h-2 w-2 rounded-full bg-mint"></span>素材仅用于本次生成</div>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <div class="space-y-5">
+          <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create template">
+            <div class="flex items-center justify-between"><div><span class="text-xs font-black text-mint-dark">STEP 1</span><h2 class="mt-1 text-xl font-black">选择动作</h2></div><span id="selectedInputCount" class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-bold">需要 2 张照片</span></div>
+            <div id="createTemplateGrid" class="mt-5 grid max-w-xs gap-3"></div>
+          </section>
+
+          <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create upload">
+            <div class="flex items-start justify-between gap-4"><div><span class="text-xs font-black text-mint-dark">STEP 2</span><h2 class="mt-1 text-xl font-black">上传全身照</h2><p class="mt-1 text-xs leading-5 text-gray-500">JPG/PNG，单张不超过 5MB。脸部清晰、身体完整、无遮挡。</p></div><button class="shrink-0 text-xs font-bold text-mint-dark hover:underline" data-modal="photo-guide">拍摄指南</button></div>
+            <div id="uploadGrid" class="mt-5 grid gap-3 sm:grid-cols-2"></div>
+            <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#f6f8f7] p-3 text-[11px] leading-5 text-gray-500"><span class="mt-0.5 text-base">ⓘ</span><span id="uploadGuidance" data-i18n="uploadDisclosure">上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。</span></div>
+          </section>
+
+          <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" aria-labelledby="generationModeTitle" data-focus-zone="create mode">
+            <div><span class="text-xs font-black text-mint-dark">STEP 3</span><h2 id="generationModeTitle" class="mt-1 text-xl font-black" data-i18n="generationModeTitle">生成模式</h2></div>
+            <div id="generationModeSwitch" class="generation-mode-switch mt-5" role="group" aria-label="生成模式">
+              <button type="button" class="generation-mode-btn" data-mode="standard" aria-pressed="true" data-i18n="standardMode">普通模式</button>
+              <button type="button" class="generation-mode-btn" data-mode="advanced" aria-pressed="false" data-i18n="advancedMode">高级模式</button>
+            </div>
+            <p id="generationModeHint" class="mt-3 text-xs leading-5 text-gray-500">普通模式 · MiniMax · 固定约 5 秒</p>
+          </section>
+
+          <section class="rounded-[26px] border border-black/5 bg-white p-5 shadow-card sm:p-6" data-focus-zone="create duration">
+            <div><span class="text-xs font-black text-mint-dark">STEP 4</span><h2 class="mt-1 text-xl font-black">选择视频时长</h2></div>
+            <div id="durationList" class="mt-5 grid grid-cols-2 gap-2 sm:gap-3">
+              <button class="duration-btn duration-option selected rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="5"><b class="block text-lg">5 秒</b><span class="mt-1 block text-[11px] opacity-60">免费体验</span></button>
+              <button class="duration-btn duration-option rounded-2xl border border-black/10 p-3 text-left transition sm:p-4" data-duration="10"><b class="block text-lg">10 秒</b><span class="mt-1 block text-[11px] opacity-60">免费体验</span></button>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-bold text-gray-500"><span class="rounded-full bg-gray-100 px-3 py-1.5">720P</span><span class="rounded-full bg-gray-100 px-3 py-1.5">9:16</span><span class="rounded-full bg-gray-100 px-3 py-1.5">MP4</span><span id="audioSpec" class="rounded-full bg-gray-100 px-3 py-1.5">静音</span></div>
+          </section>
+        </div>
+
+        <aside class="lg:sticky lg:top-24 lg:self-start" data-focus-zone="create summary generation">
+          <div class="overflow-hidden rounded-[26px] bg-ink text-white shadow-soft">
+            <div class="relative h-48 overflow-hidden bg-gradient-to-br from-[#5a8f80] to-[#102b29]">
+              <div class="hero-grid absolute inset-0 opacity-40"></div>
+              <div id="summaryPeople" class="absolute inset-x-0 bottom-0 flex h-40 items-end justify-center pb-3"><div class="person dance scale-75"></div></div>
+              <div class="absolute left-4 top-4 rounded-full bg-black/30 px-3 py-1.5 text-[10px] font-bold backdrop-blur">PREVIEW</div>
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between"><div><p class="text-[10px] font-bold uppercase tracking-[.2em] text-white/45">Your creation</p><h3 id="summaryTemplate" class="mt-1 text-xl font-black">拥抱</h3></div><span id="summaryDuration" class="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">5 秒</span></div>
+              <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between"><dt class="text-white/50">生成模式</dt><dd id="summaryMode" class="font-bold">普通模式</dd></div><div class="flex justify-between"><dt class="text-white/50">生成规格</dt><dd class="font-bold">720P · 9:16</dd></div><div class="flex justify-between"><dt class="text-white/50">预计等待</dt><dd class="font-bold">1–5 分钟</dd></div><div class="flex justify-between"><dt class="text-white/50">保存时长</dt><dd class="font-bold">24 小时</dd></div></dl>
+              <div class="my-5 h-px bg-white/10"></div>
+              <div id="freeExperienceSummary" class="rounded-2xl bg-white/[.06] p-4 text-sm" aria-live="polite"></div>
+              <button id="generateButton" class="mt-5 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-mint font-extrabold text-ink transition hover:bg-white"><span data-i18n="freeGeneration">免费生成视频</span><span>→</span></button>
+              <p class="mt-3 text-center text-[10px] leading-4 text-white/40">普通与高级模式合计每日最多真实生成 5 次</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Generation progress -->
+    <section id="screen-generation" class="screen" data-screen="generation" data-focus-zone="generation">
+      <div class="mx-auto max-w-3xl">
+        <button class="mb-5 inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-ink" data-route="works">← 前往作品记录</button>
+        <div class="overflow-hidden rounded-[30px] bg-ink text-white shadow-soft">
+          <div class="relative flex min-h-[330px] items-center justify-center overflow-hidden p-8">
+            <div class="hero-grid absolute inset-0 opacity-40"></div>
+            <div class="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/15 blur-3xl"></div>
+            <span id="generationExecutionLabel" class="absolute left-5 top-5 z-10 hidden rounded-full bg-black/35 px-3 py-1.5 text-[10px] font-black text-white backdrop-blur"></span>
+            <span id="demoResultBadge" class="absolute right-5 top-5 z-10 hidden rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-white shadow-lg" data-i18n="demoResult">演示结果</span>
+            <video id="generationVideo" class="relative hidden max-h-[70vh] w-full max-w-sm rounded-[24px] bg-black shadow-2xl" controls playsinline preload="metadata"></video>
+            <div id="generationProgressPanel" class="relative text-center">
+              <div id="progressRing" class="ring-progress mx-auto grid h-36 w-36 place-items-center rounded-full p-2" style="--progress: 42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink"><div><b id="progressValue" class="block text-3xl font-black">42%</b><span class="text-[10px] uppercase tracking-widest text-white/45">Generating</span></div></div></div>
+              <h1 id="generationTitle" class="mt-7 text-2xl font-black">正在让照片动起来</h1>
+              <p id="generationSubtitle" class="mt-2 text-sm text-white/55">任务已进入生成队列，请勿重复提交。</p>
+            </div>
+          </div>
+          <div class="border-t border-white/10 p-6 sm:p-8">
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl bg-white/8 p-4"><span class="grid h-7 w-7 place-items-center rounded-full bg-mint text-xs font-black text-ink">✓</span><b class="mt-3 block text-sm">素材已通过</b><span class="text-[11px] text-white/40">照片与内容检测完成</span></div>
+              <div id="progressStep2" class="rounded-2xl bg-white/8 p-4"><span class="grid h-7 w-7 place-items-center rounded-full border border-mint text-xs font-black text-mint">2</span><b class="mt-3 block text-sm">动作生成中</b><span class="text-[11px] text-white/40">身份与肢体一致性处理</span></div>
+              <div id="progressStep3" class="rounded-2xl bg-white/[.03] p-4 opacity-45"><span class="grid h-7 w-7 place-items-center rounded-full border border-white/25 text-xs font-black">3</span><b class="mt-3 block text-sm">安全转存</b><span class="text-[11px] text-white/40">写入私有 Cloudflare R2</span></div>
+            </div>
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p class="max-w-md text-xs leading-5 text-white/45">你可以安全离开本页面。任务会在后台继续，完成后可在“作品”中查看。</p><div id="generationDemoActions" class="flex gap-2"><button class="rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold hover:bg-white/5" data-action="simulate-failure">演示失败</button><button class="rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-ink" data-action="complete-generation">完成演示</button></div><button id="generationRetryButton" class="hidden rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-ink" data-action="retry-generation">返回创作并重试</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Works -->
+    <section id="screen-works" class="screen" data-screen="works" data-focus-zone="works">
+      <div class="mb-7 flex items-end justify-between gap-4"><div><p class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">My creations</p><h1 class="mt-2 text-3xl font-black tracking-[-.04em] md:text-4xl">作品记录</h1><p class="mt-2 text-sm text-gray-500">只有你能查看。生成素材和结果将在 24 小时后自动删除。</p></div><button class="desktop-only rounded-full bg-ink px-5 py-3 text-sm font-bold text-white" data-route="create">＋ 新创作</button></div>
+      <div id="worksEmpty" class="hidden rounded-[28px] border border-dashed border-black/15 bg-white/60 px-6 py-20 text-center"><span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gray-100 text-2xl">◌</span><h2 class="mt-5 text-xl font-black">还没有作品</h2><p class="mt-2 text-sm text-gray-500">选择一个动作，用照片生成你的第一条视频。</p><button class="mt-6 rounded-full bg-ink px-6 py-3 text-sm font-bold text-white" data-route="create">开始创作</button></div>
+      <div id="worksGrid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <article id="work-processing" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
+          <div class="relative flex aspect-[9/11] items-center justify-center overflow-hidden bg-ink text-white"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="relative text-center"><div class="ring-progress mx-auto grid h-20 w-20 place-items-center rounded-full p-1.5" style="--progress:42%"><div class="grid h-full w-full place-items-center rounded-full bg-ink text-sm font-black">42%</div></div><p class="mt-4 text-xs font-bold text-white/65">生成中 · 可离开页面</p></div><span class="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold backdrop-blur">PROCESSING</span></div>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-mint-dark" data-work-execution data-mode="standard" data-execution-type="minimax">普通模式 · MiniMax 真实生成</span><div class="flex items-center justify-between"><div><b class="block">跳舞 · 5 秒</b><span class="text-[11px] text-gray-400">刚刚创建</span></div><button class="rounded-full border border-black/10 px-3 py-2 text-xs font-bold" data-route="generation">查看进度</button></div></div>
+        </article>
+        <article id="work-ready" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
+          <button class="group relative block aspect-[9/11] w-full overflow-hidden bg-gradient-to-b from-[#bcded1] via-[#7fae9d] to-[#17312f] text-white" data-action="play-work"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="absolute inset-x-0 bottom-6 flex items-end justify-center"><div class="person dance scale-90"></div></div><span class="absolute left-4 top-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] font-bold backdrop-blur">READY · 10 SEC</span><span class="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-ink shadow-xl transition group-hover:scale-110">▶</span><span class="absolute bottom-4 right-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] backdrop-blur">剩余 18:42:10</span></button>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-mint-dark" data-work-execution data-mode="advanced" data-execution-type="wan">高级模式 · Wan 真实生成</span><div class="flex items-center justify-between gap-3"><div><b class="block">跳舞 · 10 秒</b><span class="text-[11px] text-gray-400">今天 14:20</span></div><div class="flex gap-1"><button class="grid h-9 w-9 place-items-center rounded-full border border-black/10 text-sm hover:bg-gray-50" title="下载" data-action="download-work">↓</button><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-ready">⌫</button></div></div></div>
+        </article>
+        <article id="work-demo" class="work-card overflow-hidden rounded-[26px] bg-white shadow-card ring-1 ring-black/5">
+          <button class="group relative block aspect-[9/11] w-full overflow-hidden bg-gradient-to-b from-[#ffe8df] via-[#d9b6aa] to-[#4a302c] text-white" data-action="play-work"><div class="hero-grid absolute inset-0 opacity-25"></div><div class="absolute inset-x-0 bottom-6 flex items-end justify-center"><div class="person dance scale-90"></div></div><span class="absolute left-4 top-4 rounded-full bg-coral px-3 py-1.5 text-[10px] font-black uppercase tracking-wide">Demo</span><span class="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-ink shadow-xl transition group-hover:scale-110">▶</span><span class="absolute bottom-4 right-4 rounded-full bg-black/25 px-3 py-1.5 text-[10px] backdrop-blur">剩余 22:16:03</span></button>
+          <div class="p-4"><span class="mb-2 block text-[10px] font-bold text-[#a84232]" data-work-execution data-mode="standard" data-execution-type="local_demo">本地演示动画</span><div class="flex items-center justify-between gap-3"><div><b class="block">跳舞 · 5 秒</b><span class="text-[11px] text-gray-400">今天 13:05</span></div><div class="flex gap-1"><button class="grid h-9 w-9 place-items-center rounded-full border border-black/10 text-sm hover:bg-gray-50" title="下载" data-action="download-work">↓</button><button class="grid h-9 w-9 place-items-center rounded-full border border-red-100 text-sm text-red-500 hover:bg-red-50" title="删除" data-action="delete-work" data-target="work-demo">⌫</button></div></div></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Wallet -->
+    <section id="screen-wallet" class="screen" data-screen="wallet" data-focus-zone="wallet payment">
+      <div class="mx-auto max-w-5xl">
+        <div class="mb-7"><p class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Wallet</p><h1 class="mt-2 text-3xl font-black tracking-[-.04em] md:text-4xl">金币与购买</h1><p class="mt-2 text-sm text-gray-500">金币用于视频生成，使用 PayPal Business 以美元安全结算。</p></div>
+        <div class="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+          <div class="relative overflow-hidden rounded-[28px] bg-ink p-7 text-white shadow-soft" data-focus-zone="wallet">
+            <div class="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-mint/15 blur-3xl"></div><p class="relative text-xs font-bold uppercase tracking-[.2em] text-white/45">Available balance</p><div class="relative mt-4 flex items-end gap-2"><b id="walletBalance" class="text-6xl font-black tracking-[-.06em]">30</b><span class="pb-2 text-sm text-white/50">coins</span></div><p class="relative mt-5 text-xs leading-5 text-white/45">5 秒视频需 30 金币<br/>所有确认失败的任务都会全额返还</p><button class="relative mt-7 w-full rounded-2xl border border-white/15 py-3 text-sm font-bold hover:bg-white/5" data-route="create">去创作</button>
+          </div>
+          <div class="rounded-[28px] bg-white p-5 shadow-card ring-1 ring-black/5 sm:p-7" data-focus-zone="wallet payment">
+            <div class="flex items-center justify-between"><div><h2 class="text-xl font-black">选择金币包</h2><p class="mt-1 text-xs text-gray-500">一次购买，永久有效</p></div><span class="rounded-lg border border-[#0b469b]/15 bg-[#eef5ff] px-3 py-2 text-xs font-black text-[#0b469b]">PayPal</span></div>
+            <div id="coinPacks" class="mt-5 space-y-3">
+              <button class="coin-pack flex w-full items-center justify-between rounded-2xl border border-black/10 p-4 text-left hover:border-ink" data-pack="100" data-price="5.99"><span><b class="block text-lg">100 金币</b><span class="text-xs text-gray-500">约 3 条 5 秒视频</span></span><b class="text-lg">$5.99</b></button>
+              <button class="coin-pack relative flex w-full items-center justify-between rounded-2xl border-2 border-ink bg-[#f4fffb] p-4 text-left" data-pack="220" data-price="11.99"><span class="absolute -top-2.5 right-4 rounded-full bg-coral px-2.5 py-1 text-[9px] font-black text-white">POPULAR</span><span><b class="block text-lg">220 金币</b><span class="text-xs text-gray-500">多赠送 20 金币</span></span><b class="text-lg">$11.99</b></button>
+              <button class="coin-pack flex w-full items-center justify-between rounded-2xl border border-black/10 p-4 text-left hover:border-ink" data-pack="500" data-price="24.99"><span><b class="block text-lg">500 金币</b><span class="text-xs text-gray-500">单枚金币价格最低</span></span><b class="text-lg">$24.99</b></button>
+            </div>
+            <p class="mt-4 text-[10px] leading-4 text-gray-400">支付由 PayPal 处理。Vireal 不存储你的银行卡信息。价格可能包含支付渠道费用，购买前会显示最终金额。</p>
+          </div>
+        </div>
+        <div class="mt-5 rounded-[28px] bg-white p-5 shadow-card ring-1 ring-black/5 sm:p-7" data-focus-zone="wallet">
+          <div class="flex items-center justify-between"><h2 class="text-lg font-black">金币记录</h2><button class="text-xs font-bold text-gray-400">全部记录</button></div>
+          <div class="mt-4 divide-y divide-black/5 text-sm"><div class="flex items-center justify-between py-4"><div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-mint/15 text-mint-dark">＋</span><span><b class="block">新用户赠送</b><small class="text-gray-400">2026-09-07 10:12</small></span></div><b class="text-mint-dark">+30</b></div><div class="flex items-center justify-between py-4"><div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-coral/15 text-[#aa4835]">↗</span><span><b class="block">视频生成 · 拥抱 5 秒</b><small class="text-gray-400">等待任务结果</small></span></div><b>-30</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account -->
+    <section id="screen-account" class="screen" data-screen="account" data-focus-zone="account">
+      <div class="mx-auto max-w-3xl"><div class="mb-7"><p class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Account</p><h1 class="mt-2 text-3xl font-black tracking-[-.04em]">账户与偏好</h1></div><div class="space-y-4"><div class="rounded-[26px] bg-white p-6 shadow-card ring-1 ring-black/5"><div class="flex items-center gap-4"><span class="grid h-14 w-14 place-items-center rounded-2xl bg-ink text-lg font-black text-mint">VI</span><div><b class="block">Vireal User</b><span class="text-sm text-gray-500">viewer@example.com</span></div></div></div><div class="rounded-[26px] bg-white p-2 shadow-card ring-1 ring-black/5"><button id="accountLang" class="flex w-full items-center justify-between rounded-2xl p-4 hover:bg-gray-50"><span><b class="block text-left text-sm">界面语言</b><small class="text-gray-500">跟随浏览器，可手动修改</small></span><span class="text-sm font-bold">简体中文 ›</span></button><button class="flex w-full items-center justify-between rounded-2xl p-4 hover:bg-gray-50" data-modal="privacy"><span><b class="block text-left text-sm">隐私与数据</b><small class="text-gray-500">24 小时清理规则</small></span><span>›</span></button><button class="flex w-full items-center justify-between rounded-2xl p-4 hover:bg-gray-50" data-modal="complaint"><span><b class="block text-left text-sm">内容投诉</b><small class="text-gray-500">举报未经授权的人像内容</small></span><span>›</span></button></div><button id="logoutButton" class="w-full rounded-2xl border border-red-100 bg-white py-4 text-sm font-bold text-red-500 shadow-card">退出登录</button></div></div>
+    </section>
+
+    <!-- Region blocked -->
+    <section id="screen-region-locked" class="screen" data-screen="region-locked" data-focus-zone="region">
+      <div class="mx-auto flex min-h-[650px] max-w-4xl items-center justify-center rounded-[30px] bg-white p-6 text-center shadow-soft sm:p-12">
+        <div class="max-w-lg"><span class="mx-auto grid h-20 w-20 place-items-center rounded-[26px] bg-[#fff1ed] text-3xl">⌖</span><p class="mt-7 text-xs font-black uppercase tracking-[.2em] text-coral">Region unavailable</p><h1 class="mt-3 text-3xl font-black tracking-[-.04em] sm:text-4xl">当前地区暂未开放服务</h1><p class="mt-5 text-sm leading-7 text-gray-500">Vireal 首期仅向中国大陆以外地区提供注册、登录、付费和生成服务。你仍可以浏览产品介绍与隐私说明。</p><div class="mt-7 rounded-2xl bg-gray-50 p-4 text-left text-xs leading-5 text-gray-500"><b class="text-ink">为什么会看到此提示？</b><br/>我们会根据 IP、支付账户地区等信息进行服务区域判断。如果你认为判断有误，可以联系客服复核。</div><div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button class="rounded-full bg-ink px-6 py-3 text-sm font-bold text-white" data-route="home">返回产品介绍</button><button class="rounded-full border border-black/10 px-6 py-3 text-sm font-bold" data-modal="complaint">联系支持</button></div></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="mobile-nav fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-[22px] border border-white/60 bg-ink/95 p-2 text-[10px] font-bold text-white shadow-2xl backdrop-blur md:hidden" aria-label="移动端导航">
+    <button class="mobile-nav-btn flex flex-col items-center gap-1 rounded-2xl py-2 text-white/55" data-route="home"><span class="text-lg">⌂</span><span>发现</span></button>
+    <button class="mobile-nav-btn flex flex-col items-center gap-1 rounded-2xl py-2 text-white/55" data-route="create"><span class="text-lg">＋</span><span>创作</span></button>
+    <button class="mobile-nav-btn flex flex-col items-center gap-1 rounded-2xl py-2 text-white/55" data-route="works"><span class="text-lg">▣</span><span>作品</span></button>
+    <button class="mobile-nav-btn flex flex-col items-center gap-1 rounded-2xl py-2 text-white/55" data-route="account"><span class="text-lg">◉</span><span>我的</span></button>
+  </nav>
+
+  <button class="review-trigger fixed bottom-5 right-5 z-50 hidden items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-3 text-xs font-black shadow-soft md:flex" data-modal="review"><span class="h-2 w-2 rounded-full bg-coral"></span>演示场景</button>
+
+  <div id="modalRoot" class="fixed inset-0 z-[70] hidden items-stretch justify-center modal-backdrop md:items-center md:p-6" role="dialog" aria-modal="true">
+    <div id="modalCard" class="modal-card relative w-full max-w-lg overflow-hidden rounded-[28px] bg-white shadow-2xl">
+      <button id="closeModal" class="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-gray-100 text-lg hover:bg-gray-200" aria-label="关闭">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast fixed bottom-24 left-1/2 z-[90] flex min-w-[260px] max-w-[calc(100vw-32px)] items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-2xl md:bottom-8">
+    <span id="toastIcon" class="grid h-7 w-7 place-items-center rounded-full bg-mint text-xs text-ink">✓</span><span id="toastText">操作成功</span>
+  </div>
+
+  <script>
+    const templates = [
+      { id: 'hug', name: '拥抱', en: 'Hug', people: 2, tag: '温暖互动', palette: 'from-[#d2eee4] to-[#426f65]' },
+      { id: 'handhold', name: '牵手', en: 'Hold hands', people: 2, tag: '自然同行', palette: 'from-[#ffd9cd] to-[#986557]' },
+      { id: 'dance', name: '跳舞', en: 'Dance', people: 1, tag: '节奏动作', palette: 'from-[#dcd5ff] to-[#665a94]' },
+      { id: 'pushup', name: '俯卧撑', en: 'Push-up', people: 1, tag: '运动挑战', palette: 'from-[#f2e5bd] to-[#776c4e]' },
+      { id: 'kiss', name: '亲吻', en: 'Kiss', people: 2, tag: '审核准备中', palette: 'from-[#eadde2] to-[#80636d]', disabled: true }
+    ];
+
+    const query = new URLSearchParams(location.search);
+    const configuredApiBaseUrl = document.querySelector('meta[name="vireal-api-base-url"]')?.content.trim() || '';
+    const productionApiBaseUrl = configuredApiBaseUrl.startsWith('__VIREAL_') ? '' : configuredApiBaseUrl;
+    const configuredBackendMode = document.querySelector('meta[name="vireal-backend-mode"]')?.content === '1';
+    const backendMode = query.has('backend') ? query.get('backend') === '1' : configuredBackendMode;
+    const API_BASE_URL = (query.get('api') || productionApiBaseUrl || 'http://localhost:8000').replace(/\/+$/, '');
+    const VIDEO_TASK_STORAGE_KEY = 'virealBackendVideoTask';
+    const VIDEO_SUBMISSION_STORAGE_KEY = 'virealBackendVideoSubmission';
+    const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+    const VIDEO_TASK_POLL_MS = 3000;
+
+    const state = {
+      loggedIn: false,
+      balance: Number(sessionStorage.getItem('virealBalance') || 30),
+      language: localStorage.getItem('virealLang') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'),
+      template: 'dance',
+      mode: 'standard',
+      duration: 5,
+      userRealRemaining: 5,
+      wanGlobalRemaining: 3,
+      uploads: {},
+      appToken: '',
+      appUser: null,
+      authReady: false,
+      generation: 'processing',
+      currentTask: null,
+      regionLocked: new URLSearchParams(location.search).get('region') === 'cn',
+      selectedPack: null
+    };
+
+    const focus = query.get('focus');
+    const sandbox = query.get('sandbox') === 'true';
+    let toastTimer;
+    let videoTaskPollTimer;
+
+    const translations = {
+      zh: {
+        navDiscover: '发现', navCreate: '创作', navWorks: '作品',
+        privacyTag: '仅自己可见 · 24 小时自动删除',
+        heroA: '让一张照片，', heroB: '动成一段记忆。',
+        heroDesc: '上传已授权的成年人全身照，选择动作和时长。无需提示词，几分钟生成私有静音短视频。',
+        startCreate: '开始创作', viewTemplates: '查看动作模板',
+        templatesTitle: '动作已调好，只等你的照片',
+        templatesDesc: '固定单人跳舞提示词，提供普通与高级两种生成模式。',
+        generationModeTitle: '生成模式', standardMode: '普通模式', advancedMode: '高级模式',
+        standardHint: '普通模式 · MiniMax · 固定约 5 秒',
+        advancedHint: '高级模式 · Wan · 可选 5 或 10 秒',
+        uploadDisclosure: '上传即表示你拥有图片使用权；图片可能由第三方 AI 服务处理。素材和作品将在 24 小时后清理。',
+        freeGeneration: '免费生成视频', freeExperience: '免费',
+        personalQuota: '今日真实生成剩余', advancedQuota: '高级模式全站剩余',
+        executionMiniMax: '普通模式 · MiniMax 真实生成',
+        executionWan: '高级模式 · Wan 真实生成',
+        executionLocalDemo: '本地演示动画',
+        demoResult: '演示结果', retention: '素材和作品保留 24 小时', silentSpec: '静音',
+        statusSubmitting: '正在安全创建真实生成任务…',
+        statusQueued: '任务已进入生成队列，请勿重复提交。',
+        statusRunning: '正在生成 720P · 9:16 静音视频。',
+        statusRenderingDemo: '真实生成服务暂时不可用，正在使用上传图片制作简单动画。',
+        statusSaving: '正在把结果写入私有 Cloudflare R2。',
+        statusReady: '作品已写入私有 R2，可以播放。'
+      },
+      en: {
+        navDiscover: 'Discover', navCreate: 'Create', navWorks: 'Works',
+        privacyTag: 'Private · Auto-deleted in 24 hours',
+        heroA: 'Turn a photo into', heroB: 'a moving memory.',
+        heroDesc: 'Upload an authorized adult full-body photo and create a private, silent dance video—no prompt writing needed.',
+        startCreate: 'Start creating', viewTemplates: 'Browse motions',
+        templatesTitle: 'Curated motion, ready for your photo',
+        templatesDesc: 'A controlled solo-dance prompt with Standard and Advanced generation modes.',
+        generationModeTitle: 'Generation mode', standardMode: 'Standard', advancedMode: 'Advanced',
+        standardHint: 'Standard · MiniMax · About 5 seconds',
+        advancedHint: 'Advanced · Wan · Choose 5 or 10 seconds',
+        uploadDisclosure: 'By uploading, you confirm that you have the right to use this image. Third-party AI services may process it. Media is removed after 24 hours.',
+        freeGeneration: 'Generate for free', freeExperience: 'Free',
+        personalQuota: 'Real generations left today', advancedQuota: 'Advanced slots left globally',
+        executionMiniMax: 'Standard · MiniMax real generation',
+        executionWan: 'Advanced · Wan real generation',
+        executionLocalDemo: 'Local demo animation',
+        demoResult: 'Demo result', retention: 'Media is retained for 24 hours', silentSpec: 'Silent',
+        statusSubmitting: 'Securely creating the generation task…',
+        statusQueued: 'Queued for generation. Do not submit again.',
+        statusRunning: 'Generating a silent 720P · 9:16 video.',
+        statusRenderingDemo: 'The real provider is temporarily unavailable. Creating a simple animation from your photo.',
+        statusSaving: 'Saving the result to private Cloudflare R2.',
+        statusReady: 'Saved to private R2 and ready to play.'
+      }
+    };
+
+    function t(key) {
+      return translations[state.language]?.[key] || translations.zh[key] || key;
+    }
+
+    function executionLabel(task) {
+      if (task.executionType === 'local_demo') return t('executionLocalDemo');
+      if (task.mode === 'advanced') return t('executionWan');
+      return t('executionMiniMax');
+    }
+
+    function iconPeople(count, kind = '') {
+      if (count === 2) return `<div class="flex items-end justify-center pt-8"><div class="person -mr-2 -rotate-6 scale-[.58]"></div><div class="person alt -ml-2 rotate-6 scale-[.58]"></div></div>`;
+      return `<div class="flex items-end justify-center pt-8"><div class="person ${kind === 'dance' ? 'dance' : ''} scale-[.62]"></div></div>`;
+    }
+
+    function renderTemplateCards() {
+      const available = templates.filter(t => t.id === 'dance');
+      const selectable = templates.filter(t => t.id === 'dance');
+      document.getElementById('homeTemplateGrid').innerHTML = available.map(template => `
+        <button class="template-card overflow-hidden rounded-[24px] border border-black/5 bg-white text-left shadow-card" data-template-route="${template.id}">
+          <div class="relative h-52 overflow-hidden bg-gradient-to-b ${template.palette}"><div class="hero-grid absolute inset-0 opacity-25"></div>${iconPeople(template.people, template.id)}<span class="absolute left-3 top-3 rounded-full bg-black/25 px-2.5 py-1 text-[9px] font-black text-white backdrop-blur">${template.people} PERSON${template.people > 1 ? 'S' : ''}</span><span class="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white text-ink shadow">→</span></div>
+          <div class="p-4"><div class="flex items-center justify-between"><b class="text-lg">${state.language === 'zh' ? template.name : template.en}</b><span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">${template.tag}</span></div><p class="mt-2 text-xs text-gray-500">${state.language === 'zh' ? '一张单人全身照' : 'One full-body photo'} · ${t('silentSpec')}</p></div>
+        </button>`).join('');
+
+      document.getElementById('createTemplateGrid').innerHTML = selectable.map(template => `
+        <button class="template-card ${state.template === template.id ? 'selected' : ''} ${template.disabled ? 'cursor-not-allowed opacity-50' : ''} relative overflow-hidden rounded-2xl border border-black/10 bg-white p-3 text-left" data-template="${template.id}" ${template.disabled ? 'disabled' : ''}>
+          <div class="flex h-20 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-b ${template.palette}">${iconPeople(template.people, template.id)}</div>
+          <b class="mt-3 block text-sm">${state.language === 'zh' ? template.name : template.en}</b><span class="mt-1 block text-[10px] text-gray-400">${state.language === 'zh' ? '1 人 · 固定模板' : '1 person · Curated motion'}</span>
+        </button>`).join('');
+
+      document.querySelectorAll('[data-template-route]').forEach(btn => btn.addEventListener('click', () => {
+        state.template = btn.dataset.templateRoute;
+        ensureAuthThen('create');
+        renderCreate();
+      }));
+      document.querySelectorAll('[data-template]').forEach(btn => btn.addEventListener('click', () => {
+        state.template = btn.dataset.template;
+        state.uploads = {};
+        renderCreate();
+      }));
+    }
+
+    function selectedTemplate() { return templates.find(t => t.id === state.template) || templates.find(t => t.id === 'dance'); }
+
+    function apiUrl(path) {
+      return new URL(path, `${API_BASE_URL}/`).toString();
+    }
+
+    function assetUrl(url) {
+      return new URL(url, `${API_BASE_URL}/`).toString();
+    }
+
+    function privateContentUrl(url) {
+      const parsed = new URL(url, `${API_BASE_URL}/`);
+      if (parsed.pathname.startsWith('/uploads/images/')) {
+        parsed.pathname = `/api/v1/app${parsed.pathname}`;
+      }
+      parsed.pathname = parsed.pathname.replace(/\/$/, '') + '/content';
+      return parsed.toString();
+    }
+
+    async function getClerkToken() {
+      const clerk = window.VirealClerk;
+      if (!clerk?.session) throw new Error('请先完成登录');
+      const token = await clerk.session.getToken();
+      if (!token) throw new Error('无法获取登录凭证');
+      state.appToken = token;
+      return token;
+    }
+
+    async function appRequestHeaders(headers = {}) {
+      return {
+        Authorization: `Bearer ${await getClerkToken()}`,
+        ...headers
+      };
+    }
+
+    async function authenticatedFetch(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: await appRequestHeaders(options.headers || {})
+      });
+      if ([401, 403].includes(response.status)) {
+        await clearExpiredBackendSession();
+      }
+      return response;
+    }
+
+    async function responseError(response) {
+      const text = await response.text();
+      try {
+        const payload = JSON.parse(text);
+        if (typeof payload.detail === 'string') return payload.detail;
+        if (Array.isArray(payload.detail)) return payload.detail.map(item => item.msg || item).join('; ');
+      } catch (_) {
+        // Keep the raw response below when it is not JSON.
+      }
+      return text || `${response.status} ${response.statusText}`;
+    }
+
+    function errorMessage(error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+
+    function backendErrorMessage(error) {
+      const message = errorMessage(error);
+      if (backendMode && message === 'Failed to fetch') {
+        return '无法连接后端，请确认 API 服务已启动';
+      }
+      return message;
+    }
+
+    async function initializeClerkSession() {
+      const response = await fetch(apiUrl('/api/v1/app/auth/session'), {
+        method: 'POST',
+        headers: await appRequestHeaders({ 'Content-Type': 'application/json' })
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+
+      const payload = await response.json();
+      state.appUser = payload.app_user || null;
+      state.loggedIn = true;
+      updateAccountUI();
+      return payload;
+    }
+
+    let clerkSignInMounted = false;
+    let clerkListenerAttached = false;
+    let clerkBootstrapSessionId = null;
+
+    async function syncClerkSession(clerk) {
+      const status = document.getElementById('clerkStatus');
+      if (!clerk.session || !clerk.user) {
+        state.loggedIn = false;
+        state.appToken = '';
+        state.appUser = null;
+        clerkBootstrapSessionId = null;
+        updateAccountUI();
+        if (!clerkSignInMounted) {
+          clerk.mountSignIn(document.getElementById('clerkSignIn'), {
+            routing: 'virtual',
+            appearance: {
+              variables: { colorPrimary: '#071b1b', borderRadius: '0.9rem' }
+            }
+          });
+          clerkSignInMounted = true;
+        }
+        status.textContent = '仅限受邀请用户登录';
+        return;
+      }
+
+      if (clerkSignInMounted) {
+        clerk.unmountSignIn(document.getElementById('clerkSignIn'));
+        clerkSignInMounted = false;
+      }
+      if (clerkBootstrapSessionId === clerk.session.id && state.loggedIn) return;
+      status.textContent = '正在验证登录并同步账户…';
+      try {
+        const payload = await initializeClerkSession();
+        clerkBootstrapSessionId = clerk.session.id;
+        state.authReady = true;
+        resetUploads();
+        status.textContent = '';
+        showToast(payload.is_new_user ? '欢迎加入 Vireal' : '登录成功');
+        const target = sessionStorage.getItem('virealAfterLogin') || 'home';
+        sessionStorage.removeItem('virealAfterLogin');
+        if (!resumeBackendVideoTask()) routeTo(target);
+      } catch (error) {
+        status.textContent = `登录验证失败：${backendErrorMessage(error)}`;
+        showToast(status.textContent, true);
+      }
+    }
+
+    function setupClerk(clerk) {
+      state.authReady = true;
+      if (!clerkListenerAttached) {
+        clerk.addListener(() => { void syncClerkSession(clerk); });
+        clerkListenerAttached = true;
+      }
+      void syncClerkSession(clerk);
+    }
+
+    function revokePreviewUrl(entry) {
+      if (entry?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(entry.previewUrl);
+    }
+
+    function resetUploads() {
+      Object.values(state.uploads).forEach(revokePreviewUrl);
+      state.uploads = {};
+    }
+
+    function isExpiredBackendSession(error) {
+      return /app user not found|could not validate|invalid or expired token|not authenticated|inactive app user|session has not been initialized/i.test(errorMessage(error));
+    }
+
+    async function clearExpiredBackendSession() {
+      resetUploads();
+      state.loggedIn = false;
+      state.appToken = '';
+      state.appUser = null;
+      clerkBootstrapSessionId = null;
+      updateAccountUI();
+      if (window.VirealClerk?.session) await window.VirealClerk.signOut();
+      sessionStorage.setItem('virealAfterLogin', 'create');
+      routeTo('login');
+      showToast('登录状态已失效，请重新登录', true);
+    }
+
+    async function revokeBackendSession() {
+      if (!backendMode || !window.VirealClerk?.session) return;
+      try {
+        await fetch(apiUrl('/api/v1/app/auth/logout'), {
+          method: 'POST',
+          headers: await appRequestHeaders(),
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch (_) {
+        // Clerk sign-out still completes; its short-lived token then expires.
+      }
+    }
+
+    function removeUpload(index) {
+      revokePreviewUrl(state.uploads[index]);
+      delete state.uploads[index];
+      renderUploads();
+    }
+
+    function renderBackendUploadCard(index, entry) {
+      const statusText = {
+        uploading: '正在上传到 R2…',
+        uploaded: '上传成功，正在验证私有读取…',
+        verifying: '正在通过后端同源代理读取…',
+        verified: 'R2 私有读取验证成功',
+        error: entry.error || '上传失败'
+      }[entry.status] || '处理中…';
+      const statusClass = entry.status === 'error' ? 'backend-upload-status error' : 'backend-upload-status';
+      const image = entry.previewUrl
+        ? `<img class="backend-upload-image rounded-2xl" src="${entry.previewUrl}" alt="人物 ${index} 上传预览"/>`
+        : '<div class="grid aspect-[4/3] place-items-center rounded-2xl bg-gray-100 text-sm text-gray-400">等待图片</div>';
+      return `<div class="backend-upload-card overflow-hidden rounded-2xl border border-black/10 bg-white p-3 shadow-sm">
+        ${image}
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <div class="min-w-0"><b class="block text-sm">人物 ${index}</b><span class="${statusClass} mt-1 block truncate text-[11px]">${statusText}</span></div>
+          <button class="shrink-0 rounded-full bg-gray-100 px-3 py-2 text-[10px] font-bold hover:bg-gray-200" data-remove-upload="${index}">更换</button>
+        </div>
+      </div>`;
+    }
+
+    async function verifyPrivateImage(index) {
+      const entry = state.uploads[index];
+      if (!entry?.url) return;
+      entry.status = 'verifying';
+      renderUploads();
+      const response = await authenticatedFetch(privateContentUrl(entry.url), {
+        redirect: 'follow'
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('私有读取返回的内容不是图片');
+      revokePreviewUrl(entry);
+      entry.previewUrl = URL.createObjectURL(blob);
+      entry.status = 'verified';
+      renderUploads();
+    }
+
+    async function uploadRealImage(index, file) {
+      if (!state.loggedIn) {
+        showToast('请先完成登录', true);
+        routeTo('login');
+        return;
+      }
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        showToast('仅支持 JPG 或 PNG 图片', true);
+        return;
+      }
+      if (file.size > MAX_UPLOAD_IMAGE_BYTES) {
+        showToast('图片不能超过 5MB', true);
+        return;
+      }
+
+      const entry = {
+        file,
+        previewUrl: URL.createObjectURL(file),
+        url: null,
+        uploadId: null,
+        expiresAt: null,
+        status: 'uploading',
+        error: ''
+      };
+      state.uploads[index] = entry;
+      renderUploads();
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        const response = await authenticatedFetch(apiUrl('/api/v1/app/uploads/images'), {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) throw new Error(await responseError(response));
+        const payload = await response.json();
+        if (!payload.url || !payload.id) throw new Error('上传响应缺少图片地址或 upload_id');
+        entry.url = payload.url;
+        entry.uploadId = payload.id;
+        entry.expiresAt = payload.expires_at || null;
+        entry.status = 'uploaded';
+        renderUploads();
+        await verifyPrivateImage(index);
+        showToast(`人物 ${index} 已完成 R2 上传与私有读取验证`);
+      } catch (error) {
+        if (state.uploads[index] !== entry) return;
+        if (backendMode && isExpiredBackendSession(error)) {
+          await clearExpiredBackendSession();
+          return;
+        }
+        entry.status = 'error';
+        entry.error = backendErrorMessage(error);
+        renderUploads();
+        showToast(`人物 ${index} 上传失败：${entry.error}`, true);
+      }
+    }
+
+    function samplePortrait(index) {
+      const alt = index === 2 ? 'alt' : '';
+      return `<div class="relative flex h-full min-h-[180px] items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-b ${index === 2 ? 'from-[#ffd9cd] to-[#815447]' : 'from-[#d2eee4] to-[#31564e]'}"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="person ${alt} mb-[-14px] scale-90"></div><span class="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-mint text-xs font-black text-ink">✓</span><span class="absolute bottom-3 left-3 rounded-full bg-black/30 px-2.5 py-1 text-[9px] font-bold text-white backdrop-blur">检测通过</span></div>`;
+    }
+
+    function renderUploads() {
+      const count = selectedTemplate().people;
+      const grid = document.getElementById('uploadGrid');
+      grid.className = `mt-5 grid gap-3 ${count === 2 ? 'sm:grid-cols-2' : ''}`;
+      grid.innerHTML = Array.from({length: count}, (_, i) => {
+        const n = i + 1;
+        if (backendMode && state.uploads[n] && typeof state.uploads[n] === 'object') return renderBackendUploadCard(n, state.uploads[n]);
+        if (state.uploads[n]) return `<div class="relative min-h-[210px] overflow-hidden rounded-2xl border border-black/10">${samplePortrait(n)}<button class="absolute right-3 bottom-3 rounded-full bg-white/90 px-3 py-2 text-[10px] font-bold shadow" data-remove-upload="${n}">更换</button></div>`;
+        return `<div class="upload-zone relative flex min-h-[210px] flex-col items-center justify-center rounded-2xl border border-dashed border-black/20 p-5 text-center" data-upload-zone="${n}"><input class="hidden" type="file" accept="image/jpeg,image/png" data-file-input="${n}"/><span class="grid h-12 w-12 place-items-center rounded-2xl bg-mint/15 text-xl text-mint-dark">＋</span><b class="mt-3 text-sm">上传人物 ${n}</b><span class="mt-1 text-[11px] text-gray-400">点击选择全身照片</span><button class="mt-4 rounded-full bg-gray-100 px-3 py-2 text-[10px] font-bold hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50" data-sample-upload="${n}" ${backendMode ? 'disabled' : ''}>${backendMode ? '需选择真实照片' : '使用示例照片'}</button></div>`;
+      }).join('');
+      grid.querySelectorAll('[data-upload-zone]').forEach(zone => zone.addEventListener('click', e => {
+        if (e.target.closest('[data-sample-upload]')) return;
+        zone.querySelector('input').click();
+      }));
+      grid.querySelectorAll('[data-sample-upload]').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (backendMode) return showToast('R2 测试模式需要选择真实图片', true);
+        state.uploads[btn.dataset.sampleUpload] = true;
+        renderUploads();
+        showToast('示例照片已通过基础检测');
+      }));
+      grid.querySelectorAll('[data-remove-upload]').forEach(btn => btn.addEventListener('click', () => removeUpload(btn.dataset.removeUpload)));
+      grid.querySelectorAll('[data-file-input]').forEach(input => input.addEventListener('change', () => {
+        if (!input.files || !input.files[0]) return;
+        if (backendMode) return void uploadRealImage(input.dataset.fileInput, input.files[0]);
+        state.uploads[input.dataset.fileInput] = true;
+        renderUploads();
+        showToast('照片已添加，等待生成前检测');
+      }));
+    }
+
+    function renderCreate() {
+      const template = selectedTemplate();
+      renderGenerationMode();
+      document.getElementById('selectedInputCount').textContent = state.language === 'zh' ? `需要 ${template.people} 张照片` : `${template.people} photo required`;
+      document.getElementById('summaryTemplate').textContent = state.language === 'zh' ? template.name : template.en;
+      document.getElementById('summaryMode').textContent = state.mode === 'standard' ? t('standardMode') : t('advancedMode');
+      document.getElementById('summaryDuration').textContent = state.language === 'zh' ? `${state.duration} 秒` : `${state.duration} sec`;
+      document.getElementById('audioSpec').textContent = t('silentSpec');
+      document.getElementById('summaryPeople').innerHTML = iconPeople(template.people, template.id);
+      document.querySelectorAll('.duration-btn').forEach(btn => btn.classList.toggle('selected', Number(btn.dataset.duration) === state.duration));
+      document.querySelectorAll('[data-template]').forEach(btn => btn.classList.toggle('selected', btn.dataset.template === state.template));
+      renderFreeExperienceSummary();
+      renderUploads();
+      applyFocusMode();
+    }
+
+    function renderGenerationMode() {
+      const isStandard = state.mode === 'standard';
+      if (isStandard) state.duration = 5;
+      const modeButtons = document.querySelectorAll('.generation-mode-btn');
+      const durationButtons = document.querySelectorAll('.duration-btn');
+      modeButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
+      });
+      const duration10Button = [...durationButtons]
+        .find((button) => Number(button.dataset.duration) === 10);
+      duration10Button.disabled = isStandard;
+      document.getElementById('generationModeHint').textContent = isStandard
+        ? t('standardHint')
+        : t('advancedHint');
+    }
+
+    function renderFreeExperienceSummary() {
+      const advancedQuota = state.mode === 'advanced'
+        ? `<span class="mt-2 block text-white/55">${t('advancedQuota')} ${state.wanGlobalRemaining}/3</span>`
+        : '';
+      document.getElementById('freeExperienceSummary').innerHTML = `
+        <span class="flex items-center justify-between gap-3"><span class="text-white/55">${state.language === 'zh' ? '本次体验' : 'This generation'}</span><b class="text-mint">${t('freeExperience')}</b></span>
+        <span class="mt-3 block text-xs text-white/55">${t('personalQuota')} ${state.userRealRemaining}/5</span>
+        ${advancedQuota}`;
+      document.getElementById('generateButton').firstElementChild.textContent = t('freeGeneration');
+    }
+
+    function updateAccountUI() {
+      document.getElementById('coinBalanceTop').textContent = state.balance;
+      document.getElementById('walletBalance').textContent = state.balance;
+      const account = document.getElementById('accountButton');
+      account.textContent = state.loggedIn ? 'VI' : '登录';
+      account.dataset.route = state.loggedIn ? 'account' : 'login';
+      const coinButton = document.getElementById('coinButton');
+      coinButton.hidden = !state.loggedIn;
+      coinButton.style.display = state.loggedIn ? '' : 'none';
+      coinButton.classList.toggle('hidden', !state.loggedIn);
+      coinButton.classList.toggle('flex', state.loggedIn);
+      sessionStorage.setItem('virealBalance', state.balance);
+    }
+
+    function routeTo(route, replace = false) {
+      if (state.regionLocked && ['login','create','works','wallet','account','generation'].includes(route) && !focus) route = 'region-locked';
+      document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === route));
+      document.querySelectorAll('.nav-link,.mobile-nav-btn').forEach(b => b.classList.toggle('bg-white', b.dataset.route === route));
+      document.querySelectorAll('.mobile-nav-btn').forEach(b => { b.classList.toggle('text-white', b.dataset.route === route); b.classList.toggle('text-white/55', b.dataset.route !== route); });
+      document.querySelector('.mobile-nav').classList.toggle('hidden', ['login','region-locked'].includes(route) || !state.loggedIn);
+      if (!focus) {
+        const url = `${location.pathname}${location.search}#${route}`;
+        if (replace) history.replaceState(null, '', url); else history.pushState(null, '', url);
+      }
+      window.scrollTo({top:0, behavior:'instant'});
+      if (route === 'create') renderCreate();
+      applyFocusMode();
+    }
+
+    function ensureAuthThen(route) {
+      if (focus) return routeTo(route);
+      if (state.regionLocked) return routeTo('region-locked');
+      if (!state.loggedIn && ['create','works','wallet','account','generation'].includes(route)) {
+        sessionStorage.setItem('virealAfterLogin', route);
+        routeTo('login');
+        return;
+      }
+      routeTo(route);
+    }
+
+    function showToast(message, error = false) {
+      clearTimeout(toastTimer);
+      const toast = document.getElementById('toast');
+      document.getElementById('toastText').textContent = message;
+      const icon = document.getElementById('toastIcon');
+      icon.textContent = error ? '!' : '✓';
+      icon.className = `grid h-7 w-7 place-items-center rounded-full text-xs ${error ? 'bg-coral text-white' : 'bg-mint text-ink'}`;
+      toast.classList.add('show');
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    const modalTemplates = {
+      privacy: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Privacy</span><h2 class="mt-2 text-2xl font-black">照片与视频如何处理</h2><div class="mt-6 space-y-4 text-sm leading-6 text-gray-600"><div class="rounded-2xl bg-gray-50 p-4"><b class="text-ink">仅本人访问</b><p>作品不进入公开广场，不提供公开分享链接。</p></div><div class="rounded-2xl bg-gray-50 p-4"><b class="text-ink">24 小时删除</b><p>上传原图和生成视频最长保留 24 小时。用户主动删除后立即撤销访问，后台最迟 24 小时完成物理清理。</p></div><div class="rounded-2xl bg-gray-50 p-4"><b class="text-ink">必要审计</b><p>不包含媒体的声明、审核、订单和投诉记录可保留 180 天，用于安全与争议追溯。</p></div></div><button class="modal-close mt-7 h-12 w-full rounded-2xl bg-ink font-bold text-white">我知道了</button></div>`,
+      'photo-guide': () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="text-xs font-black uppercase tracking-[.2em] text-mint-dark">Photo guide</span><h2 class="mt-2 text-2xl font-black">这样拍，效果更稳定</h2><div class="mt-6 grid grid-cols-3 gap-2"><div class="rounded-2xl bg-mint/10 p-3 text-center"><div class="mx-auto h-20 rounded-xl bg-gradient-to-b from-[#d2eee4] to-[#527c71]">${iconPeople(1)}</div><b class="mt-2 block text-xs">完整全身</b></div><div class="rounded-2xl bg-mint/10 p-3 text-center"><div class="mx-auto h-20 rounded-xl bg-gradient-to-b from-[#f2e5bd] to-[#776c4e]">${iconPeople(1)}</div><b class="mt-2 block text-xs">正面清晰</b></div><div class="rounded-2xl bg-mint/10 p-3 text-center"><div class="mx-auto h-20 rounded-xl bg-gradient-to-b from-[#ffd9cd] to-[#986557]">${iconPeople(1)}</div><b class="mt-2 block text-xs">单人入镜</b></div></div><ul class="mt-6 space-y-3 text-sm text-gray-600"><li>✓ 头部、手臂、双腿、双脚全部入镜</li><li>✓ 光线均匀，脸部无遮挡且不模糊</li><li>✓ 简洁背景，人物不与其他人重叠</li><li class="text-red-500">× 不接受未成年人、公众人物或未获授权照片</li></ul><button class="modal-close mt-7 h-12 w-full rounded-2xl bg-ink font-bold text-white">开始上传</button></div>`,
+      payment: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><div class="flex items-center justify-between"><span class="rounded-lg border border-[#0b469b]/15 bg-[#eef5ff] px-3 py-2 text-xs font-black text-[#0b469b]">PayPal</span><span class="text-xs text-gray-400">USD</span></div><h2 class="mt-5 text-2xl font-black">确认购买</h2><div class="mt-5 rounded-2xl bg-gray-50 p-5"><div class="flex items-center justify-between"><span><b class="block text-lg">${state.selectedPack?.coins || 220} 金币</b><small class="text-gray-500">充值至 Vireal 钱包</small></span><b class="text-2xl">$${state.selectedPack?.price || '11.99'}</b></div></div><p class="mt-4 text-xs leading-5 text-gray-500">点击后将进入 PayPal 安全收银台。只有服务端收到并验证支付通知后，金币才会到账。</p><button id="confirmPayment" class="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#ffc439] font-black text-[#113984]">使用 PayPal 支付</button><button class="modal-close mt-2 h-11 w-full text-sm font-bold text-gray-400">取消</button></div>`,
+      'payment-success': () => `<div class="p-8 pt-16 text-center"><span class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-mint text-2xl font-black text-ink">✓</span><h2 class="mt-5 text-2xl font-black">金币已到账</h2><p class="mt-2 text-sm text-gray-500">成功增加 ${state.selectedPack?.coins || 220} 金币，当前余额 ${state.balance}。</p><button class="modal-close mt-6 h-12 w-full rounded-2xl bg-ink font-bold text-white">完成</button></div>`,
+      delete: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-xl text-red-500">⌫</span><h2 class="mt-5 text-2xl font-black">删除这条记录？</h2><p class="mt-3 text-sm leading-6 text-gray-500">作品将立即无法播放或下载，原图和视频会进入物理删除队列。删除后无法恢复。</p><div class="mt-6 grid grid-cols-2 gap-3"><button class="modal-close h-12 rounded-2xl border border-black/10 font-bold">取消</button><button id="confirmDelete" class="h-12 rounded-2xl bg-red-500 font-bold text-white">确认删除</button></div></div>`,
+      player: () => `<div class="bg-ink text-white"><div class="relative flex aspect-[9/12] max-h-[72vh] items-end justify-center overflow-hidden bg-gradient-to-b from-[#bcded1] via-[#7fae9d] to-[#17312f]"><div class="hero-grid absolute inset-0 opacity-30"></div><div class="mb-12 flex items-end"><div class="person dance"></div></div><button class="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-xl text-ink shadow-xl">▶</button><div class="absolute inset-x-5 bottom-5"><div class="h-1 rounded-full bg-white/25"><div class="h-1 w-2/5 rounded-full bg-mint"></div></div><div class="mt-3 flex justify-between text-[10px] text-white/60"><span>00:04</span><span>00:10</span></div></div></div><div class="flex items-center justify-between p-5"><div><b>跳舞 · 10 秒</b><p class="text-[11px] text-white/45">18 小时后自动删除</p></div><button class="rounded-full bg-white px-4 py-2 text-xs font-bold text-ink" data-action="download-work">下载</button></div></div>`,
+      complaint: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16"><span class="text-xs font-black uppercase tracking-[.2em] text-coral">Safety support</span><h2 class="mt-2 text-2xl font-black">内容投诉与肖像申诉</h2><p class="mt-3 text-sm leading-6 text-gray-500">如果你发现自己的肖像被未经授权使用，请提交可核验的信息。我们会冻结相关内容并进行人工复核。</p><label class="mt-5 block text-sm font-bold">联系邮箱</label><input class="mt-2 h-12 w-full rounded-xl border border-black/10 bg-gray-50 px-4" placeholder="name@example.com"/><label class="mt-4 block text-sm font-bold">问题描述</label><textarea class="mt-2 h-28 w-full resize-none rounded-xl border border-black/10 bg-gray-50 p-4" placeholder="请描述发生了什么"></textarea><button class="modal-close mt-5 h-12 w-full rounded-2xl bg-ink font-bold text-white" onclick="showToast('投诉请求已提交，我们会尽快处理')">提交投诉</button></div>`,
+      review: () => `<div class="p-6 pt-16 sm:p-8 sm:pt-16">
+        <span class="text-xs font-black uppercase tracking-[.2em] text-coral">Prototype controls</span>
+        <h2 class="mt-2 text-2xl font-black">演示场景</h2>
+        <p class="mt-2 text-xs leading-5 text-gray-500">用于评审关键状态，不属于正式产品界面。</p>
+        <div class="mt-6 grid gap-3">
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="real-result"><span><b class="block">真实生成结果</b><small class="text-gray-500">普通模式 · MiniMax 播放器</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="demo-result"><span><b class="block">演示降级结果</b><small class="text-gray-500">同一播放器并显示 Demo 标记</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="region"><span><b class="block">大陆地区限制</b><small class="text-gray-500">查看不可登录状态</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="empty"><span><b class="block">作品空状态</b><small class="text-gray-500">隐藏现有作品</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="network"><span><b class="block">断网提示</b><small class="text-gray-500">模拟生成提交网络异常</small></span><span>→</span></button>
+          <button class="review-action flex items-center justify-between rounded-2xl border border-black/10 p-4 text-left" data-review="reset"><span><b class="block">重置原型</b><small class="text-gray-500">恢复初始评审状态</small></span><span>↺</span></button>
+        </div>
+      </div>`
+    };
+
+    let pendingDeleteTarget = null;
+    function openModal(type) {
+      const root = document.getElementById('modalRoot');
+      document.getElementById('modalContent').innerHTML = modalTemplates[type] ? modalTemplates[type]() : '';
+      root.classList.remove('hidden'); root.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      bindModalActions(type);
+    }
+    function closeModal() { const root = document.getElementById('modalRoot'); root.classList.add('hidden'); root.classList.remove('flex'); document.body.style.overflow = ''; }
+    function bindModalActions(type) {
+      document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', closeModal));
+      document.querySelectorAll('[data-modal-route]').forEach(b => b.addEventListener('click', () => { closeModal(); routeTo(b.dataset.modalRoute); }));
+      if (type === 'payment') document.getElementById('confirmPayment').addEventListener('click', () => { const btn = document.getElementById('confirmPayment'); btn.textContent = '正在确认 PayPal 通知…'; btn.disabled = true; setTimeout(() => { state.balance += Number(state.selectedPack?.coins || 220); updateAccountUI(); openModal('payment-success'); }, 800); });
+      if (type === 'delete') document.getElementById('confirmDelete').addEventListener('click', () => { if (pendingDeleteTarget) document.getElementById(pendingDeleteTarget)?.remove(); closeModal(); showToast('已删除，媒体进入清理队列'); updateEmptyWorks(); });
+      if (type === 'review') document.querySelectorAll('[data-review]').forEach(b => b.addEventListener('click', () => runReviewScenario(b.dataset.review)));
+      document.querySelectorAll('[data-action="download-work"]').forEach(b => b.addEventListener('click', () => showToast('下载任务已开始')));
+    }
+
+    function updateEmptyWorks(force) {
+      const cards = document.querySelectorAll('.work-card');
+      const empty = force === true || cards.length === 0;
+      document.getElementById('worksEmpty').classList.toggle('hidden', !empty);
+      document.getElementById('worksGrid').classList.toggle('hidden', empty);
+    }
+
+    function renderWorkMetadata() {
+      document.querySelectorAll('[data-work-execution]').forEach((element) => {
+        element.textContent = executionLabel({
+          mode: element.dataset.mode,
+          executionType: element.dataset.executionType
+        });
+      });
+    }
+
+    function showReviewResult(isDemo) {
+      const task = {
+        id: isDemo ? 'review-demo-result' : 'review-real-result',
+        mode: 'standard',
+        duration: 5,
+        executionType: isDemo ? 'local_demo' : 'minimax',
+        isDemo,
+        fallbackReason: isDemo ? 'provider_unavailable' : null,
+        status: 'succeeded'
+      };
+      const video = document.getElementById('generationVideo');
+      video.poster = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1280"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#9bd8c4"/><stop offset="1" stop-color="#17312f"/></linearGradient></defs><rect width="720" height="1280" fill="url(#g)"/><circle cx="360" cy="420" r="92" fill="#e9b98c"/><path d="M220 560 Q360 500 500 560 L550 1120 L170 1120 Z" fill="#071b1b"/><text x="360" y="1210" text-anchor="middle" fill="white" font-family="sans-serif" font-size="32">Vireal review video</text></svg>')}`;
+      persistVideoTask(task);
+      routeTo('generation');
+      updateGenerationFromTask({
+        id: task.id,
+        mode: task.mode,
+        duration: task.duration,
+        execution_type: task.executionType,
+        is_demo: task.isDemo,
+        fallback_reason: task.fallbackReason,
+        status: task.status
+      });
+    }
+
+    function runReviewScenario(type) {
+      closeModal();
+      if (type === 'real-result') showReviewResult(false);
+      if (type === 'demo-result') showReviewResult(true);
+      if (type === 'region') { state.regionLocked = true; routeTo('region-locked'); }
+      if (type === 'empty') { routeTo('works'); updateEmptyWorks(true); }
+      if (type === 'network') { routeTo('create'); setTimeout(() => showToast('网络连接已断开，请检查网络后重试。照片仍保留在本页。', true), 300); }
+      if (type === 'reset') { clearTimeout(videoTaskPollTimer); sessionStorage.clear(); state.loggedIn = false; state.balance = 30; state.regionLocked = false; state.uploads = {}; state.currentTask = null; updateAccountUI(); renderCreate(); routeTo('home'); showToast('原型状态已重置'); }
+    }
+
+    function readStoredVideoTask() {
+      try {
+        const task = JSON.parse(sessionStorage.getItem(VIDEO_TASK_STORAGE_KEY) || 'null');
+        return task && typeof task.id === 'string' ? task : null;
+      } catch (_) {
+        sessionStorage.removeItem(VIDEO_TASK_STORAGE_KEY);
+        return null;
+      }
+    }
+
+    function persistVideoTask(task) {
+      state.currentTask = task;
+      sessionStorage.setItem(VIDEO_TASK_STORAGE_KEY, JSON.stringify(task));
+    }
+
+    function createIdempotencyKey() {
+      return typeof crypto.randomUUID === 'function'
+        ? `h5-${crypto.randomUUID()}`
+        : `h5-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function getVideoSubmission(uploadId) {
+      const fingerprint = `dance:${state.mode}:${uploadId}:${state.duration}`;
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(VIDEO_SUBMISSION_STORAGE_KEY) || 'null');
+        if (stored?.fingerprint === fingerprint && stored?.idempotencyKey) return stored;
+      } catch (_) {
+        // Replace corrupt local state with a new idempotency key below.
+      }
+      const submission = { fingerprint, idempotencyKey: createIdempotencyKey() };
+      sessionStorage.setItem(VIDEO_SUBMISSION_STORAGE_KEY, JSON.stringify(submission));
+      return submission;
+    }
+
+    function isReplicateCreditError(error) {
+      return /insufficient credit|purchase credit|account\/billing/i.test(String(error || ''));
+    }
+
+    function videoTaskFailureCopy(payload) {
+      if (isReplicateCreditError(payload.error)) {
+        return [
+          '真实视频服务暂不可用',
+          '真实生成额度不足，且本次演示降级未能完成。请稍后再试。'
+        ];
+      }
+      return ['本次生成未完成', payload.error || '视频生成服务返回失败。'];
+    }
+
+    function updateGenerationFromTask(payload) {
+      const task = state.currentTask || { id: payload.id };
+      const previousStatus = task.status;
+      const failureCopy = videoTaskFailureCopy(payload);
+      task.status = payload.status;
+      task.mode = payload.mode || task.mode || state.mode;
+      task.duration = payload.duration || task.duration || state.duration;
+      task.executionType = payload.execution_type || task.executionType || null;
+      task.isDemo = typeof payload.is_demo === 'boolean' ? payload.is_demo : Boolean(task.isDemo);
+      task.fallbackReason = payload.fallback_reason || task.fallbackReason || null;
+      const quota = payload.quota || payload;
+      if (Number.isInteger(quota.user_real_remaining)) state.userRealRemaining = quota.user_real_remaining;
+      if (Number.isInteger(quota.wan_global_remaining)) state.wanGlobalRemaining = quota.wan_global_remaining;
+      state.mode = task.mode;
+      state.duration = task.duration;
+      persistVideoTask(task);
+
+      const video = document.getElementById('generationVideo');
+      const demoResultBadge = document.getElementById('demoResultBadge');
+      const generationExecutionLabel = document.getElementById('generationExecutionLabel');
+      const progressPanel = document.getElementById('generationProgressPanel');
+      const title = document.getElementById('generationTitle');
+      const subtitle = document.getElementById('generationSubtitle');
+      const progress = document.getElementById('progressValue');
+      const ring = document.getElementById('progressRing');
+      const taskExecutionLabel = executionLabel(task);
+      const display = {
+        submitting: ['正在提交生成任务', `${taskExecutionLabel} · ${t('statusSubmitting')}`, '15%', '15%'],
+        pending: ['任务已进入生成队列', `${taskExecutionLabel} · ${t('statusQueued')}`, '25%', '25%'],
+        running: ['正在让照片动起来', `${taskExecutionLabel} · ${t('statusRunning')}`, '62%', '62%'],
+        rendering_demo: ['正在生成演示动画', `${taskExecutionLabel} · ${t('statusRenderingDemo')}`, '72%', '72%'],
+        saving: ['生成完成，正在安全转存', `${taskExecutionLabel} · ${t('statusSaving')}`, '88%', '88%'],
+        submission_unknown: ['提交结果暂时无法确认', payload.error || '系统不会自动重提，以避免重复计费；仍会等待已签名 Webhook。', '!', '100%'],
+        failed: [failureCopy[0], failureCopy[1], '!', '100%'],
+        canceled: ['生成任务已取消', payload.error || '本次任务没有输出视频。', '!', '100%'],
+        expired: ['作品已过期', '图片和视频已按 24 小时规则清理。', '—', '100%']
+      }[payload.status];
+
+      if (payload.status === 'succeeded') {
+        state.generation = 'ready';
+        progressPanel.classList.add('hidden');
+        video.classList.remove('hidden');
+        generationExecutionLabel.textContent = taskExecutionLabel;
+        generationExecutionLabel.classList.remove('hidden');
+        demoResultBadge.textContent = t('demoResult');
+        demoResultBadge.classList.toggle('hidden', !task.isDemo);
+        if (payload.playback_url && video.src !== payload.playback_url) {
+          video.src = payload.playback_url;
+          video.load();
+        }
+        if (previousStatus !== 'succeeded') showToast(t('statusReady'));
+        return;
+      }
+
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.classList.add('hidden');
+      generationExecutionLabel.classList.add('hidden');
+      demoResultBadge.classList.add('hidden');
+      progressPanel.classList.remove('hidden');
+      if (display) {
+        title.textContent = display[0];
+        subtitle.textContent = display[1];
+        progress.textContent = display[2];
+        ring.style.setProperty('--progress', display[3]);
+      }
+      if (['failed', 'canceled', 'submission_unknown'].includes(payload.status)) {
+        state.generation = 'failed';
+      } else {
+        state.generation = 'processing';
+      }
+      document.getElementById('generationRetryButton').classList.toggle(
+        'hidden',
+        !['failed', 'canceled'].includes(payload.status)
+      );
+    }
+
+    function shouldPollVideoTask(status) {
+      return !['succeeded', 'failed', 'canceled', 'expired'].includes(status);
+    }
+
+    async function pollBackendVideoTask() {
+      clearTimeout(videoTaskPollTimer);
+      const task = state.currentTask;
+      if (!backendMode || !state.loggedIn || !task?.id) return;
+      try {
+        const response = await authenticatedFetch(apiUrl(`/api/v1/app/video-tasks/${task.id}`));
+        if (!response.ok) throw new Error(await responseError(response));
+        const payload = await response.json();
+        updateGenerationFromTask(payload);
+        if (shouldPollVideoTask(payload.status)) {
+          videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+        }
+      } catch (error) {
+        if (isExpiredBackendSession(error)) return await clearExpiredBackendSession();
+        document.getElementById('generationSubtitle').textContent = `状态查询失败：${backendErrorMessage(error)}，3 秒后重试。`;
+        videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+      }
+    }
+
+    function resumeBackendVideoTask() {
+      if (!backendMode || !state.loggedIn) return false;
+      const stored = readStoredVideoTask();
+      if (!stored) return false;
+      state.currentTask = stored;
+      state.mode = stored.mode || state.mode;
+      state.duration = stored.duration || state.duration;
+      routeTo('generation', true);
+      void pollBackendVideoTask();
+      return true;
+    }
+
+    async function submitBackendVideoTask() {
+      const upload = Object.values(state.uploads)[0];
+      const submission = getVideoSubmission(upload.uploadId);
+      const button = document.getElementById('generateButton');
+      button.disabled = true;
+      button.classList.add('opacity-60');
+      button.firstElementChild.textContent = '正在提交…';
+      try {
+        const response = await authenticatedFetch(apiUrl('/api/v1/app/video-tasks'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': submission.idempotencyKey
+          },
+          body: JSON.stringify({
+            template_id: 'dance',
+            mode: state.mode,
+            upload_ids: [upload.uploadId],
+            duration: state.duration
+          })
+        });
+        if (!response.ok) {
+          if (response.status < 500) sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+          throw new Error(await responseError(response));
+        }
+        const payload = await response.json();
+        if (!payload.id || !payload.status) throw new Error('任务响应缺少 id 或 status');
+        const task = {
+          id: payload.id,
+          idempotencyKey: submission.idempotencyKey,
+          mode: state.mode,
+          duration: state.duration,
+          executionType: payload.execution_type,
+          isDemo: Boolean(payload.is_demo),
+          fallbackReason: payload.fallback_reason || null,
+          status: payload.status
+        };
+        persistVideoTask(task);
+        sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+        routeTo('generation');
+        updateGenerationFromTask(payload);
+        if (shouldPollVideoTask(payload.status)) {
+          videoTaskPollTimer = setTimeout(pollBackendVideoTask, VIDEO_TASK_POLL_MS);
+        }
+        showToast(payload.execution_type === 'local_demo'
+          ? '真实服务暂不可用，正在制作演示结果'
+          : '真实任务已提交，本次体验免费');
+      } catch (error) {
+        if (isExpiredBackendSession(error)) return await clearExpiredBackendSession();
+        showToast(`生成任务提交失败：${backendErrorMessage(error)}`, true);
+      } finally {
+        button.disabled = false;
+        button.classList.remove('opacity-60');
+        button.firstElementChild.textContent = '免费生成视频';
+      }
+    }
+
+    async function startGeneration() {
+      if (backendMode && readStoredVideoTask()) {
+        resumeBackendVideoTask();
+        showToast('已恢复当前真实生成任务，请勿重复提交');
+        return;
+      }
+      const need = selectedTemplate().people;
+      const uploaded = Object.keys(state.uploads).length;
+      if (uploaded < need) {
+        document.querySelectorAll('[data-upload-zone]').forEach(z => z.classList.add('error'));
+        showToast(`还需要上传 ${need - uploaded} 张照片`, true); return;
+      }
+      if (backendMode && !Object.values(state.uploads).every(entry => entry && entry.status === 'verified')) {
+        showToast('请等待所有图片完成 R2 私有读取验证', true); return;
+      }
+      if (backendMode && !Object.values(state.uploads).every(entry => entry.uploadId)) {
+        showToast('上传响应缺少 upload_id，请重新上传图片', true); return;
+      }
+      if (backendMode) return submitBackendVideoTask();
+      state.generation = 'processing';
+      routeTo('generation'); showToast('演示任务已提交，本次体验免费');
+    }
+
+    function completeGeneration(failed = false) {
+      if (state.generation === 'failed' || state.generation === 'ready') {
+        showToast(state.generation === 'failed' ? '失败状态已记录，请勿重复操作' : '视频已经生成');
+        return;
+      }
+      if (failed) {
+        state.generation = 'failed';
+        document.getElementById('generationTitle').textContent = '本次生成未完成';
+        document.getElementById('generationSubtitle').textContent = '本次体验免费，没有产生金币消耗。';
+        document.getElementById('progressValue').textContent = '!';
+        document.getElementById('progressRing').style.setProperty('--progress','100%');
+        showToast('演示失败，没有产生金币消耗');
+        return;
+      }
+      state.generation = 'ready';
+      document.getElementById('generationTitle').textContent = '视频已生成';
+      document.getElementById('generationSubtitle').textContent = '作品将在 24 小时内可播放和下载。';
+      document.getElementById('progressValue').textContent = '✓';
+      document.getElementById('progressRing').style.setProperty('--progress','100%');
+      document.getElementById('progressStep3').classList.remove('opacity-45','bg-white/[.03]'); document.getElementById('progressStep3').classList.add('bg-white/8');
+      showToast('视频已保存到作品记录');
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
+      document.getElementById('langToggle').textContent = state.language === 'zh' ? '中' : 'EN';
+      document.querySelectorAll('[data-i18n]').forEach(el => { const val = translations[state.language][el.dataset.i18n]; if (val) el.textContent = val; });
+      if (backendMode) {
+        document.querySelector('[data-i18n="heroDesc"]').textContent = state.language === 'zh'
+          ? '上传一张已授权的成年人全身照，生成 5 或 10 秒的私有静音跳舞视频。'
+          : 'Upload one authorized full-body photo of an adult to create a private 5- or 10-second silent dance video.';
+        document.querySelector('[data-i18n="templatesDesc"]').textContent = state.language === 'zh'
+          ? '固定使用单人跳舞提示词，普通模式使用 MiniMax，高级模式使用 Wan。'
+          : 'A controlled solo-dance prompt routes Standard to MiniMax and Advanced to Wan.';
+      }
+      renderTemplateCards(); renderCreate(); renderWorkMetadata();
+      if (state.currentTask) {
+        document.getElementById('generationExecutionLabel').textContent = executionLabel(state.currentTask);
+        document.getElementById('demoResultBadge').textContent = t('demoResult');
+      }
+      localStorage.setItem('virealLang', state.language);
+    }
+
+    function applyBackendModeUI() {
+      const banner = document.getElementById('backendModeBanner');
+      if (!backendMode) return;
+      banner.classList.remove('hidden');
+      banner.classList.add('flex');
+      banner.innerHTML = `<span class="h-2 w-2 rounded-full bg-mint"></span><span>双模式实链路测试 · 本次体验免费 · API ${new URL(API_BASE_URL).host}</span>`;
+      document.getElementById('deviceHint').textContent = '受邀请用户可通过邮箱验证码、Google 或 Apple 安全登录。';
+      document.getElementById('audioSpec').textContent = '静音';
+      document.getElementById('heroDurationSpec').innerHTML = '<b class="text-mint">✓</b> 5 / 10 sec';
+      document.getElementById('heroAudioSpec').innerHTML = '<b class="text-mint">✓</b> Silent output';
+      document.getElementById('heroAudioIcon').textContent = '∅';
+      document.getElementById('heroModelLabel').textContent = 'DANCE · MINIMAX / WAN';
+      document.getElementById('homeUploadCount').textContent = '上传 1 张真实全身照';
+      document.getElementById('privacyStorageCopy').textContent = '原图和视频存储在私有 Cloudflare R2，仅你本人可通过短期授权地址访问，并在 24 小时后进入清理。';
+      document.getElementById('uploadGuidance').textContent = t('uploadDisclosure');
+      document.getElementById('generateButton').firstElementChild.textContent = t('freeGeneration');
+      document.getElementById('generationDemoActions').classList.add('hidden');
+      document.getElementById('progressStep3').innerHTML = '<span class="grid h-7 w-7 place-items-center rounded-full border border-white/25 text-xs font-black">3</span><b class="mt-3 block text-sm">安全转存</b><span class="text-[11px] text-white/40">写入私有 Cloudflare R2</span>';
+    }
+
+    function applyFocusMode() {
+      if (!focus) return;
+      document.body.classList.add('focus-mode');
+      document.getElementById('focusLabel').textContent = `专注演示 · ${focus}`;
+      document.querySelectorAll('[data-focus-zone]').forEach(el => {
+        const allowed = (el.dataset.focusZone || '').split(/\s+/);
+        el.classList.toggle('focus-locked', !allowed.includes(focus));
+      });
+      const routeMap = { home:'home', templates:'home', privacy:'home', login:'login', region:'region-locked', create:'create', template:'create', upload:'create', mode: 'create', duration:'create', summary:'create', generation:'generation', works:'works', wallet:'wallet', payment:'wallet', account:'account' };
+      const target = routeMap[focus] || 'home';
+      document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === target));
+    }
+
+    document.addEventListener('click', e => {
+      const routeBtn = e.target.closest('[data-route]');
+      if (routeBtn) { e.preventDefault(); ensureAuthThen(routeBtn.dataset.route); }
+      const modalBtn = e.target.closest('[data-modal]');
+      if (modalBtn) openModal(modalBtn.dataset.modal);
+      const scrollBtn = e.target.closest('[data-scroll]');
+      if (scrollBtn) document.getElementById(scrollBtn.dataset.scroll)?.scrollIntoView({behavior:'smooth'});
+      const action = e.target.closest('[data-action]');
+      if (action) {
+        if (action.dataset.action === 'play-work') openModal('player');
+        if (action.dataset.action === 'download-work') showToast('下载任务已开始');
+        if (action.dataset.action === 'delete-work') { pendingDeleteTarget = action.dataset.target; openModal('delete'); }
+        if (action.dataset.action === 'complete-generation') completeGeneration(false);
+        if (action.dataset.action === 'simulate-failure') completeGeneration(true);
+        if (action.dataset.action === 'retry-generation') {
+          clearTimeout(videoTaskPollTimer);
+          state.currentTask = null;
+          state.generation = 'processing';
+          sessionStorage.removeItem(VIDEO_TASK_STORAGE_KEY);
+          sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+          routeTo('create');
+          showToast('旧失败记录已关闭；充值 Replicate 后只点击一次生成');
+        }
+      }
+    });
+
+    document.getElementById('closeModal').addEventListener('click', closeModal);
+    document.getElementById('modalRoot').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+    document.getElementById('langToggle').addEventListener('click', () => { state.language = state.language === 'zh' ? 'en' : 'zh'; applyLanguage(); showToast(state.language === 'zh' ? '已切换为简体中文' : 'Switched to English'); });
+    document.getElementById('accountLang').addEventListener('click', () => document.getElementById('langToggle').click());
+    document.getElementById('logoutButton').addEventListener('click', async () => {
+      clearTimeout(videoTaskPollTimer);
+      resetUploads();
+      await revokeBackendSession();
+      if (window.VirealClerk) await window.VirealClerk.signOut();
+      state.loggedIn = false;
+      state.appToken = '';
+      state.appUser = null;
+      state.currentTask = null;
+      sessionStorage.removeItem(VIDEO_TASK_STORAGE_KEY);
+      sessionStorage.removeItem(VIDEO_SUBMISSION_STORAGE_KEY);
+      updateAccountUI();
+      routeTo('home');
+      showToast('已退出登录');
+    });
+    document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
+      state.mode = button.dataset.mode;
+      renderGenerationMode();
+      renderCreate();
+    }));
+    document.querySelectorAll('.duration-btn').forEach(btn => btn.addEventListener('click', () => { state.duration = Number(btn.dataset.duration); renderCreate(); }));
+    document.getElementById('generateButton').addEventListener('click', startGeneration);
+    document.querySelectorAll('.coin-pack').forEach(btn => btn.addEventListener('click', () => {
+      if (backendMode) return showToast('PoC 页面金币是演示值，不能为 Replicate 账户充值', true);
+      state.selectedPack = { coins:Number(btn.dataset.pack), price:btn.dataset.price };
+      openModal('payment');
+    }));
+    window.addEventListener('hashchange', () => { if (!focus) ensureAuthThen(location.hash.slice(1) || 'home'); });
+    window.addEventListener('online', () => showToast('网络已恢复'));
+    window.addEventListener('offline', () => showToast('网络连接已断开，当前操作不会提交', true));
+    window.addEventListener('vireal:clerk-ready', event => setupClerk(event.detail));
+    window.addEventListener('vireal:clerk-error', event => {
+      state.authReady = true;
+      document.getElementById('clerkStatus').textContent = `登录服务加载失败：${event.detail.message}`;
+      showToast('登录服务暂时不可用，请稍后重试', true);
+    });
+
+    updateAccountUI();
+    applyLanguage();
+    applyBackendModeUI();
+    const initialRoute = focus ? 'home' : (location.hash.slice(1) || 'home');
+    if (state.regionLocked && !focus && initialRoute !== 'home') routeTo('region-locked', true); else ensureAuthThen(initialRoute);
+    if (window.VirealClerk) setupClerk(window.VirealClerk);
+    if (backendMode && state.loggedIn) resumeBackendVideoTask();
+    applyFocusMode();
+  </script>
+</body>
+</html>

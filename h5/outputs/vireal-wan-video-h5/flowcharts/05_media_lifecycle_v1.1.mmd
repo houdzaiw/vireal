@@ -1,0 +1,50 @@
+flowchart LR
+    upload([上传原图])
+    input[(R2 私有输入对象)]
+    record[记录所有者与二十四小时到期时间]
+    accepted{图片校验通过?}
+    reject[拒绝创建任务]
+    signed[服务端签发一小时输入地址]
+    execution{执行路径}
+    provider[MiniMax 或 Wan]
+    demo[Worker 读取原图生成动画]
+    temp[外部临时视频]
+    verify[限制大小并验证视频]
+    output[(R2 私有 MP4 对象)]
+    playback[服务端签发五分钟播放地址]
+    refresh{播放地址过期?}
+    direct{未签名直接访问?}
+    deny[拒绝访问]
+    expiry{到达二十四小时?}
+    purge[Worker 删除输入和输出]
+    expired[任务标记 expired]
+    done([媒体生命周期结束])
+
+    upload --> input
+    input --> record
+    record --> accepted
+    accepted -->|否| reject
+    accepted -->|是| signed
+    signed --> execution
+    execution -->|真实生成| provider
+    execution -->|演示降级| demo
+    provider --> temp
+    temp --> verify
+    verify --> output
+    demo --> output
+    output --> playback
+    playback --> refresh
+    refresh -->|是| playback
+    refresh -->|否| expiry
+    output --> direct
+    direct -->|是| deny
+    expiry -->|否| playback
+    expiry -->|是| purge
+    purge --> expired
+    expired --> done
+
+    style reject fill:#FFCDC2,stroke:#FF7556
+    style deny fill:#FFCDC2,stroke:#FF7556
+    style purge fill:#CDF4D3,stroke:#66D575
+    style output fill:#C6FAF6,stroke:#5AD8CC
+

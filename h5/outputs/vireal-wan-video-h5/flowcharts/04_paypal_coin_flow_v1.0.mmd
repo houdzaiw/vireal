@@ -1,0 +1,29 @@
+flowchart LR
+    select([选择金币包])
+    order[创建待支付订单]
+    paypal[进入 PayPal 收银台]
+    paid{用户完成支付?}
+    callback[接收支付通知]
+    verify{签名金额币种有效?}
+    duplicate{事件已处理?}
+    credit[原子增加金币]
+    pending[保持订单处理中]
+    reject[记录异常并告警]
+    success([展示到账结果])
+
+    select --> order
+    order --> paypal
+    paypal --> paid
+    paid -->|否| pending
+    paid -->|是| callback
+    callback --> verify
+    verify -->|否| reject
+    verify -->|是| duplicate
+    duplicate -->|是| success
+    duplicate -->|否| credit
+    credit --> success
+
+    style credit fill:#CDF4D3,stroke:#66D575
+    style pending fill:#FFECBD,stroke:#FFC943
+    style reject fill:#FFCDC2,stroke:#FF7556
+

@@ -1,0 +1,6 @@
+.DS_Store
+dist/
+node_modules/
+tests/__pycache__/
+server/
+.worktrees/

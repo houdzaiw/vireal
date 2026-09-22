@@ -1,0 +1,54 @@
+flowchart TD
+    visit([访问 Vireal H5])
+    login[设备登录]
+    choose[选择单人跳舞]
+    upload[/上传一张成年人全身照/]
+    valid{图片有效且属于当前用户?}
+    mode[选择普通或高级模式]
+    duration{模式与时长匹配?}
+    submit[携带幂等键提交任务]
+    execution{实际执行类型}
+    minimax[普通模式 MiniMax]
+    wan[高级模式 Wan]
+    demo[本地简单动画]
+    progress[每三秒查询并支持刷新恢复]
+    outcome{任务结果}
+    unknown[显示结果待确认且禁止自动重提]
+    failed[显示失败原因与重新上传入口]
+    player[统一播放器和下载入口]
+    badge{是否演示结果?}
+    label[显示不可隐藏的演示结果标识]
+    retention[私有保存二十四小时]
+    expire([过期后停止签发地址并物理清理])
+
+    visit --> login
+    login --> choose
+    choose --> upload
+    upload --> valid
+    valid -->|否| upload
+    valid -->|是| mode
+    mode --> duration
+    duration -->|否| mode
+    duration -->|是| submit
+    submit --> execution
+    execution -->|标准真实生成| minimax
+    execution -->|高级真实生成| wan
+    execution -->|额度或服务降级| demo
+    minimax --> progress
+    wan --> progress
+    demo --> progress
+    progress --> outcome
+    outcome -->|提交结果不明确| unknown
+    outcome -->|最终失败| failed
+    outcome -->|成功| player
+    player --> badge
+    badge -->|是| label
+    badge -->|否| retention
+    label --> retention
+    retention --> expire
+
+    style demo fill:#FFECBD,stroke:#FFC943
+    style unknown fill:#FFECBD,stroke:#FFC943
+    style failed fill:#FFCDC2,stroke:#FF7556
+    style player fill:#C6FAF6,stroke:#5AD8CC
+

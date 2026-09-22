@@ -1,0 +1,43 @@
+stateDiagram-v2
+    [*] --> submitting
+    submitting --> pending: prediction 已创建
+    submitting --> running: provider 已开始
+    submitting --> rendering_demo: 配额耗尽或明确可降级错误
+    submitting --> submission_unknown: 创建结果不明确
+    submitting --> failed: 输入或安全拒绝
+
+    pending --> running: provider processing
+    pending --> saving: Webhook succeeded
+    running --> saving: Webhook succeeded
+    pending --> rendering_demo: provider 明确失败且允许降级
+    running --> rendering_demo: provider 明确失败且允许降级
+    pending --> failed: 安全拒绝
+    running --> failed: 安全拒绝
+
+    rendering_demo --> saving: FFmpeg 输出完成
+    rendering_demo --> failed: 本地重试耗尽
+    saving --> saving: 下载 转码或 R2 写入重试
+    saving --> succeeded: 私有 R2 输出已保存
+    saving --> failed: Worker 重试耗尽
+
+    submission_unknown --> pending: 可靠 Webhook 确认创建
+    submission_unknown --> running: 可靠 Webhook 确认运行
+    submission_unknown --> saving: 可靠 Webhook 确认成功
+    submission_unknown --> failed: 人工确认未创建或失败
+
+    succeeded --> expired: 到达二十四小时
+    failed --> expired: 到达清理时间
+    canceled --> expired: 到达清理时间
+    expired --> [*]
+
+    note right of submission_unknown
+        不自动重提
+        不自动降级
+        保持额度预留
+    end note
+
+    note right of rendering_demo
+        不调用外部模型
+        只允许重试本地处理
+    end note
+

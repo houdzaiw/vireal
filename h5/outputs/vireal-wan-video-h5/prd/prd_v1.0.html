@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vireal Wan Video H5 - PRD v1.0</title>
+  <style>
+    :root {
+      --bg: #f5f3ed;
+      --surface: #fffdf8;
+      --surface-soft: #f7f8f5;
+      --text: #071b1b;
+      --muted: #66736f;
+      --line: #dde3df;
+      --brand: #126c58;
+      --brand-soft: #e5f8f1;
+      --success: #067647;
+      --success-soft: #ecfdf3;
+      --warning: #b54708;
+      --warning-soft: #fffaeb;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --info: #175cd3;
+      --info-soft: #eff8ff;
+      --shadow: 0 16px 38px rgba(16, 24, 40, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { max-width: 1480px; margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; padding: 28px; }
+    .toc {
+      position: sticky;
+      top: 24px;
+      height: calc(100vh - 48px);
+      overflow: auto;
+      background: #071b1b;
+      color: #d1d5db;
+      border-radius: 18px;
+      padding: 22px 18px;
+      box-shadow: var(--shadow);
+    }
+    .toc .eyebrow { color: #43e2b0; }
+    .toc h2 { margin: 4px 0 18px; color: white; font-size: 18px; }
+    .toc a { display: block; color: #cbd5e1; padding: 7px 9px; border-radius: 8px; font-size: 13px; }
+    .toc a:hover { background: rgba(255,255,255,.08); color: white; text-decoration: none; }
+    .toc .meta { margin-top: 22px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; font-size: 12px; color: #94a3b8; }
+    main { min-width: 0; }
+    .hero {
+      overflow: hidden;
+      position: relative;
+      padding: 42px;
+      border-radius: 22px;
+      color: white;
+      background: linear-gradient(135deg, #071b1b 0%, #123f38 62%, #126c58 100%);
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      right: -80px;
+      top: -110px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+    }
+    .hero h1 { margin: 8px 0 12px; font-size: clamp(30px, 4vw, 50px); line-height: 1.1; letter-spacing: -1.5px; }
+    .hero p { max-width: 820px; margin: 0; color: #d7f5eb; font-size: 17px; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+    .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 700; }
+    .hero .pill { color: white; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.12); }
+    section { margin-top: 26px; padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 8px 24px rgba(16,24,40,.04); }
+    h2 { margin: 0 0 22px; font-size: 26px; line-height: 1.25; letter-spacing: -.5px; }
+    h3 { margin: 28px 0 12px; font-size: 18px; }
+    h4 { margin: 20px 0 8px; font-size: 15px; }
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 8px 0 18px; padding-left: 22px; }
+    li { margin: 5px 0; }
+    .eyebrow { font-size: 11px; letter-spacing: 1.7px; text-transform: uppercase; font-weight: 800; color: var(--brand); }
+    .muted { color: var(--muted); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-soft); }
+    .card h3, .card h4 { margin-top: 0; }
+    .metric { font-size: 28px; font-weight: 800; color: var(--brand); letter-spacing: -1px; }
+    .callout { padding: 16px 18px; border-left: 4px solid; border-radius: 10px; margin: 16px 0; }
+    .callout.info { background: var(--info-soft); border-color: var(--info); }
+    .callout.warning { background: var(--warning-soft); border-color: var(--warning); }
+    .callout.danger { background: var(--danger-soft); border-color: var(--danger); }
+    .callout.success { background: var(--success-soft); border-color: var(--success); }
+    .badge { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 800; }
+    .p0 { color: #9c2a10; background: #ffead5; }
+    .p1 { color: #175cd3; background: #eff8ff; }
+    .p2 { color: #475467; background: #f2f4f7; }
+    .on { color: var(--success); background: var(--success-soft); }
+    .off { color: var(--warning); background: var(--warning-soft); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; margin: 14px 0 22px; }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-size: 13px; }
+    th { background: #f9fafb; color: #475467; font-size: 12px; text-transform: uppercase; letter-spacing: .35px; }
+    tr:last-child td { border-bottom: 0; }
+    code { padding: 2px 5px; border-radius: 6px; background: #f2f4f7; color: #344054; font-size: 12px; }
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 9px; align-items: stretch; margin: 16px 0 24px; }
+    .flow div { position: relative; display: grid; place-items: center; min-height: 72px; padding: 12px; text-align: center; border-radius: 12px; background: var(--brand-soft); color: #126c58; font-size: 12px; font-weight: 700; }
+    .flow div:not(:last-child)::after { content: "→"; position: absolute; right: -9px; z-index: 2; color: #126c58; }
+    .status-line { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .status-line span { padding: 7px 10px; border-radius: 8px; background: #f2f4f7; font-size: 12px; font-weight: 700; }
+    .placeholder { border: 1px dashed #b9b3ea; background: #faf9ff; border-radius: 14px; padding: 24px; color: #6254a8; text-align: center; }
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li { position: relative; padding-left: 25px; }
+    .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: 900; }
+    .hero-tools { position: absolute; top: 22px; right: 22px; z-index: 2; display: flex; align-items: center; gap: 8px; }
+    .hero-tools label { font-size: 11px; color: rgba(255,255,255,.65); font-weight: 700; }
+    .hero-tools select { border: 1px solid rgba(255,255,255,.24); border-radius: 999px; padding: 7px 28px 7px 12px; color: white; background: rgba(255,255,255,.12); font: inherit; font-size: 12px; font-weight: 800; outline: none; }
+    .hero-tools option { color: var(--text); background: white; }
+    .feature-module { margin: 24px 0; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, #fff 0%, #fbfcfa 100%); }
+    .feature-module > h3 { display: flex; align-items: center; gap: 10px; margin-top: 0; font-size: 20px; }
+    .feature-number { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #071b1b; color: #43e2b0; font-size: 12px; }
+    .feature-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, .78fr); gap: 22px; align-items: start; }
+    .logic-rules { min-width: 0; }
+    .logic-rules h4 { margin-top: 16px; }
+    .logic-rules ul { font-size: 13px; }
+    .mermaid-wrap { overflow: auto; min-height: 220px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+    .mermaid { display: flex; justify-content: center; min-width: 560px; }
+    .prototype-panel { overflow: auto; padding: 14px; border-radius: 18px; background: #071b1b; box-shadow: 0 18px 38px rgba(7,27,27,.18); }
+    .prototype-label { display: flex; justify-content: space-between; gap: 12px; margin: 0 2px 12px; color: white; font-size: 11px; font-weight: 800; }
+    .prototype-label span:last-child { color: #43e2b0; }
+    .device-frame { width: 390px; max-width: 100%; height: 620px; margin: 0 auto; overflow: hidden; border-radius: 22px; background: #f5f3ed; }
+    .device-frame iframe { width: 390px; height: 812px; max-width: none; border: 0; background: transparent; transform-origin: top left; }
+    .diagram-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .diagram-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-soft); }
+    .diagram-card h3 { margin-top: 0; }
+    .diagram-card .mermaid { min-width: 520px; }
+    .source-link { display: inline-flex; margin-top: 10px; font-size: 12px; font-weight: 700; }
+    .delivery-check { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+    .delivery-check div { padding: 12px 14px; border-radius: 11px; background: var(--success-soft); color: var(--success); font-size: 12px; font-weight: 800; }
+    footer { padding: 26px 8px 50px; text-align: center; color: var(--muted); font-size: 12px; }
+
+    @media (max-width: 980px) {
+      .page { grid-template-columns: 1fr; padding: 16px; }
+      .toc { position: static; height: auto; }
+      .toc nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .feature-content, .diagram-grid, .delivery-check { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .flow div:not(:last-child)::after { content: "↓"; right: auto; bottom: -12px; }
+      .hero { padding: 30px 24px; }
+      section { padding: 24px 18px; }
+      .hero-tools { position: static; margin-bottom: 18px; justify-content: flex-end; }
+      .feature-module { padding: 18px; }
+      .prototype-panel { padding: 10px; }
+      .device-frame { height: 640px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="toc">
+      <div class="eyebrow">Product Requirement</div>
+      <h2>Vireal Wan Video H5</h2>
+      <nav>
+        <a href="#meta">项目信息与版本</a>
+        <a href="#background">一、需求背景</a>
+        <a href="#goals">二、需求目标</a>
+        <a href="#users">三、用户与场景</a>
+        <a href="#features">四、功能清单</a>
+        <a href="#solution">五、详细方案</a>
+        <a href="#flowchart">六、业务流程图</a>
+        <a href="#exceptions">七、异常与边界</a>
+        <a href="#analytics">八、数据追踪</a>
+        <a href="#roadmap">九、未来规划</a>
+        <a href="#annex">十、附件</a>
+      </nav>
+      <div class="meta">
+        <strong>当前状态</strong><br />
+        最终版 PRD · 原型已确认<br /><br />
+        <strong>产品范围</strong><br />
+        International Web / H5
+      </div>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="hero-tools">
+          <label for="versionSelect">版本</label>
+          <select id="versionSelect" aria-label="版本切换">
+            <option value="prd_v1.0.html" selected>v1.0 · 当前版本</option>
+          </select>
+        </div>
+        <div class="eyebrow">Vireal · Image to Video</div>
+        <h1>真人图片动作视频生成</h1>
+        <p>用户上传一至两张已获授权的成年人全身照片，选择固定动作模板，通过 Replicate 视频模型生成仅自己可见、24 小时内可播放和下载的视频。</p>
+        <div class="hero-meta">
+          <span class="pill">PRD v1.0</span>
+          <span class="pill">2026-09-10</span>
+          <span class="pill">新加坡区域</span>
+          <span class="pill">Web / H5 First</span>
+        </div>
+      </header>
+
+      <section id="meta">
+        <div class="eyebrow">Overview</div>
+        <h2>项目信息与版本记录</h2>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>项目名称</th><td>Vireal Wan Video H5</td><th>文档版本</th><td>v1.0 最终版</td></tr>
+              <tr><th>产品形态</th><td>响应式 Web / H5</td><th>目标市场</th><td>中国大陆以外市场，重点覆盖新加坡、马来西亚及海外华人</td></tr>
+              <tr><th>基础设施</th><td>Singapore App/OSS + Replicate Predictions API</td><th>商业模式</th><td>免费赠送金币 + PayPal Business 美元购买金币包</td></tr>
+              <tr><th>当前项目</th><td>复用 Vireal FastAPI、PostgreSQL/SQLModel、React/Vite 与管理后台基础</td><th>文档状态</th><td>PRD 与原型已确认，可进入 PoC 与技术设计</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>版本</th><th>日期</th><th>变更内容</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>v1.0</td><td>2026-09-10</td><td>确认国际版范围与 Replicate 供应商迁移；完成高保真原型、六份 Mermaid 流程图、功能交互切片、异常分支及交付验收口径。</td><td><span class="badge on">已确认</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout info"><strong>本版关键假设：</strong>新用户首次赠送 30 金币；默认生成规格为 720P、9:16；两项均做成后台配置，原型评审时可调整。</div>
+      </section>
+
+      <section id="background">
+        <div class="eyebrow">Problem</div>
+        <h2>一、需求背景</h2>
+        <h3>1.1 现状与痛点</h3>
+        <div class="grid-2">
+          <div class="card">
+            <h4>用户侧</h4>
+            <ul>
+              <li>普通用户希望快速将真人照片变为具有情绪价值的短视频，但专业视频编辑门槛高。</li>
+              <li>通用模型需要反复编写提示词，动作不稳定、人物身份容易漂移。</li>
+              <li>双人互动尤其容易出现站位混乱、肢体穿插和手部畸变。</li>
+              <li>上传真人照片时，用户会关注隐私、保存时长和是否公开。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>业务侧</h4>
+            <ul>
+              <li>现有 Vireal 项目具备后端、订单事件和后台基础，但没有用户 H5、生成任务和 OSS。</li>
+              <li>视频生成耗时且成本明显高于普通 API，需要可追踪的异步任务和金币账本。</li>
+              <li>个人项目缺少境外公司主体，首期直接接 Stripe 或国内支付会增加准入成本。</li>
+              <li>真人生成涉及肖像授权、内容审核和支付渠道风控，必须在产品入口前置治理。</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>1.2 为什么现在做</h3>
+        <p>Replicate 当前提供 Wan 2.7 R2V、Seedance 2.0 和 Wan 2.2 Animate：前两者作为双人参考图候选，后者把固定动作视频迁移到单张人物图片。Wan R2V 最长 10 秒且多主体效果必须实测；双人 15 秒仅在 Seedance PoC 通过后开放。</p>
+
+        <h3>1.3 产品定位</h3>
+        <p><strong>一句话定位：</strong>面向海外个人用户的私密真人照片动作视频生成工具。</p>
+        <div class="callout warning"><strong>首期不做：</strong>中国大陆注册与付费、公开社区、站内分享、用户自定义提示词、用户上传动作视频、多人以上生成、原生 iOS/Android 应用。</div>
+      </section>
+
+      <section id="goals">
+        <div class="eyebrow">Goals</div>
+        <h2>二、需求目标</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>目标类型</th><th>描述</th><th>衡量指标</th><th>目标值</th></tr></thead>
+            <tbody>
+              <tr><td>产品验证</td><td>用固定模板验证用户是否愿意为真人图片生成短视频付费。</td><td>注册用户首个生成完成率</td><td>≥ 65%</td></tr>
+              <tr><td>功能覆盖</td><td>覆盖双人和单人两类核心动作，降低提示词使用门槛。</td><td>首期可用模板</td><td>4 个开放模板；亲吻模板灰度关闭</td></tr>
+              <tr><td>生成可靠性</td><td>完成从扣币到生成、存储、播放和失败返币的闭环。</td><td>技术任务成功率</td><td>PoC 后目标 ≥ 85%</td></tr>
+              <tr><td>生成体验</td><td>用户提交后可离开页面，并从作品记录查看进度与结果。</td><td>P90 可获取结果时间</td><td>≤ 8 分钟</td></tr>
+              <tr><td>商业健康度</td><td>金币价格覆盖模型、支付、存储和失败波动。</td><td>付费生成贡献毛利率</td><td>≥ 30%</td></tr>
+              <tr><td>隐私保护</td><td>媒体只用于本次生成并按期清理。</td><td>24 小时媒体删除完成率</td><td>100%</td></tr>
+              <tr><td>安全合规</td><td>拒绝未成年人、未授权真人和不允许内容。</td><td>授权声明记录覆盖率</td><td>100%</td></tr>
+              <tr><td>支付质量</td><td>通过 PayPal 完成金币购买并正确处理重复通知。</td><td>重复入账率 / 支付错账率</td><td>0</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>2.1 MVP 验收口径</h3>
+        <ul class="checklist">
+          <li>用户可使用 Apple、Google 或邮箱验证码登录，且同一邮箱能够正确归并账号。</li>
+          <li>用户可完成一人/两人照片上传、质量校验、授权声明、模板和时长选择。</li>
+          <li>系统提交异步生成任务后，用户离开页面不会中断生成。</li>
+          <li>成功任务产生一个视频；任何失败终态只返还一次本次扣除金币。</li>
+          <li>PayPal 支付成功只增加一次金币，伪造或重复 webhook 不得重复入账。</li>
+          <li>视频只对所有者授权访问，到期和主动删除后均无法继续访问。</li>
+        </ul>
+      </section>
+
+      <section id="users">
+        <div class="eyebrow">Audience</div>
+        <h2>三、用户与使用场景</h2>
+        <h3>3.1 典型用户</h3>
+        <div class="grid-3">
+          <div class="card"><h4>海外华人情侣</h4><p class="muted">希望把两张个人照片制作成拥抱或牵手短视频，保存纪念，不希望作品公开。</p></div>
+          <div class="card"><h4>个人娱乐用户</h4><p class="muted">希望用自己的全身照快速制作跳舞、运动短视频，用于个人观看或下载保存。</p></div>
+          <div class="card"><h4>轻度创作用户</h4><p class="muted">不会写提示词，希望选择动作、时长即可完成生成，愿意为更长视频购买金币。</p></div>
+        </div>
+
+        <h3>3.2 核心使用场景</h3>
+        <ul>
+          <li><strong>双人纪念：</strong>用户分别上传两张独立单人全身照，生成拥抱或牵手视频。</li>
+          <li><strong>单人娱乐：</strong>用户上传自己的全身照，生成固定舞蹈视频。</li>
+          <li><strong>运动趣味：</strong>用户上传全身照，生成规范俯卧撑动作视频。</li>
+          <li><strong>后台等待：</strong>提交任务后关闭页面，稍后重新登录查看作品。</li>
+          <li><strong>短期下载：</strong>用户在24小时内播放、下载或主动删除作品。</li>
+        </ul>
+
+        <h3>3.3 User Journey Map</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>阶段</th><th>用户触点</th><th>用户行为</th><th>痛点 / 情绪</th><th>产品机会点</th></tr></thead>
+            <tbody>
+              <tr><td>了解产品</td><td>海外中文渠道、英文落地页</td><td>查看示例、价格和隐私说明</td><td>担心上传照片泄露；不知道效果是否真实</td><td>首屏明确“仅自己可见、24小时删除”，展示带 AI 标识的真实样例</td></tr>
+              <tr><td>区域判断</td><td>落地页区域门控</td><td>系统检查访问地区</td><td>大陆访客不理解为何无法使用</td><td>保留内容浏览，明确提示“当前地区暂未开放服务”</td></tr>
+              <tr><td>登录</td><td>Apple / Google / Email</td><td>选择熟悉方式完成登录</td><td>第三方弹窗失败；多个方式形成重复账号</td><td>按设备排序但展示全部方式；通过已验证邮箱做账号归并</td></tr>
+              <tr><td>选择模板</td><td>创作首页</td><td>选择拥抱、牵手、跳舞或俯卧撑</td><td>不清楚需要几张图、怎样的照片效果好</td><td>模板卡直接标明人数、照片示例、动作与声音说明</td></tr>
+              <tr><td>上传素材</td><td>上传与裁剪页</td><td>上传1或2张真人全身照</td><td>半身、多人、遮挡图片会导致失败</td><td>前置质量检测，具体指出不通过原因，避免无效扣币</td></tr>
+              <tr><td>授权确认</td><td>生成确认页</td><td>逐项确认成年人和肖像授权</td><td>协议文字过长，容易跳过</td><td>短句分项确认，查看完整政策；双人素材分别留档</td></tr>
+              <tr><td>选择时长</td><td>生成配置页</td><td>选择5/10/15秒并查看金币</td><td>金币余额不足；不了解等待时间</td><td>显示余额、扣费、预计1–5分钟和结果保存24小时</td></tr>
+              <tr><td>生成等待</td><td>进度页、作品记录</td><td>提交后离开，稍后回来</td><td>担心关闭页面后任务丢失</td><td>明确“可离开页面”，服务端执行并保存状态</td></tr>
+              <tr><td>查看结果</td><td>作品详情</td><td>播放、下载或删除</td><td>人物可能不像、动作可能失真</td><td>收集轻量满意度；失败自动返币，质量投诉进入人工复核</td></tr>
+              <tr><td>购买金币</td><td>钱包、PayPal Checkout</td><td>选择美元金币包并付款</td><td>跳转第三方支付、等待到账</td><td>明确 PayPal 收银台；支付回调后自动到账并提供订单记录</td></tr>
+              <tr><td>到期清理</td><td>作品记录</td><td>24小时后记录消失</td><td>可能忘记下载</td><td>作品页持续展示剩余时间；到期前可选发送站内/邮件提醒</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="eyebrow">Scope</div>
+        <h2>四、需求功能清单</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>模块</th><th>功能</th><th>优先级</th><th>基础逻辑与规则</th><th>数据流向</th></tr></thead>
+            <tbody>
+              <tr><td>市场门控</td><td>中国大陆限制</td><td><span class="badge p0">P0</span></td><td>大陆访问者可浏览落地页，但注册、登录、购买和生成入口不可用；显示地区未开放提示。服务端必须二次校验，不能只依赖前端。</td><td>IP/风险信号 → Region Policy → Auth/Payment/Generation Gate</td></tr>
+              <tr><td>国际化</td><td>英文 / 简中切换</td><td><span class="badge p0">P0</span></td><td>首次按浏览器语言选择，用户手动选择后写入账户偏好；错误提示、协议和邮件同步国际化。</td><td>Browser Locale → Local Storage / User Profile</td></tr>
+              <tr><td>账户</td><td>Apple、Google、邮箱验证码</td><td><span class="badge p0">P0</span></td><td>iPhone 将 Apple 排第一，Android 将 Google 排第一，但始终可选择其他方式；邮箱验证码短时有效且限制频率。</td><td>OAuth/OTP → Backend Auth → App User + Session</td></tr>
+              <tr><td>账户</td><td>账号归并</td><td><span class="badge p0">P0</span></td><td>只有第三方返回“已验证邮箱”时才自动匹配；冲突时要求用户验证原账户，避免接管。</td><td>Identity Provider → Linked Identity → App User</td></tr>
+              <tr><td>模板</td><td>动作模板列表</td><td><span class="badge p0">P0</span></td><td>拥抱、牵手、跳舞、俯卧撑开放；亲吻通过 feature flag 关闭并标记 Coming later。</td><td>Admin Config → Public Template API → H5</td></tr>
+              <tr><td>素材</td><td>图片上传与质检</td><td><span class="badge p0">P0</span></td><td>单人模板1张，双人模板2张；每张仅1名成年人、全身清晰、无遮挡。格式、大小、分辨率满足所选 Replicate 模型。</td><td>H5 → Backend Signed Upload → OSS → Moderation/Quality Check</td></tr>
+              <tr><td>合规</td><td>成年人和授权声明</td><td><span class="badge p0">P0</span></td><td>生成前强制勾选本人/已授权、人物成年、允许用于本次AI生成；声明版本与任务绑定。</td><td>Consent Form → Consent Record → Generation Task</td></tr>
+              <tr><td>生成</td><td>时长和扣币</td><td><span class="badge p0">P0</span></td><td>5秒/30金币、10秒/40金币、15秒/50金币；提交时原子扣币，余额不足进入购买页。</td><td>Wallet → Ledger Debit → Generation Task</td></tr>
+              <tr><td>生成</td><td>双人参考生成</td><td><span class="badge p0">P0</span></td><td>5/10 秒评估 `wan-video/wan-2.7-r2v` 与 Seedance 2.0，15 秒仅评估 Seedance；两张图作为独立人物参考，模型按模板变体由服务端路由。</td><td>OSS Inputs → Replicate R2V → Temporary Result</td></tr>
+              <tr><td>生成</td><td>单人动作迁移</td><td><span class="badge p0">P0</span></td><td>使用 `wan-video/wan-2.2-animate-animation`，服务器为每个模板提供已授权的动作视频和音乐。</td><td>OSS Portrait + Template Video → Replicate Wan Animate → Result</td></tr>
+              <tr><td>生成</td><td>异步任务与轮询</td><td><span class="badge p0">P0</span></td><td>服务端提交 Prediction 并保存 prediction ID；completed Webhook 推进终态，后台轮询兜底，前端按退避策略刷新。</td><td>API → Task DB → Worker/Webhook/Poller → Replicate</td></tr>
+              <tr><td>金币</td><td>失败全额返还</td><td><span class="badge p0">P0</span></td><td>模型失败、审核拒绝、超时和内部错误都返还本次金币；用唯一业务引用保证只返一次。</td><td>Failure Event → Ledger Credit → Wallet Balance</td></tr>
+              <tr><td>作品</td><td>记录、播放、下载、删除</td><td><span class="badge p0">P0</span></td><td>仅本人访问；任务进行中展示状态，成功后可播放、下载、删除并显示剩余保存时间。</td><td>Task/Work API → Signed OSS URL → H5 Player</td></tr>
+              <tr><td>作品</td><td>24小时自动清理</td><td><span class="badge p0">P0</span></td><td>结果产生后24小时到期；撤销访问后删除输入、输出与作品记录。不含媒体的审计数据保留180天。</td><td>Expiry Scheduler + OSS Lifecycle → Purge → Audit Log</td></tr>
+              <tr><td>支付</td><td>PayPal 金币包</td><td><span class="badge p0">P0</span></td><td>USD 5.99/100、11.99/220、24.99/500；前端跳转/弹出 PayPal Checkout，支付成功后入账。</td><td>H5 → Order API → PayPal → Verified Webhook → Ledger</td></tr>
+              <tr><td>安全</td><td>输入输出审核</td><td><span class="badge p0">P0</span></td><td>提交前审核图片与意图，生成后审核视频；禁止未成年人、色情、侵权、公众人物冒充和其他不允许内容。</td><td>Media → Moderation → Decision + Audit</td></tr>
+              <tr><td>安全</td><td>AI 标识</td><td><span class="badge p0">P0</span></td><td>播放页和导出视频包含明显 AI Generated 标识；文件元数据记录服务和内容编号，不向用户提供去标识功能。</td><td>Result → Label/Post-process → Final OSS Object</td></tr>
+              <tr><td>客服</td><td>投诉与删除请求</td><td><span class="badge p0">P0</span></td><td>权利人可提交作品编号、证明和联系信息；后台支持冻结、删除、封禁及留痕。</td><td>Complaint Form → Admin Review → Enforcement</td></tr>
+              <tr><td>运营</td><td>配置与任务后台</td><td><span class="badge p1">P1</span></td><td>查看模板开关、价格、赠币、任务状态、失败原因、审核结果和支付订单；敏感操作写入审计日志。</td><td>Admin UI ↔ Backend Admin API ↔ DB</td></tr>
+              <tr><td>质量</td><td>组合首帧实验</td><td><span class="badge p1">P1</span></td><td>当直接双人 R2V 稳定性不足时，先合成包含两人的起始画面，再结合人物参考生成视频；仅用于 A/B PoC。</td><td>Two Portraits → Image Compose → First Frame + R2V</td></tr>
+              <tr><td>生成</td><td>亲吻模板</td><td><span class="badge p2">P2</span></td><td>完成 Replicate 模型、PayPal 和内容规则审核后灰度开放；只允许非露骨成年人场景。</td><td>Feature Flag → Restricted Template Pipeline</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>4.1 用户核心操作主线</h3>
+        <div class="flow">
+          <div>区域判断与语言选择</div>
+          <div>登录并领取30金币</div>
+          <div>选模板、上传、授权</div>
+          <div>选择时长并扣币生成</div>
+          <div>作品中播放、下载或删除</div>
+        </div>
+
+        <h3>4.2 关键前置条件</h3>
+        <ol>
+          <li>用户所在地区允许注册、支付和生成。</li>
+          <li>用户已登录，邮箱或第三方身份已经验证。</li>
+          <li>上传素材通过格式、人数、全身完整度和内容审核。</li>
+          <li>用户完成当前版本的成年人及肖像授权声明。</li>
+          <li>金币余额不少于所选时长价格。</li>
+          <li>模板、模型和所在区域均处于可用状态。</li>
+        </ol>
+
+        <h3>4.3 基础数据流</h3>
+        <div class="flow">
+          <div>H5 请求预签名上传</div>
+          <div>原图进入私有 OSS 与审核</div>
+          <div>后端扣币并创建任务</div>
+          <div>Worker 调用 Replicate，Webhook/轮询收敛状态</div>
+          <div>结果转存、标识并授权播放</div>
+        </div>
+        <p class="muted">Replicate API 的输入、输出和日志默认约 1 小时后删除，任务成功后必须由服务端立即下载并转存到私有 OSS。H5 永远不直接持有 Replicate API Token，也不依赖临时结果 URL。</p>
+      </section>
+
+      <section id="solution">
+        <div class="eyebrow">Detailed Solution</div>
+        <h2>五、详细方案</h2>
+        <div class="callout success"><strong>原型评审结论：</strong>2026-09-09 已确认动作优先的信息架构，以及登录、上传、授权、扣币、异步生成、失败返币、作品与 PayPal 的完整交互。下列切片均引用同版本原型，并启用 Focus 模式锁定无关区域。</div>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">01</span>地区门控与用户登录</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    visit([访问产品])
+    region{地区开放?}
+    browse[允许浏览介绍]
+    blocked([限制注册与生成])
+    device{设备类型?}
+    apple[Apple 优先]
+    google[Google 优先]
+    email[邮箱验证码]
+    session([创建登录会话])
+    visit --> region
+    region -->|否| browse
+    browse --> blocked
+    region -->|是| device
+    device -->|iPhone| apple
+    device -->|Android| google
+    device -->|其他| email
+    apple --> session
+    google --> session
+    email --> session
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>地区校验：</strong>前端提示与服务端拦截同时执行；中国大陆用户只能浏览落地页，登录、购买和生成接口返回地区不可用。</li>
+                <li><strong>登录排序：</strong>iPhone 默认将 Apple 放在首位，Android 默认将 Google 放在首位，三种方式始终全部可选。</li>
+                <li><strong>邮箱验证：</strong>验证码一次有效、短时过期，并按邮箱、IP 和设备进行发送限流。</li>
+                <li><strong>新用户赠送：</strong>首次创建有效账户时幂等发放 30 金币；重复登录不得重复领取。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=login</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=login#login" title="登录专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">02</span>动作选择与照片上传</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    choose([选择模板])
+    subjects{人物数量?}
+    one[/上传一张照片/]
+    two[/上传两张照片/]
+    local{格式大小有效?}
+    quality{全身单人清晰?}
+    pass([进入授权步骤])
+    fix[展示修改建议]
+    choose --> subjects
+    subjects -->|单人| one
+    subjects -->|双人| two
+    one --> local
+    two --> local
+    local -->|否| fix
+    local -->|是| quality
+    quality -->|否| fix
+    quality -->|是| pass
+    fix --> one
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>模板：</strong>首期开放拥抱、牵手、跳舞、俯卧撑；亲吻保留 Coming later 状态，不允许创建任务。</li>
+                <li><strong>双人输入：</strong>必须分别上传两张独立单人全身照，不接受已经在同一张图片中的合照。</li>
+                <li><strong>文件限制：</strong>JPG 或 PNG，单张不超过 10MB；客户端预检后仍由服务端复验 MIME、尺寸和安全性。</li>
+                <li><strong>质检失败：</strong>在对应上传卡片原位提示缺失全身、多人、遮挡或模糊原因，不扣金币。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=upload</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=upload#create" title="照片上传专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">03</span>成年人及肖像授权</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    ready([素材准备完成])
+    open[打开完整声明]
+    agree{用户确认?}
+    record[记录声明版本]
+    moderate[提交内容审核]
+    safe{审核通过?}
+    proceed([允许创建任务])
+    reject([拒绝并提示])
+    ready --> open
+    open --> agree
+    agree -->|否| ready
+    agree -->|是| record
+    record --> moderate
+    moderate --> safe
+    safe -->|是| proceed
+    safe -->|否| reject
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>声明内容：</strong>人物均年满 18 周岁；为本人或已经明确授权；禁止冒充、欺诈、骚扰、色情和诽谤用途。</li>
+                <li><strong>审计证据：</strong>声明版本、语言、内容哈希、确认时间和脱敏 IP 与生成任务绑定，非媒体记录保留 180 天。</li>
+                <li><strong>审核：</strong>输入与输出均进行内容审核；疑似未成年人、公众人物冒充或高风险内容拒绝处理。</li>
+                <li><strong>产品边界：</strong>不要求上传身份证、授权书或活体视频，首期仅保留声明、审核和投诉追溯能力。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=consent</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=consent#create" title="授权声明专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">04</span>时长扣币、异步生成与失败返还</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    select([选择时长])
+    balance{余额充足?}
+    buy[进入金币购买]
+    debit[原子扣除金币]
+    submit[创建异步任务]
+    terminal{最终状态?}
+    save[保存私有视频]
+    refunded{已返币?}
+    refund[全额返还]
+    done([作品记录展示])
+    select --> balance
+    balance -->|否| buy
+    balance -->|是| debit
+    debit --> submit
+    submit --> terminal
+    terminal -->|成功| save
+    terminal -->|失败| refunded
+    refunded -->|否| refund
+    refunded -->|是| done
+    refund --> done
+    save --> done
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>定价：</strong>5 秒 30 金币、10 秒 40 金币、15 秒 50 金币；一次生成只输出一个结果。</li>
+                <li><strong>提交事务：</strong>生成任务、扣币流水和幂等键在同一事务内创建；按钮提交后立即禁用，避免重复任务。</li>
+                <li><strong>后台处理：</strong>用户可离开当前页面；客户端只展示阶段与预计等待，不承诺精确百分比。</li>
+                <li><strong>失败返还：</strong>审核拒绝、模型失败、超时、结果转存或后审失败均全额返还；唯一键 <code>task_id + ledger_type</code> 保证最多返还一次。</li>
+                <li><strong>Replicate 临时地址：</strong>结果成功后由 Worker 立即转存私有 OSS，H5 不接触 API Token，也不直接依赖 <code>replicate.delivery</code>。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=generation</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=generation#generation" title="生成进度专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">05</span>作品记录与媒体清理</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    works([打开作品记录])
+    items{存在记录?}
+    empty[展示空状态]
+    state{任务状态?}
+    progress[查看后台进度]
+    ready[播放或下载]
+    failed[展示失败与返币]
+    remove{主动删除?}
+    revoke[立即撤销访问]
+    purge([异步物理删除])
+    works --> items
+    items -->|否| empty
+    items -->|是| state
+    state -->|处理中| progress
+    state -->|已成功| ready
+    state -->|已失败| failed
+    progress --> works
+    ready --> remove
+    failed --> remove
+    remove -->|是| revoke
+    remove -->|否| works
+    revoke --> purge
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>私有访问：</strong>所有查询、播放、下载和删除都验证当前用户与作品所有权，不提供公开分享链接。</li>
+                <li><strong>作品状态：</strong>处理中展示阶段；成功展示播放器、下载和倒计时；失败展示原因和已返金币。</li>
+                <li><strong>主动删除：</strong>二次确认后立即撤销签名 URL 和页面访问，输入、输出进入清理队列且不可恢复。</li>
+                <li><strong>自动到期：</strong>结果生成后 24 小时清理媒体及作品记录；OSS Lifecycle 作为应用任务失败时的兜底。</li>
+                <li><strong>断网恢复：</strong>页面断网只影响状态刷新，服务端任务继续；重新登录后从作品记录恢复最终状态。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=works</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=works#works" title="作品记录专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <article class="feature-module">
+          <h3><span class="feature-number">06</span>PayPal 购买与金币账本</h3>
+          <div class="feature-content">
+            <div class="logic-rules">
+              <h4>交互逻辑</h4>
+              <div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    pack([选择金币包])
+    order[创建待支付订单]
+    paypal[PayPal 收银台]
+    webhook[接收服务端通知]
+    verify{验签及金额有效?}
+    seen{事件已处理?}
+    credit[原子写入购买流水]
+    pending[保持处理中]
+    success([展示到账])
+    pack --> order
+    order --> paypal
+    paypal --> webhook
+    webhook --> verify
+    verify -->|否| pending
+    verify -->|是| seen
+    seen -->|是| success
+    seen -->|否| credit
+    credit --> success
+              </div></div>
+              <h4>规则与反馈</h4>
+              <ul>
+                <li><strong>金币包：</strong>USD 5.99 购买 100 金币；USD 11.99 购买 220 金币；USD 24.99 购买 500 金币。</li>
+                <li><strong>到账依据：</strong>前端支付完成页不能入账；只有后端验证 PayPal webhook 或主动查询交易成功后才能增加金币。</li>
+                <li><strong>支付幂等：</strong>外部事件 ID 与交易 ID 建唯一约束，重复通知直接返回成功但不重复入账。</li>
+                <li><strong>账本：</strong>新用户赠送、购买、生成扣除、失败返还、人工调整和支付退款冲销都写不可变流水。</li>
+                <li><strong>支付地区：</strong>币种固定 USD；受限地区用户无法创建订单，服务端再次验证地区及账户风控状态。</li>
+              </ul>
+            </div>
+            <div class="prototype-panel"><div class="prototype-label"><span>H5 原型切片</span><span>focus=payment</span></div><div class="device-frame"><iframe src="../prototype/prototype_v1.0.html?sandbox=true&amp;focus=payment#wallet" title="PayPal 金币购买专注模式原型" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe></div></div>
+          </div>
+        </article>
+
+        <h3>5.7 模板与模型路由</h3>
+        <div class="table-wrap"><table><thead><tr><th>模板</th><th>输入</th><th>模型</th><th>动作控制</th><th>音频</th><th>首期状态</th></tr></thead><tbody>
+          <tr><td>拥抱</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V（5/10秒）/ Seedance 2.0（候选）</td><td>固定提示词；PoC 验证双主体与15秒</td><td>模型环境声</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>牵手</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V（5/10秒）/ Seedance 2.0（候选）</td><td>固定提示词，强化人物引用与手部约束</td><td>模型环境声</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>亲吻</td><td>2张独立单人全身照</td><td>Wan 2.7 R2V / Seedance 2.0</td><td>固定非露骨提示词与严格审核</td><td>模型环境声</td><td><span class="badge off">关闭待审</span></td></tr>
+          <tr><td>跳舞</td><td>1张单人全身照</td><td>Wan 2.2 Animate</td><td>服务器固定动作参考视频</td><td>已授权模板音乐</td><td><span class="badge on">PoC后开放</span></td></tr>
+          <tr><td>俯卧撑</td><td>1张单人全身照</td><td>Wan 2.2 Animate</td><td>服务器固定动作参考视频</td><td>模板节奏声</td><td><span class="badge on">PoC后开放</span></td></tr>
+        </tbody></table></div>
+        <div class="callout warning"><strong>质量门槛：</strong>上线前至少使用 50 组真实授权样本，覆盖体型、服装、背景、肤色和拍摄角度。分别记录身份一致性、动作完成度、肢体异常、审核拒绝率、平均耗时和单次成本；固定模板不能被描述为每次都能完美复现。</div>
+
+        <h3>5.8 生成规格与任务状态</h3>
+        <div class="table-wrap"><table><thead><tr><th>视频时长</th><th>扣除金币</th><th>输出数量</th><th>默认规格</th><th>失败处理</th></tr></thead><tbody><tr><td>5 秒</td><td>30</td><td>1</td><td>720P / 9:16 / MP4</td><td>全额返还 30</td></tr><tr><td>10 秒</td><td>40</td><td>1</td><td>720P / 9:16 / MP4</td><td>全额返还 40</td></tr><tr><td>15 秒</td><td>50</td><td>1</td><td>720P / 9:16 / MP4</td><td>全额返还 50</td></tr></tbody></table></div>
+        <div class="status-line"><span>DRAFT</span><span>VALIDATING</span><span>QUEUED</span><span>PROCESSING</span><span>SUCCEEDED</span><span>FAILED</span><span>DELETING</span><span>DELETED</span><span>EXPIRED</span></div>
+        <p class="muted"><code>SUCCEEDED</code>、<code>FAILED</code>、<code>DELETED</code>、<code>EXPIRED</code> 是业务终态。只有输出完成审核、AI 标识并转存 OSS 后才能标记成功；外部任务状态不明确时先进入人工或定时复核，不立即重复生成。</p>
+
+        <h3>5.9 核心数据对象</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>对象</th><th>用途</th><th>关键字段</th></tr></thead>
+            <tbody>
+              <tr><td>AppUserIdentity</td><td>绑定 Apple、Google、Email 身份</td><td>user_id, provider, provider_subject, verified_email</td></tr>
+              <tr><td>CoinWallet</td><td>缓存用户可用金币</td><td>user_id, balance, version</td></tr>
+              <tr><td>CoinLedger</td><td>记录所有金币变更</td><td>type, amount, balance_after, reference_type, reference_id, idempotency_key</td></tr>
+              <tr><td>VideoTemplate</td><td>动作模板与模型配置</td><td>slug, subject_count, model, prompt_version, action_asset_url, enabled</td></tr>
+              <tr><td>GenerationTask</td><td>生成任务生命周期</td><td>user_id, template_id, duration, coin_cost, status, external_task_id, failure_code</td></tr>
+              <tr><td>GenerationAsset</td><td>输入输出素材与到期时间</td><td>task_id, kind, oss_key, moderation_status, expires_at, deleted_at</td></tr>
+              <tr><td>ConsentRecord</td><td>保存授权声明证据</td><td>task_id, policy_version, locale, declaration_hash, accepted_at, ip_hash</td></tr>
+              <tr><td>PaymentOrder/Event</td><td>PayPal 订单和事件</td><td>provider, product_id, amount, currency, transaction_id, event_id, raw_payload</td></tr>
+              <tr><td>Complaint</td><td>权利投诉与处理闭环</td><td>work_id, claimant, reason, evidence, status, handled_by, resolution</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="flowchart">
+        <div class="eyebrow">Flowchart</div>
+        <h2>六、业务流程图</h2>
+        <p class="muted">流程图源文件均保存在 <code>../flowcharts/</code>。本页使用 Mermaid 实时渲染，便于产品、设计与研发对照同一份流程定义。</p>
+        <div class="diagram-grid">
+          <article class="diagram-card"><h3>6.1 核心用户主线</h3><div class="mermaid-wrap"><div class="mermaid">
+flowchart LR
+    visit([访问落地页])
+    region{地区开放?}
+    blocked([地区暂未开放])
+    login[完成登录]
+    choose[选择动作]
+    upload[/上传照片/]
+    consent{确认授权?}
+    balance{金币充足?}
+    checkout[购买金币]
+    submit[提交生成]
+    result{生成成功?}
+    works[作品记录]
+    refund[全额返还]
+    expire([下载或到期])
+    visit --> region
+    region -->|否| blocked
+    region -->|是| login
+    login --> choose
+    choose --> upload
+    upload --> consent
+    consent -->|否| upload
+    consent -->|是| balance
+    balance -->|否| checkout
+    checkout --> balance
+    balance -->|是| submit
+    submit -.-> result
+    result -->|成功| works
+    result -->|失败| refund
+    refund --> works
+    works --> expire
+          </div></div><a class="source-link" href="../flowcharts/01_core_user_flow_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+
+          <article class="diagram-card"><h3>6.2 生成成功时序</h3><div class="mermaid-wrap"><div class="mermaid">
+sequenceDiagram
+    participant User
+    participant H5
+    participant API
+    participant Worker
+    participant Replicate
+    participant OSS
+    participant Database
+    User->>H5: 提交照片与配置
+    H5->>API: 创建生成任务
+    API->>Database: 扣币并写入任务
+    API-->>H5: 返回任务编号
+    API->>Worker: 投递异步任务
+    Worker->>Replicate: 创建 Prediction
+    Replicate-->>Worker: 返回 prediction ID
+    Replicate-->>API: completed Webhook
+    API->>Worker: 投递结果处理任务
+    Worker->>Replicate: 查询结果（兜底）
+    Worker->>OSS: 保存视频
+    Worker->>Database: 标记成功
+    H5->>API: 查询作品状态
+    API-->>H5: 返回私有地址
+    H5-->>User: 展示播放下载
+          </div></div><a class="source-link" href="../flowcharts/02_generation_sequence_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+
+          <article class="diagram-card"><h3>6.3 失败返币</h3><div class="mermaid-wrap"><div class="mermaid">
+flowchart TD
+    task([任务处理中])
+    failed{失败类型?}
+    retryable{允许重试?}
+    retry[任务内部重试]
+    success{重试成功?}
+    finalFail[标记最终失败]
+    refunded{返还已存在?}
+    createRefund[写入返还流水]
+    keepRefund[保持原余额]
+    notify([展示失败原因])
+    task --> failed
+    failed -->|网络限流| retryable
+    failed -->|内容参数| finalFail
+    retryable -->|是| retry
+    retryable -->|否| finalFail
+    retry --> success
+    success -->|否| finalFail
+    success -->|是| notify
+    finalFail --> refunded
+    refunded -->|否| createRefund
+    refunded -->|是| keepRefund
+    createRefund --> notify
+    keepRefund --> notify
+          </div></div><a class="source-link" href="../flowcharts/03_failure_refund_flow_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+
+          <article class="diagram-card"><h3>6.4 PayPal 金币购买</h3><div class="mermaid-wrap"><div class="mermaid">
+flowchart LR
+    select([选择金币包])
+    order[创建订单]
+    paypal[PayPal 收银台]
+    callback[支付通知]
+    verify{验签有效?}
+    duplicate{事件已处理?}
+    credit[增加金币]
+    pending[保持处理中]
+    success([展示到账])
+    select --> order
+    order --> paypal
+    paypal --> callback
+    callback --> verify
+    verify -->|否| pending
+    verify -->|是| duplicate
+    duplicate -->|是| success
+    duplicate -->|否| credit
+    credit --> success
+          </div></div><a class="source-link" href="../flowcharts/04_paypal_coin_flow_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+
+          <article class="diagram-card"><h3>6.5 媒体生命周期</h3><div class="mermaid-wrap"><div class="mermaid">
+flowchart LR
+    upload([上传原图])
+    input[(私有输入)]
+    moderate[内容审核]
+    accepted{审核通过?}
+    reject[拒绝并返币]
+    generate[生成视频]
+    output[(私有输出)]
+    available[作品可访问]
+    deleteAction{主动删除?}
+    revoke[撤销访问]
+    expiry{到期?}
+    purge([物理删除])
+    audit[(审计记录)]
+    upload --> input
+    input --> moderate
+    moderate --> accepted
+    accepted -->|否| reject
+    accepted -->|是| generate
+    generate --> output
+    output --> available
+    available --> deleteAction
+    deleteAction -->|是| revoke
+    deleteAction -->|否| expiry
+    revoke --> purge
+    expiry -->|是| purge
+    expiry -->|否| available
+    purge --> audit
+          </div></div><a class="source-link" href="../flowcharts/05_media_lifecycle_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+
+          <article class="diagram-card"><h3>6.6 系统架构</h3><div class="mermaid-wrap"><div class="mermaid">
+flowchart LR
+    subgraph client ["Client Apps"]
+        h5[Responsive H5]
+        admin[Admin Console]
+    end
+    subgraph gateway ["API Layer"]
+        edge[CDN and Gateway]
+    end
+    subgraph service ["Core Services"]
+        app[FastAPI App]
+        worker[Generation Worker]
+        cleanup[Cleanup Scheduler]
+    end
+    subgraph datastore ["Data Stores"]
+        postgres[(PostgreSQL)]
+        oss[(Singapore OSS)]
+    end
+    subgraph external ["External Services"]
+        oauth[Apple and Google]
+        paypal[PayPal Business]
+        replicate[Replicate Video Models]
+        email[Email OTP]
+    end
+    subgraph async ["Async Infrastructure"]
+        queue[Task Queue]
+    end
+    h5 --> edge
+    admin --> edge
+    edge --> app
+    app --> postgres
+    app --> oss
+    app -.-> queue
+    queue -.-> worker
+    worker --> postgres
+    worker --> oss
+    app --> cleanup
+    cleanup --> oss
+    cleanup --> postgres
+    app -.-> oauth
+    app -.-> paypal
+    app -.-> email
+    worker -.-> replicate
+    replicate -.-> app
+          </div></div><a class="source-link" href="../flowcharts/06_system_architecture_v1.0.mmd">查看 Mermaid 源文件 →</a></article>
+        </div>
+      </section>
+
+      <section id="exceptions">
+        <div class="eyebrow">Edge Cases</div>
+        <h2>七、异常与边界处理</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>场景</th><th>系统行为</th><th>用户反馈</th><th>金币处理</th></tr></thead>
+            <tbody>
+              <tr><td>中国大陆访问</td><td>服务端拒绝注册、登录、购买和生成请求</td><td>当前地区暂未开放服务</td><td>不变</td></tr>
+              <tr><td>第三方登录取消或失败</td><td>不创建会话；允许改用其他方式</td><td>登录未完成，请重试或使用邮箱</td><td>不变</td></tr>
+              <tr><td>邮箱验证码过期/频繁发送</td><td>拒绝验证或限流</td><td>验证码已过期 / 请稍后再试</td><td>不变</td></tr>
+              <tr><td>图片格式、尺寸不合法</td><td>上传前后双重验证并删除无效临时文件</td><td>指出具体格式、大小或分辨率要求</td><td>未扣币</td></tr>
+              <tr><td>图片非全身、多人、遮挡</td><td>质量检测拒绝提交</td><td>展示修改建议和合格示例</td><td>未扣币</td></tr>
+              <tr><td>疑似未成年人或违规素材</td><td>审核拒绝、记录原因；高风险账号限制使用</td><td>素材不符合使用规则</td><td>若已扣则全额返还</td></tr>
+              <tr><td>余额不足</td><td>不创建生成任务</td><td>展示所需金币和购买入口</td><td>不变</td></tr>
+              <tr><td>重复点击生成</td><td>客户端禁用按钮；服务端幂等键阻止重复任务</td><td>已提交，请在作品记录查看</td><td>只扣一次</td></tr>
+              <tr><td>网络中断或关闭页面</td><td>服务端继续任务</td><td>重新登录后恢复任务状态</td><td>按最终状态处理</td></tr>
+              <tr><td>Replicate 超时/失败</td><td>验证 Webhook 后有限次数查询；不盲目创建新 Prediction</td><td>生成失败，金币已返还</td><td>全额返还一次</td></tr>
+              <tr><td>结果转存或后审失败</td><td>删除不可用结果并终止任务</td><td>生成失败，金币已返还</td><td>全额返还一次</td></tr>
+              <tr><td>PayPal 页面显示成功但 webhook 未到</td><td>订单保持处理中，后台主动查询</td><td>付款确认中，请稍后查看</td><td>确认后才入账</td></tr>
+              <tr><td>重复 PayPal webhook</td><td>按 event_id 幂等忽略</td><td>不重复提示</td><td>只入账一次</td></tr>
+              <tr><td>用户删除作品</td><td>立即撤销访问，进入异步物理删除</td><td>作品已删除</td><td>不返还</td></tr>
+              <tr><td>作品到期</td><td>删除媒体和作品记录，只保留非媒体审计数据</td><td>到期前显示倒计时；到期后不再展示</td><td>不返还</td></tr>
+              <tr><td>权利人投诉</td><td>冻结访问、人工审核、删除或封禁</td><td>按公布时限反馈处理结果</td><td>根据违规规则处理，不自动返还</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="analytics">
+        <div class="eyebrow">Analytics</div>
+        <h2>八、数据追踪与埋点</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>事件</th><th>触发时机</th><th>关键属性</th><th>目的</th></tr></thead>
+            <tbody>
+              <tr><td>landing_view</td><td>进入落地页</td><td>country, locale, source</td><td>评估市场与中文推广渠道</td></tr>
+              <tr><td>region_blocked</td><td>命中地区限制</td><td>country, action</td><td>监控大陆及其他受限地区请求</td></tr>
+              <tr><td>login_started/completed</td><td>开始/完成登录</td><td>provider, device, locale, error</td><td>比较 Apple/Google/Email 转化</td></tr>
+              <tr><td>template_selected</td><td>选择动作</td><td>template, subject_count</td><td>判断模板需求</td></tr>
+              <tr><td>image_validation_failed</td><td>素材质检失败</td><td>reason, template</td><td>优化上传指导与检测</td></tr>
+              <tr><td>generation_submitted</td><td>任务创建成功</td><td>template, duration, coin_cost, prompt_version</td><td>分析生成偏好和成本</td></tr>
+              <tr><td>generation_terminal</td><td>任务成功或失败</td><td>status, latency, model, failure_code</td><td>监控成功率和时延</td></tr>
+              <tr><td>coin_refunded</td><td>失败返币</td><td>task_id, amount, reason</td><td>核对财务和模型稳定性</td></tr>
+              <tr><td>work_played/downloaded/deleted</td><td>作品操作</td><td>template, age_minutes</td><td>衡量结果价值和保留时长</td></tr>
+              <tr><td>checkout_started</td><td>打开 PayPal</td><td>coin_pack, price</td><td>支付漏斗</td></tr>
+              <tr><td>payment_terminal</td><td>支付终态</td><td>status, product_id, amount, currency</td><td>支付成功率、错账和争议</td></tr>
+              <tr><td>consent_accepted</td><td>提交授权声明</td><td>policy_version, subject_count</td><td>授权覆盖审计</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">分析事件不得上传原始照片、人脸特征、完整邮箱、PayPal 原始载荷或可直接识别个人的敏感字段。</p>
+      </section>
+
+      <section id="roadmap">
+        <div class="eyebrow">Roadmap</div>
+        <h2>九、未来演进规划</h2>
+        <div class="grid-3">
+          <div class="card">
+            <div class="badge p0">Phase 0 · PoC</div>
+            <h3>模型可行性验证</h3>
+            <ul>
+              <li>50组授权样本</li>
+              <li>4个开放模板</li>
+              <li>直接R2V与组合首帧对比</li>
+              <li>成本、耗时、成功率基线</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="badge p1">Phase 1 · MVP</div>
+            <h3>国际 Web/H5</h3>
+            <ul>
+              <li>三种登录方式</li>
+              <li>金币与 PayPal</li>
+              <li>作品与24小时清理</li>
+              <li>审核、标识、投诉</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="badge p2">Phase 2 · Growth</div>
+            <h3>审核后扩展</h3>
+            <ul>
+              <li>亲吻模板灰度开放</li>
+              <li>更多舞蹈与运动模板</li>
+              <li>1080P 高级档</li>
+              <li>成立主体后评估 Stripe / 中国版</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="annex">
+        <div class="eyebrow">References</div>
+        <h2>十、附件</h2>
+        <h3>10.1 外部资料</h3>
+        <ul>
+          <li><a href="https://replicate.com/wan-video/wan-2.7-r2v" target="_blank" rel="noreferrer">Replicate Wan 2.7 R2V</a></li>
+          <li><a href="https://replicate.com/wan-video/wan-2.2-animate-animation" target="_blank" rel="noreferrer">Replicate Wan 2.2 Animate</a></li>
+          <li><a href="https://replicate.com/bytedance/seedance-2.0" target="_blank" rel="noreferrer">Replicate Seedance 2.0</a></li>
+          <li><a href="https://replicate.com/docs/topics/predictions/data-retention" target="_blank" rel="noreferrer">Replicate data retention</a></li>
+          <li><a href="https://www.paypal.com/c2/webapps/mpp/account-selection" target="_blank" rel="noreferrer">PayPal China account selection</a></li>
+          <li><a href="https://www.paypal.com/c2/business/paypal-business-fees" target="_blank" rel="noreferrer">PayPal China merchant fees</a></li>
+          <li><a href="https://www.paypal.com/uk/legalhub/paypal/acceptableuse-full" target="_blank" rel="noreferrer">PayPal Acceptable Use Policy</a></li>
+        </ul>
+
+        <h3>10.2 项目附件</h3>
+        <ul>
+          <li><code>../annex/requirements_baseline_v1.0.md</code>：已确认需求基线。</li>
+          <li><code>../templates/prd_template.md</code>：后续版本使用的文档模板。</li>
+          <li><code>../prototype/prototype_v1.0.html</code>：已确认的单文件 Tailwind 高保真交互原型。</li>
+          <li><code>../flowcharts/</code>：六份 Mermaid 源文件，分别覆盖主流程、生成时序、失败返币、PayPal、媒体生命周期和系统架构。</li>
+        </ul>
+
+        <h3>10.3 原型确认结论</h3>
+        <ul>
+          <li>采用动作优先的信息架构，模板卡直接说明所需人物与照片数量。</li>
+          <li>照片质检错误显示在上传卡片原位，并提供拍摄指南和合格示例。</li>
+          <li>授权声明采用生成前弹层确认，完整声明记录与任务绑定。</li>
+          <li>生成页展示处理阶段和预计等待，用户可离开页面，不承诺模型精确进度。</li>
+          <li>作品展示剩余时间，支持播放、下载和二次确认删除。</li>
+          <li>大陆用户可浏览产品介绍，登录、购买和生成由前端提示与服务端共同拦截。</li>
+        </ul>
+
+        <h3>10.4 交付检查</h3>
+        <div class="delivery-check">
+          <div>✓ 用户旅程图已完成</div>
+          <div>✓ 核心功能均含 Mermaid 流程</div>
+          <div>✓ 原型切片均启用 Focus 模式</div>
+          <div>✓ 断网、空状态、权限与幂等已覆盖</div>
+          <div>✓ PRD 与原型版本保持 v1.0 对应</div>
+          <div>✓ 历史版本复制规则已建立</div>
+        </div>
+
+        <h3>10.5 版本管理规则</h3>
+        <ul>
+          <li>当前 <code>prd_v1.0.html</code>、<code>prototype_v1.0.html</code> 和所有带 <code>v1.0</code> 后缀的流程图作为只读历史快照保留。</li>
+          <li>下一次需求迭代先复制为 <code>prd_v1.1.html</code> 与 <code>prototype_v1.1.html</code>，只修改新版本文件，禁止直接覆盖 v1.0。</li>
+          <li>新版 PRD 的所有 iframe 必须统一指向同版本原型，并在版本切换器和版本记录表中加入 v1.1。</li>
+          <li>涉及交互逻辑的修改必须同时更新：原型、详细方案规则、对应 Mermaid 源文件和异常处理表。</li>
+        </ul>
+      </section>
+
+      <footer>Vireal Wan Video H5 · PRD v1.0 · Final · 2026-09-10</footer>
+    </main>
+  </div>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "loose",
+      theme: "base",
+      flowchart: { curve: "basis", htmlLabels: false },
+      sequence: { mirrorActors: false },
+      themeVariables: {
+        primaryColor: "#e5f8f1",
+        primaryBorderColor: "#126c58",
+        primaryTextColor: "#071b1b",
+        lineColor: "#4f6f67",
+        secondaryColor: "#fff4ed",
+        tertiaryColor: "#f7f8f5",
+        fontFamily: "Inter, ui-sans-serif, system-ui"
+      }
+    });
+  </script>
+  <script>
+    document.getElementById('versionSelect').addEventListener('change', function () {
+      if (this.value && !location.pathname.endsWith(this.value)) location.href = this.value;
+    });
+  </script>
+</body>
+</html>
