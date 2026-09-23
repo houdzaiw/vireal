@@ -7,7 +7,10 @@
     "test": "python3 -m unittest tests/test_vireal_h5_prototype.py"
   },
   "dependencies": {
-    "@clerk/clerk-js": "^6.32.1"
+    "@clerk/clerk-js": "^6.32.1",
+    "@clerk/ui": "^1.33.1",
+    "react": "~19.2.3",
+    "react-dom": "~19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",

@@ -11,6 +11,7 @@ PROTOTYPE = (
     / "prototype_v1.1.html"
 )
 BUILD_SCRIPT = ROOT / "scripts" / "build-vireal-pages.sh"
+AUTH_ENTRY = PROTOTYPE.parent / "vireal-auth.js"
 README = ROOT / "outputs" / "vireal-wan-video-h5" / "README.md"
 
 
@@ -19,6 +20,7 @@ class VirealH5PrototypeTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.html = PROTOTYPE.read_text(encoding="utf-8") if PROTOTYPE.exists() else ""
         cls.build_script = BUILD_SCRIPT.read_text(encoding="utf-8")
+        cls.auth_entry = AUTH_ENTRY.read_text(encoding="utf-8")
         cls.readme = README.read_text(encoding="utf-8")
 
     def test_v11_prototype_exists(self) -> None:
@@ -36,6 +38,8 @@ class VirealH5PrototypeTests(unittest.TestCase):
         self.assertNotIn("123456", self.html)
         self.assertNotIn("virealAppAccessToken", self.html)
         self.assertIn("/api/v1/app/auth/logout", self.html)
+        self.assertIn('import { ui } from "@clerk/ui"', self.auth_entry)
+        self.assertIn("await clerk.load({ ui })", self.auth_entry)
         logout_handler = self.html[
             self.html.index("document.getElementById('logoutButton')") :
         ]

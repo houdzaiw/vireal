@@ -1,4 +1,5 @@
 import { Clerk } from "@clerk/clerk-js"
+import { ui } from "@clerk/ui"
 
 async function initializeClerk() {
   const meta = document.querySelector('meta[name="clerk-publishable-key"]')
@@ -8,7 +9,7 @@ async function initializeClerk() {
   }
 
   const clerk = new Clerk(publishableKey)
-  await clerk.load()
+  await clerk.load({ ui })
   window.VirealClerk = clerk
   window.dispatchEvent(new CustomEvent("vireal:clerk-ready", { detail: clerk }))
 }
