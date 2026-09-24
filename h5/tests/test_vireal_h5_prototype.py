@@ -40,6 +40,8 @@ class VirealH5PrototypeTests(unittest.TestCase):
         self.assertIn("/api/v1/app/auth/logout", self.html)
         self.assertIn('import { ui } from "@clerk/ui"', self.auth_entry)
         self.assertIn("await clerk.load({ ui })", self.auth_entry)
+        self.assertIn("邮箱验证码或 Google 安全登录", self.html)
+        self.assertNotIn("Google 或 Apple 安全登录", self.html)
         logout_handler = self.html[
             self.html.index("document.getElementById('logoutButton')") :
         ]
