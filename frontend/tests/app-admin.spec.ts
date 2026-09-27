@@ -310,6 +310,98 @@ test.describe("App admin pages", () => {
     ).toBeVisible()
   })
 
+  test("Admin can publish an effect, upload media, grant coins, and audit it", async ({
+    page,
+  }) => {
+    const categorySlug = uniqueId("e2e-effects")
+    const categoryName = uniqueId("效果分类")
+    const nickname = uniqueId("Wallet User E2E")
+    const { appUserId } = await createAppUser(nickname)
+
+    await page.goto("/effect-categories")
+    await expect(
+      page.getByRole("heading", { name: "Effect Categories", exact: true }),
+    ).toBeVisible()
+    await page.getByRole("button", { name: "新建分类" }).click()
+    const createForm = page
+      .getByRole("button", { name: "保存" })
+      .first()
+      .locator("xpath=ancestor::div[contains(@class,'grid')][1]")
+    await createForm.locator("input").nth(0).fill(categoryName)
+    await createForm.locator("input").nth(1).fill("PLAYWRIGHT EFFECTS")
+    await createForm.locator("input").nth(2).fill(categorySlug)
+    await createForm.getByRole("button", { name: "保存" }).click()
+    await expect(page.getByText("分类已保存")).toBeVisible()
+    const categoryCard = page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.locator(`input[value="${categorySlug}"]`) })
+    await expect(categoryCard.getByText("3 个效果")).toBeVisible()
+
+    await page.goto("/effects")
+    await expect(
+      page.getByRole("heading", { name: "Effects", exact: true }),
+    ).toBeVisible()
+    await page.locator("select").first().selectOption({ label: categoryName })
+    const effectList = page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.locator("select") })
+      .first()
+    await expect(effectList.getByRole("button")).toHaveCount(3)
+
+    await page.getByRole("button", { name: "发布" }).click()
+    await expect(page.getByText(/发布失败/)).toBeVisible()
+
+    await page
+      .locator("label")
+      .filter({ hasText: "上传封面" })
+      .locator('input[type="file"]')
+      .setInputFiles({
+        name: "poster.png",
+        mimeType: "image/png",
+        buffer: Buffer.from("89504e470d0a1a0a706c6179777269676874", "hex"),
+      })
+    await expect(page.getByText("媒体已上传，请保存效果以生效")).toBeVisible()
+    await page
+      .locator("label")
+      .filter({ hasText: "上传预览视频" })
+      .locator('input[type="file"]')
+      .setInputFiles({
+        name: "preview.mp4",
+        mimeType: "video/mp4",
+        buffer: Buffer.from("00000018667479706d703432766964656f", "hex"),
+      })
+    await expect(page.getByText("媒体已上传，请保存效果以生效")).toBeVisible()
+    await page.getByRole("button", { name: "保存", exact: true }).click()
+    await expect(page.getByText("效果已保存")).toBeVisible()
+
+    await page.getByRole("button", { name: "添加变体" }).click()
+    await expect(page.getByText("已添加变体")).toBeVisible()
+    await expect(page.locator("select").last()).toHaveValue("minimax/video-01")
+    await page.getByRole("button", { name: "发布" }).click()
+    await expect(page.getByText("效果已发布")).toBeVisible()
+    await expect(page.getByText("published").first()).toBeVisible()
+
+    await page.goto("/coin-wallet")
+    await expect(
+      page.getByRole("heading", { name: "Coin Wallet", exact: true }),
+    ).toBeVisible()
+    await page.getByRole("textbox").nth(1).fill(appUserId)
+    await page.getByRole("spinbutton").fill("50")
+    await page
+      .getByPlaceholder("例如：活动赠送 / 客诉补偿")
+      .fill("Playwright staging grant")
+    await page.getByRole("button", { name: "确认调整" }).click()
+    await expect(page.getByText("调整成功，余额 50")).toBeVisible()
+
+    await page.goto("/app-operation-logs")
+    const auditRow = page
+      .getByRole("row")
+      .filter({ hasText: appUserId })
+      .first()
+    await expect(auditRow).toBeVisible()
+    await expect(auditRow.getByText("coin.adjust")).toBeVisible()
+  })
+
   test("Non-superuser is redirected away from App admin pages", async ({
     page,
   }) => {

@@ -9,11 +9,18 @@ from app.core.db import engine, init_db
 from app.main import app
 from app.models import (
     AppAdminOperationLog,
+    AppCoinAccount,
+    AppCoinLedger,
     AppConfig,
     AppContent,
     AppContentImage,
     AppDevice,
+    AppEffect,
+    AppEffectCategory,
+    AppEffectRecommendation,
+    AppEffectVariant,
     AppGeneration,
+    AppManagedMediaAsset,
     AppOrder,
     AppOrderEvent,
     AppUpload,
@@ -51,6 +58,10 @@ def db() -> Generator[Session]:
         session.execute(statement)
         statement = delete(AppConfig)
         session.execute(statement)
+        statement = delete(AppEffectRecommendation)
+        session.execute(statement)
+        statement = delete(AppCoinLedger)
+        session.execute(statement)
         statement = delete(AppGeneration)
         session.execute(statement)
         statement = delete(AppContentImage)
@@ -60,6 +71,16 @@ def db() -> Generator[Session]:
         statement = delete(AppVideoTaskWebhookEvent)
         session.execute(statement)
         statement = delete(AppVideoTask)
+        session.execute(statement)
+        statement = delete(AppEffectVariant)
+        session.execute(statement)
+        statement = delete(AppEffect)
+        session.execute(statement)
+        statement = delete(AppEffectCategory)
+        session.execute(statement)
+        statement = delete(AppManagedMediaAsset)
+        session.execute(statement)
+        statement = delete(AppCoinAccount)
         session.execute(statement)
         statement = delete(AppUpload)
         session.execute(statement)

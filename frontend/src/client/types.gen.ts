@@ -5,6 +5,416 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminCategoriesPublic
+ */
+export type AdminCategoriesPublic = {
+    /**
+     * Data
+     */
+    data: Array<AdminCategoryPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * AdminCategoryInput
+ */
+export type AdminCategoryInput = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name Zh
+     */
+    name_zh: string;
+    /**
+     * Name En
+     */
+    name_en: string;
+    /**
+     * Tones
+     */
+    tones: [
+        string,
+        string,
+        string
+    ];
+    /**
+     * Sort Order
+     */
+    sort_order?: number;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+};
+
+/**
+ * AdminCategoryPublic
+ */
+export type AdminCategoryPublic = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name Zh
+     */
+    name_zh: string;
+    /**
+     * Name En
+     */
+    name_en: string;
+    /**
+     * Tones
+     */
+    tones: [
+        string,
+        string,
+        string
+    ];
+    /**
+     * Sort Order
+     */
+    sort_order?: number;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Effect Count
+     */
+    effect_count?: number;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+};
+
+/**
+ * AdminCoinAdjustmentInput
+ */
+export type AdminCoinAdjustmentInput = {
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Delta
+     */
+    delta: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+};
+
+/**
+ * AdminCoinAdjustmentPublic
+ */
+export type AdminCoinAdjustmentPublic = {
+    /**
+     * Balance
+     */
+    balance: number;
+    /**
+     * Ledger Id
+     */
+    ledger_id: string;
+    /**
+     * Applied
+     */
+    applied: boolean;
+};
+
+/**
+ * AdminEffectInput
+ */
+export type AdminEffectInput = {
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Title Zh
+     */
+    title_zh: string;
+    /**
+     * Title En
+     */
+    title_en: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Input Image Count
+     */
+    input_image_count: number;
+    /**
+     * Poster Asset Id
+     */
+    poster_asset_id?: string | null;
+    /**
+     * Preview Asset Id
+     */
+    preview_asset_id?: string | null;
+    /**
+     * Sort Order
+     */
+    sort_order?: number;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+    /**
+     * Recommendation Label
+     */
+    recommendation_label?: string | null;
+    /**
+     * Recommendation Ids
+     */
+    recommendation_ids?: Array<string>;
+};
+
+/**
+ * AdminEffectPublic
+ */
+export type AdminEffectPublic = {
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Title Zh
+     */
+    title_zh: string;
+    /**
+     * Title En
+     */
+    title_en: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Input Image Count
+     */
+    input_image_count: number;
+    /**
+     * Poster Asset Id
+     */
+    poster_asset_id?: string | null;
+    /**
+     * Preview Asset Id
+     */
+    preview_asset_id?: string | null;
+    /**
+     * Sort Order
+     */
+    sort_order?: number;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+    /**
+     * Recommendation Label
+     */
+    recommendation_label?: string | null;
+    /**
+     * Recommendation Ids
+     */
+    recommendation_ids?: Array<string>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Publish Status
+     */
+    publish_status: string;
+    /**
+     * Variants
+     */
+    variants?: Array<AdminVariantPublic>;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+};
+
+/**
+ * AdminEffectsPublic
+ */
+export type AdminEffectsPublic = {
+    /**
+     * Data
+     */
+    data: Array<AdminEffectPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * AdminMediaPublic
+ */
+export type AdminMediaPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+};
+
+/**
+ * AdminVariantInput
+ */
+export type AdminVariantInput = {
+    /**
+     * Duration Seconds
+     */
+    duration_seconds: number;
+    /**
+     * Coin Cost
+     */
+    coin_cost: number;
+    /**
+     * Provider
+     */
+    provider?: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Model Type
+     */
+    model_type: string;
+    /**
+     * Prompt
+     */
+    prompt: string;
+    /**
+     * Negative Prompt
+     */
+    negative_prompt?: string | null;
+    /**
+     * Prompt Version
+     */
+    prompt_version?: string;
+    /**
+     * Is Default
+     */
+    is_default?: boolean;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+};
+
+/**
+ * AdminVariantPublic
+ */
+export type AdminVariantPublic = {
+    /**
+     * Duration Seconds
+     */
+    duration_seconds: number;
+    /**
+     * Coin Cost
+     */
+    coin_cost: number;
+    /**
+     * Provider
+     */
+    provider?: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Model Type
+     */
+    model_type: string;
+    /**
+     * Prompt
+     */
+    prompt: string;
+    /**
+     * Negative Prompt
+     */
+    negative_prompt?: string | null;
+    /**
+     * Prompt Version
+     */
+    prompt_version?: string;
+    /**
+     * Is Default
+     */
+    is_default?: boolean;
+    /**
+     * Is Enabled
+     */
+    is_enabled?: boolean;
+    /**
+     * Id
+     */
+    id: string;
+};
+
+/**
  * AppAdminOperationLogPublic
  */
 export type AppAdminOperationLogPublic = {
@@ -71,6 +481,40 @@ export type AppAuthSessionResponse = {
      * Is New User
      */
     is_new_user: boolean;
+};
+
+/**
+ * AppCoinLedgerPublic
+ */
+export type AppCoinLedgerPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Delta
+     */
+    delta: number;
+    /**
+     * Balance After
+     */
+    balance_after: number;
+    /**
+     * Entry Type
+     */
+    entry_type: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Task Id
+     */
+    task_id?: string | null;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
 };
 
 /**
@@ -976,13 +1420,19 @@ export type AppVideoTaskCreate = {
     /**
      * Template Id
      */
-    template_id: 'dance';
+    template_id?: 'dance' | null;
+    /**
+     * Effect Id
+     */
+    effect_id?: string | null;
+    /**
+     * Variant Id
+     */
+    variant_id?: string | null;
     /**
      * Upload Ids
      */
-    upload_ids: [
-        string
-    ];
+    upload_ids: Array<string>;
     /**
      * Mode
      */
@@ -990,7 +1440,7 @@ export type AppVideoTaskCreate = {
     /**
      * Duration
      */
-    duration: 5 | 10;
+    duration?: 5 | 10 | null;
 };
 
 /**
@@ -1012,11 +1462,11 @@ export type AppVideoTaskPublic = {
     /**
      * Mode
      */
-    mode: 'standard' | 'advanced';
+    mode: 'standard' | 'advanced' | 'effect';
     /**
      * Execution Type
      */
-    execution_type: 'minimax' | 'wan' | 'local_demo';
+    execution_type: 'minimax' | 'wan' | 'seedance' | 'local_demo';
     /**
      * Is Demo
      */
@@ -1029,6 +1479,30 @@ export type AppVideoTaskPublic = {
      * Duration
      */
     duration: number;
+    /**
+     * Effect Id
+     */
+    effect_id?: string | null;
+    /**
+     * Variant Id
+     */
+    variant_id?: string | null;
+    /**
+     * Effect Slug
+     */
+    effect_slug?: string | null;
+    /**
+     * Effect Title
+     */
+    effect_title?: string | null;
+    /**
+     * Coin Cost
+     */
+    coin_cost?: number | null;
+    /**
+     * Balance
+     */
+    balance?: number | null;
     /**
      * Resolution
      */
@@ -1084,6 +1558,68 @@ export type AppVideoTaskQuotaPublic = {
      * Resets At
      */
     resets_at: string;
+    /**
+     * Concurrent Limit
+     */
+    concurrent_limit?: number;
+    /**
+     * Concurrent Remaining
+     */
+    concurrent_remaining?: number;
+};
+
+/**
+ * AppVideoTasksPublic
+ */
+export type AppVideoTasksPublic = {
+    /**
+     * Data
+     */
+    data: Array<AppVideoTaskPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * AppWalletPublic
+ */
+export type AppWalletPublic = {
+    /**
+     * Balance
+     */
+    balance: number;
+    /**
+     * Daily Remaining
+     */
+    daily_remaining: number;
+    /**
+     * Concurrent Remaining
+     */
+    concurrent_remaining: number;
+    /**
+     * Resets At
+     */
+    resets_at: string;
+    /**
+     * Ledger
+     */
+    ledger?: Array<AppCoinLedgerPublic>;
+};
+
+/**
+ * Body_admin effect catalog-upload_media_asset
+ */
+export type Body_admin_effect_catalog_upload_media_asset = {
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * File
+     */
+    file: Blob | File;
 };
 
 /**
@@ -1154,6 +1690,134 @@ export type Body_login_login_access_token = {
      * Client Secret
      */
     client_secret?: string | null;
+};
+
+/**
+ * EffectCatalogPublic
+ */
+export type EffectCatalogPublic = {
+    /**
+     * Categories
+     */
+    categories: Array<EffectCategoryPublic>;
+};
+
+/**
+ * EffectCategoryPublic
+ */
+export type EffectCategoryPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name Zh
+     */
+    name_zh: string;
+    /**
+     * Name En
+     */
+    name_en: string;
+    /**
+     * Tones
+     */
+    tones: Array<string>;
+    /**
+     * Sort Order
+     */
+    sort_order: number;
+    /**
+     * Effects
+     */
+    effects?: Array<EffectPublic>;
+};
+
+/**
+ * EffectPublic
+ */
+export type EffectPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Category Slug
+     */
+    category_slug: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Title Zh
+     */
+    title_zh: string;
+    /**
+     * Title En
+     */
+    title_en: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Input Image Count
+     */
+    input_image_count: number;
+    /**
+     * Poster Url
+     */
+    poster_url?: string | null;
+    /**
+     * Preview Video Url
+     */
+    preview_video_url?: string | null;
+    /**
+     * Sort Order
+     */
+    sort_order: number;
+    /**
+     * Recommendation Label
+     */
+    recommendation_label?: string | null;
+    /**
+     * Variants
+     */
+    variants?: Array<EffectVariantPublic>;
+    /**
+     * Recommendations
+     */
+    recommendations?: Array<string>;
+};
+
+/**
+ * EffectVariantPublic
+ */
+export type EffectVariantPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Duration Seconds
+     */
+    duration_seconds: number;
+    /**
+     * Coin Cost
+     */
+    coin_cost: number;
+    /**
+     * Is Default
+     */
+    is_default: boolean;
 };
 
 /**
@@ -2189,6 +2853,80 @@ export type appAuthTestAppTokenResponses = {
 
 export type appAuthTestAppTokenResponse = appAuthTestAppTokenResponses[keyof appAuthTestAppTokenResponses];
 
+export type appEffectCatalogReadEffectCatalogData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/effect-catalog';
+};
+
+export type appEffectCatalogReadEffectCatalogResponses = {
+    /**
+     * Successful Response
+     */
+    200: EffectCatalogPublic;
+};
+
+export type appEffectCatalogReadEffectCatalogResponse = appEffectCatalogReadEffectCatalogResponses[keyof appEffectCatalogReadEffectCatalogResponses];
+
+export type appEffectCatalogReadMediaAssetData = {
+    body?: never;
+    path: {
+        /**
+         * Asset Id
+         */
+        asset_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/media-assets/{asset_id}';
+};
+
+export type appEffectCatalogReadMediaAssetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appEffectCatalogReadMediaAssetError = appEffectCatalogReadMediaAssetErrors[keyof appEffectCatalogReadMediaAssetErrors];
+
+export type appEffectCatalogReadMediaAssetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type appEffectCatalogReadEffectData = {
+    body?: never;
+    path: {
+        /**
+         * Slug
+         */
+        slug: string;
+    };
+    query?: never;
+    url: '/api/v1/app/effects/{slug}';
+};
+
+export type appEffectCatalogReadEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appEffectCatalogReadEffectError = appEffectCatalogReadEffectErrors[keyof appEffectCatalogReadEffectErrors];
+
+export type appEffectCatalogReadEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: EffectPublic;
+};
+
+export type appEffectCatalogReadEffectResponse = appEffectCatalogReadEffectResponses[keyof appEffectCatalogReadEffectResponses];
+
 export type appUsersReadAppUserMeData = {
     body?: never;
     path?: never;
@@ -2588,6 +3326,40 @@ export type appOrdersReadOrderResponses = {
 
 export type appOrdersReadOrderResponse = appOrdersReadOrderResponses[keyof appOrdersReadOrderResponses];
 
+export type appVideoTasksReadVideoTasksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/app/video-tasks';
+};
+
+export type appVideoTasksReadVideoTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksReadVideoTasksError = appVideoTasksReadVideoTasksErrors[keyof appVideoTasksReadVideoTasksErrors];
+
+export type appVideoTasksReadVideoTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppVideoTasksPublic;
+};
+
+export type appVideoTasksReadVideoTasksResponse = appVideoTasksReadVideoTasksResponses[keyof appVideoTasksReadVideoTasksResponses];
+
 export type appVideoTasksCreateVideoTaskData = {
     body: AppVideoTaskCreate;
     headers: {
@@ -2619,6 +3391,36 @@ export type appVideoTasksCreateVideoTaskResponses = {
 
 export type appVideoTasksCreateVideoTaskResponse = appVideoTasksCreateVideoTaskResponses[keyof appVideoTasksCreateVideoTaskResponses];
 
+export type appVideoTasksDeleteVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/video-tasks/{task_id}';
+};
+
+export type appVideoTasksDeleteVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksDeleteVideoTaskError = appVideoTasksDeleteVideoTaskErrors[keyof appVideoTasksDeleteVideoTaskErrors];
+
+export type appVideoTasksDeleteVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type appVideoTasksDeleteVideoTaskResponse = appVideoTasksDeleteVideoTaskResponses[keyof appVideoTasksDeleteVideoTaskResponses];
+
 export type appVideoTasksReadVideoTaskData = {
     body?: never;
     path: {
@@ -2648,6 +3450,22 @@ export type appVideoTasksReadVideoTaskResponses = {
 };
 
 export type appVideoTasksReadVideoTaskResponse = appVideoTasksReadVideoTaskResponses[keyof appVideoTasksReadVideoTaskResponses];
+
+export type appWalletReadWalletData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/wallet';
+};
+
+export type appWalletReadWalletResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppWalletPublic;
+};
+
+export type appWalletReadWalletResponse = appWalletReadWalletResponses[keyof appWalletReadWalletResponses];
 
 export type adminAppReadAppUsersData = {
     body?: never;
@@ -3195,6 +4013,460 @@ export type adminAppUpdateAppConfigResponses = {
 };
 
 export type adminAppUpdateAppConfigResponse = adminAppUpdateAppConfigResponses[keyof adminAppUpdateAppConfigResponses];
+
+export type adminEffectCatalogListCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/app/effect-categories';
+};
+
+export type adminEffectCatalogListCategoriesResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminCategoriesPublic;
+};
+
+export type adminEffectCatalogListCategoriesResponse = adminEffectCatalogListCategoriesResponses[keyof adminEffectCatalogListCategoriesResponses];
+
+export type adminEffectCatalogCreateCategoryData = {
+    body: AdminCategoryInput;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/app/effect-categories';
+};
+
+export type adminEffectCatalogCreateCategoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogCreateCategoryError = adminEffectCatalogCreateCategoryErrors[keyof adminEffectCatalogCreateCategoryErrors];
+
+export type adminEffectCatalogCreateCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminCategoryPublic;
+};
+
+export type adminEffectCatalogCreateCategoryResponse = adminEffectCatalogCreateCategoryResponses[keyof adminEffectCatalogCreateCategoryResponses];
+
+export type adminEffectCatalogDeleteCategoryData = {
+    body?: never;
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effect-categories/{category_id}';
+};
+
+export type adminEffectCatalogDeleteCategoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogDeleteCategoryError = adminEffectCatalogDeleteCategoryErrors[keyof adminEffectCatalogDeleteCategoryErrors];
+
+export type adminEffectCatalogDeleteCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type adminEffectCatalogDeleteCategoryResponse = adminEffectCatalogDeleteCategoryResponses[keyof adminEffectCatalogDeleteCategoryResponses];
+
+export type adminEffectCatalogUpdateCategoryData = {
+    body: AdminCategoryInput;
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effect-categories/{category_id}';
+};
+
+export type adminEffectCatalogUpdateCategoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogUpdateCategoryError = adminEffectCatalogUpdateCategoryErrors[keyof adminEffectCatalogUpdateCategoryErrors];
+
+export type adminEffectCatalogUpdateCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminCategoryPublic;
+};
+
+export type adminEffectCatalogUpdateCategoryResponse = adminEffectCatalogUpdateCategoryResponses[keyof adminEffectCatalogUpdateCategoryResponses];
+
+export type adminEffectCatalogListEffectsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Category Id
+         */
+        category_id?: string | null;
+    };
+    url: '/api/v1/admin/app/effects';
+};
+
+export type adminEffectCatalogListEffectsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogListEffectsError = adminEffectCatalogListEffectsErrors[keyof adminEffectCatalogListEffectsErrors];
+
+export type adminEffectCatalogListEffectsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminEffectsPublic;
+};
+
+export type adminEffectCatalogListEffectsResponse = adminEffectCatalogListEffectsResponses[keyof adminEffectCatalogListEffectsResponses];
+
+export type adminEffectCatalogCreateEffectData = {
+    body: AdminEffectInput;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/app/effects';
+};
+
+export type adminEffectCatalogCreateEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogCreateEffectError = adminEffectCatalogCreateEffectErrors[keyof adminEffectCatalogCreateEffectErrors];
+
+export type adminEffectCatalogCreateEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminEffectPublic;
+};
+
+export type adminEffectCatalogCreateEffectResponse = adminEffectCatalogCreateEffectResponses[keyof adminEffectCatalogCreateEffectResponses];
+
+export type adminEffectCatalogDeleteEffectData = {
+    body?: never;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}';
+};
+
+export type adminEffectCatalogDeleteEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogDeleteEffectError = adminEffectCatalogDeleteEffectErrors[keyof adminEffectCatalogDeleteEffectErrors];
+
+export type adminEffectCatalogDeleteEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type adminEffectCatalogDeleteEffectResponse = adminEffectCatalogDeleteEffectResponses[keyof adminEffectCatalogDeleteEffectResponses];
+
+export type adminEffectCatalogReadEffectData = {
+    body?: never;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}';
+};
+
+export type adminEffectCatalogReadEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogReadEffectError = adminEffectCatalogReadEffectErrors[keyof adminEffectCatalogReadEffectErrors];
+
+export type adminEffectCatalogReadEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminEffectPublic;
+};
+
+export type adminEffectCatalogReadEffectResponse = adminEffectCatalogReadEffectResponses[keyof adminEffectCatalogReadEffectResponses];
+
+export type adminEffectCatalogUpdateEffectData = {
+    body: AdminEffectInput;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}';
+};
+
+export type adminEffectCatalogUpdateEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogUpdateEffectError = adminEffectCatalogUpdateEffectErrors[keyof adminEffectCatalogUpdateEffectErrors];
+
+export type adminEffectCatalogUpdateEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminEffectPublic;
+};
+
+export type adminEffectCatalogUpdateEffectResponse = adminEffectCatalogUpdateEffectResponses[keyof adminEffectCatalogUpdateEffectResponses];
+
+export type adminEffectCatalogCreateVariantData = {
+    body: AdminVariantInput;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}/variants';
+};
+
+export type adminEffectCatalogCreateVariantErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogCreateVariantError = adminEffectCatalogCreateVariantErrors[keyof adminEffectCatalogCreateVariantErrors];
+
+export type adminEffectCatalogCreateVariantResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVariantPublic;
+};
+
+export type adminEffectCatalogCreateVariantResponse = adminEffectCatalogCreateVariantResponses[keyof adminEffectCatalogCreateVariantResponses];
+
+export type adminEffectCatalogDeleteVariantData = {
+    body?: never;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+        /**
+         * Variant Id
+         */
+        variant_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}/variants/{variant_id}';
+};
+
+export type adminEffectCatalogDeleteVariantErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogDeleteVariantError = adminEffectCatalogDeleteVariantErrors[keyof adminEffectCatalogDeleteVariantErrors];
+
+export type adminEffectCatalogDeleteVariantResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type adminEffectCatalogDeleteVariantResponse = adminEffectCatalogDeleteVariantResponses[keyof adminEffectCatalogDeleteVariantResponses];
+
+export type adminEffectCatalogUpdateVariantData = {
+    body: AdminVariantInput;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+        /**
+         * Variant Id
+         */
+        variant_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}/variants/{variant_id}';
+};
+
+export type adminEffectCatalogUpdateVariantErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogUpdateVariantError = adminEffectCatalogUpdateVariantErrors[keyof adminEffectCatalogUpdateVariantErrors];
+
+export type adminEffectCatalogUpdateVariantResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVariantPublic;
+};
+
+export type adminEffectCatalogUpdateVariantResponse = adminEffectCatalogUpdateVariantResponses[keyof adminEffectCatalogUpdateVariantResponses];
+
+export type adminEffectCatalogPublishEffectData = {
+    body?: never;
+    path: {
+        /**
+         * Effect Id
+         */
+        effect_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/effects/{effect_id}/publish';
+};
+
+export type adminEffectCatalogPublishEffectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogPublishEffectError = adminEffectCatalogPublishEffectErrors[keyof adminEffectCatalogPublishEffectErrors];
+
+export type adminEffectCatalogPublishEffectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminEffectPublic;
+};
+
+export type adminEffectCatalogPublishEffectResponse = adminEffectCatalogPublishEffectResponses[keyof adminEffectCatalogPublishEffectResponses];
+
+export type adminEffectCatalogUploadMediaAssetData = {
+    body: Body_admin_effect_catalog_upload_media_asset;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/app/media-assets';
+};
+
+export type adminEffectCatalogUploadMediaAssetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogUploadMediaAssetError = adminEffectCatalogUploadMediaAssetErrors[keyof adminEffectCatalogUploadMediaAssetErrors];
+
+export type adminEffectCatalogUploadMediaAssetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminMediaPublic;
+};
+
+export type adminEffectCatalogUploadMediaAssetResponse = adminEffectCatalogUploadMediaAssetResponses[keyof adminEffectCatalogUploadMediaAssetResponses];
+
+export type adminEffectCatalogDeleteMediaAssetData = {
+    body?: never;
+    path: {
+        /**
+         * Asset Id
+         */
+        asset_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/media-assets/{asset_id}';
+};
+
+export type adminEffectCatalogDeleteMediaAssetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogDeleteMediaAssetError = adminEffectCatalogDeleteMediaAssetErrors[keyof adminEffectCatalogDeleteMediaAssetErrors];
+
+export type adminEffectCatalogDeleteMediaAssetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type adminEffectCatalogDeleteMediaAssetResponse = adminEffectCatalogDeleteMediaAssetResponses[keyof adminEffectCatalogDeleteMediaAssetResponses];
+
+export type adminEffectCatalogAdjustUserCoinsData = {
+    body: AdminCoinAdjustmentInput;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/app/coin-adjustments';
+};
+
+export type adminEffectCatalogAdjustUserCoinsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminEffectCatalogAdjustUserCoinsError = adminEffectCatalogAdjustUserCoinsErrors[keyof adminEffectCatalogAdjustUserCoinsErrors];
+
+export type adminEffectCatalogAdjustUserCoinsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminCoinAdjustmentPublic;
+};
+
+export type adminEffectCatalogAdjustUserCoinsResponse = adminEffectCatalogAdjustUserCoinsResponses[keyof adminEffectCatalogAdjustUserCoinsResponses];
 
 export type paymentWebhooksReceiveAppleIapCallbackData = {
     body: PaymentCallbackRequest;

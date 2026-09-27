@@ -46,6 +46,13 @@ class StoredVideo:
     size: int
 
 
+@dataclass(frozen=True)
+class StoredManagedAsset:
+    object_key: str
+    content_type: str
+    size: int
+
+
 class ImageStorageError(Exception):
     def __init__(self, detail: str, status_code: int = 400) -> None:
         self.detail = detail
@@ -84,6 +91,15 @@ class ImageStorage(Protocol):
 
     def delete_object(self, object_key: str) -> None:
         """Delete one managed object if it exists."""
+
+    def store_managed_asset(
+        self,
+        *,
+        kind: str,
+        content: bytes,
+        uploaded_content_type: str | None,
+    ) -> StoredManagedAsset:
+        """Store one long-lived catalogue poster or preview video."""
 
 
 class S3ObjectClient(Protocol):
@@ -138,6 +154,29 @@ def validate_image_upload(
         raise ImageStorageError("File must be an image")
 
     return detected
+
+
+def validate_managed_asset(
+    *, kind: str, content: bytes, uploaded_content_type: str | None
+) -> tuple[str, str]:
+    if kind == "poster":
+        if len(content) > settings.MAX_CATALOG_IMAGE_BYTES:
+            raise ImageStorageError("Catalogue image is too large", status_code=413)
+        detected = detect_image_type(content)
+        if detected is None:
+            raise ImageStorageError("Poster must be a supported image")
+        return detected
+    if kind != "preview_video":
+        raise ImageStorageError("Unsupported catalogue asset kind")
+    if len(content) > settings.MAX_CATALOG_VIDEO_BYTES:
+        raise ImageStorageError("Preview video is too large", status_code=413)
+    if len(content) >= 12 and content[4:8] == b"ftyp":
+        return "video/mp4", ".mp4"
+    if content.startswith(b"\x1a\x45\xdf\xa3"):
+        return "video/webm", ".webm"
+    if uploaded_content_type not in {"video/mp4", "video/webm"}:
+        raise ImageStorageError("Preview must be MP4 or WebM")
+    raise ImageStorageError("Preview video signature is invalid")
 
 
 class LocalImageStorage:
@@ -218,6 +257,26 @@ class LocalImageStorage:
     def delete_object(self, object_key: str) -> None:
         path = self._object_path(object_key)
         path.unlink(missing_ok=True)
+
+    def store_managed_asset(
+        self,
+        *,
+        kind: str,
+        content: bytes,
+        uploaded_content_type: str | None,
+    ) -> StoredManagedAsset:
+        content_type, extension = validate_managed_asset(
+            kind=kind,
+            content=content,
+            uploaded_content_type=uploaded_content_type,
+        )
+        object_key = f"catalog/{kind}/{uuid.uuid4()}{extension}"
+        path = self._object_path(object_key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        return StoredManagedAsset(
+            object_key=object_key, content_type=content_type, size=len(content)
+        )
 
     def _object_path(self, object_key: str) -> Path:
         upload_root = self.upload_root.resolve()
@@ -400,6 +459,42 @@ class R2ImageStorage:
                 "Unable to delete object from Cloudflare R2",
                 status_code=502,
             ) from exc
+
+    def store_managed_asset(
+        self,
+        *,
+        kind: str,
+        content: bytes,
+        uploaded_content_type: str | None,
+    ) -> StoredManagedAsset:
+        content_type, extension = validate_managed_asset(
+            kind=kind,
+            content=content,
+            uploaded_content_type=uploaded_content_type,
+        )
+        object_key = f"{self.object_prefix}/catalog/{kind}/{uuid.uuid4()}{extension}"
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+                Body=content,
+                ContentLength=len(content),
+                ContentType=content_type,
+                CacheControl="private, max-age=300",
+                Metadata={"asset-kind": kind},
+            )
+        except (BotoCoreError, ClientError) as exc:
+            logger.exception(
+                "Cloudflare R2 catalogue upload failed",
+                extra={"bucket": self.bucket_name, "key": object_key},
+            )
+            raise ImageStorageError(
+                "Unable to store catalogue media in Cloudflare R2",
+                status_code=502,
+            ) from exc
+        return StoredManagedAsset(
+            object_key=object_key, content_type=content_type, size=len(content)
+        )
 
     def _object_key(self, *, app_user_id: uuid.UUID, filename: str) -> str:
         return f"{self.object_prefix}/images/{app_user_id}/{filename}"

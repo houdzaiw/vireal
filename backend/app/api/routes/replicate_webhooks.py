@@ -10,6 +10,7 @@ from sqlmodel import select
 from app.api.deps import SessionDep
 from app.core.config import settings
 from app.models import AppVideoTask, AppVideoTaskWebhookEvent
+from app.services.coin_wallet import refund_video_task
 from app.services.replicate_video import (
     ReplicateAPIError,
     parse_replicate_task_payload,
@@ -138,6 +139,8 @@ async def receive_replicate_webhook(
         elif result.status == VideoTaskStatus.PENDING:
             task.status = "pending"
         task.updated_at = now
+        if task.status in {"failed", "canceled"}:
+            refund_video_task(session=session, task=task)
         session.add(task)
 
     try:

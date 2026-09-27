@@ -1,7 +1,10 @@
 import {
   Briefcase,
+  Coins,
+  FolderKanban,
   History,
   Home,
+  Images,
   MessageSquareText,
   ReceiptText,
   SlidersHorizontal,
@@ -35,6 +38,13 @@ export function AppSidebar() {
         ...baseItems,
         { icon: Users, title: "Admin", path: "/admin" },
         { icon: Smartphone, title: "App Users", path: "/app-users" },
+        {
+          icon: FolderKanban,
+          title: "Effect Categories",
+          path: "/effect-categories",
+        },
+        { icon: Images, title: "Effects", path: "/effects" },
+        { icon: Coins, title: "Coin Wallet", path: "/coin-wallet" },
         {
           icon: MessageSquareText,
           title: "App Contents",

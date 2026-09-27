@@ -1,6 +1,8 @@
+import subprocess
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -15,7 +17,17 @@ from app.models import (
     AppVideoTaskWebhookEvent,
 )
 from app.services.storage import ImageStorageError, ReadImage, StoredVideo
-from app.workers.video_tasks import cleanup_expired_media, process_next_video_task
+from app.workers import video_tasks as worker_module
+from app.workers.video_tasks import (
+    VideoOutputError,
+    _download_video,
+    _run_ffmpeg,
+    _validate_local_video,
+    cleanup_expired_media,
+    normalize_provider_video,
+    process_next_video_task,
+    render_local_demo,
+)
 
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42generated-video"
 
@@ -44,6 +56,17 @@ class CleanupStorage:
 
     def delete_object(self, object_key: str) -> None:
         self.deleted.append(object_key)
+
+
+class SelectiveFailingCleanupStorage(CleanupStorage):
+    def __init__(self, failures: set[str]) -> None:
+        super().__init__()
+        self.failures = failures
+
+    def delete_object(self, object_key: str) -> None:
+        if object_key in self.failures:
+            raise ImageStorageError("delete failed", status_code=502)
+        super().delete_object(object_key)
 
 
 class LocalDemoStorage:
@@ -257,3 +280,250 @@ def test_worker_renders_local_demo_from_owned_upload(
     assert completed.is_demo is True
     assert completed.fallback_reason == "replicate_disabled"
     assert storage.stored_content == MP4_BYTES
+
+
+def test_download_video_validates_transport_metadata_and_mp4_signature(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "download.mp4"
+    with httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200))
+    ):
+        with pytest.raises(VideoOutputError, match="must use HTTPS"):
+            _download_video(
+                url="http://example.com/video.mp4",
+                target=target,
+                http_client=httpx.Client(),
+            )
+
+    cases = [
+        (
+            {"Content-Type": "text/plain"},
+            MP4_BYTES,
+            "not a video",
+        ),
+        (
+            {"Content-Type": "video/mp4", "Content-Length": "invalid"},
+            MP4_BYTES,
+            "size is invalid",
+        ),
+        (
+            {"Content-Type": "video/mp4"},
+            b"short",
+            "video is empty",
+        ),
+        (
+            {"Content-Type": "application/octet-stream"},
+            b"0123456789abcdef",
+            "not an MP4",
+        ),
+    ]
+    for headers, content, message in cases:
+        with httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _request, headers=headers, content=content: httpx.Response(
+                    200, headers=headers, content=content
+                )
+            )
+        ) as client:
+            with pytest.raises(VideoOutputError, match=message):
+                _download_video(
+                    url="https://example.com/video.mp4",
+                    target=target,
+                    http_client=client,
+                )
+
+    monkeypatch.setattr(settings, "MAX_GENERATED_VIDEO_BYTES", len(MP4_BYTES) - 1)
+    with httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                headers={
+                    "Content-Type": "video/mp4; charset=binary",
+                    "Content-Length": str(len(MP4_BYTES)),
+                },
+                content=MP4_BYTES,
+            )
+        )
+    ) as client:
+        with pytest.raises(VideoOutputError, match="size limit"):
+            _download_video(
+                url="https://example.com/video.mp4",
+                target=target,
+                http_client=client,
+            )
+    monkeypatch.setattr(settings, "MAX_GENERATED_VIDEO_BYTES", 1024)
+    with httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200, headers={"Content-Type": "video/webm"}, content=MP4_BYTES
+            )
+        )
+    ) as client:
+        assert (
+            _download_video(
+                url="https://example.com/video.mp4",
+                target=target,
+                http_client=client,
+            )
+            == "video/webm"
+        )
+    assert target.read_bytes() == MP4_BYTES
+
+
+def test_local_video_validation_and_ffmpeg_error_mapping(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing = tmp_path / "missing.mp4"
+    with pytest.raises(VideoOutputError, match="could not be read"):
+        _validate_local_video(missing)
+    invalid = tmp_path / "invalid.mp4"
+    invalid.write_bytes(b"invalid")
+    with pytest.raises(VideoOutputError, match="not a valid MP4"):
+        _validate_local_video(invalid)
+    valid = tmp_path / "valid.mp4"
+    valid.write_bytes(MP4_BYTES)
+    _validate_local_video(valid)
+    monkeypatch.setattr(settings, "MAX_GENERATED_VIDEO_BYTES", 12)
+    with pytest.raises(VideoOutputError, match="exceeds the size limit"):
+        _validate_local_video(valid)
+
+    exceptions = [
+        (FileNotFoundError(), "not installed"),
+        (subprocess.TimeoutExpired(cmd="ffmpeg", timeout=1), "timed out"),
+        (subprocess.CalledProcessError(1, "ffmpeg"), "failed"),
+    ]
+    for exception, message in exceptions:
+
+        def fail(*_args: Any, exception: Exception = exception, **_kwargs: Any) -> None:
+            raise exception
+
+        monkeypatch.setattr(worker_module.subprocess, "run", fail)
+        with pytest.raises(VideoOutputError, match=message):
+            _run_ffmpeg(["ffmpeg"], operation="testing")
+
+
+def test_renderer_and_normalizer_build_ffmpeg_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.png"
+    source.write_bytes(b"image")
+    commands: list[tuple[list[str], str]] = []
+
+    def fake_ffmpeg(command: list[str], *, operation: str) -> None:
+        commands.append((command, operation))
+        Path(command[-1]).write_bytes(MP4_BYTES)
+
+    monkeypatch.setattr(worker_module, "_run_ffmpeg", fake_ffmpeg)
+    demo = tmp_path / "demo.mp4"
+    normalized = tmp_path / "normalized.mp4"
+    render_local_demo(source, demo, 5)
+    normalize_provider_video(demo, normalized, 10)
+    assert commands[0][1] == "rendering a local demo"
+    assert "zoompan" in commands[0][0][commands[0][0].index("-vf") + 1]
+    assert commands[1][1] == "normalizing a provider video"
+    assert normalized.read_bytes() == MP4_BYTES
+
+
+def test_worker_normalizes_standard_provider_output_and_handles_empty_queue(
+    db: Session,
+) -> None:
+    task = _create_saving_task(db)
+    task.mode = "standard"
+    db.add(task)
+    db.commit()
+    storage = LocalDemoStorage()
+
+    def normalizer(source: Path, output: Path, duration: int) -> None:
+        assert source.read_bytes() == MP4_BYTES
+        assert duration == 5
+        output.write_bytes(MP4_BYTES)
+
+    with httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200, content=MP4_BYTES, headers={"Content-Type": "video/mp4"}
+            )
+        )
+    ) as client:
+        assert process_next_video_task(
+            storage=storage,
+            http_client=client,
+            provider_video_normalizer=normalizer,
+        )
+    assert storage.stored_content == MP4_BYTES
+    assert process_next_video_task(storage=storage) is False
+
+
+def test_worker_records_invalid_local_demo_source_as_failure(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app_user = AppUser()
+    db.add(app_user)
+    db.commit()
+    db.refresh(app_user)
+    now = datetime.now(UTC)
+    task = AppVideoTask(
+        app_user_id=app_user.id,
+        idempotency_key=f"invalid-demo-{uuid.uuid4()}",
+        template_id="dance",
+        upload_ids_json="not-json",
+        provider="local",
+        model="local/ffmpeg",
+        execution_type="local_demo",
+        is_demo=True,
+        status="rendering_demo",
+        duration=5,
+        seed=123,
+        next_attempt_at=now,
+        expires_at=now + timedelta(hours=24),
+    )
+    db.add(task)
+    db.commit()
+    monkeypatch.setattr(settings, "VIDEO_WORKER_MAX_ATTEMPTS", 1)
+    assert process_next_video_task(storage=LocalDemoStorage()) is True
+    db.expire_all()
+    failed = db.get(AppVideoTask, task.id)
+    assert failed is not None
+    assert failed.status == "failed"
+    assert "invalid source upload" in (failed.error or "")
+
+
+def test_cleanup_skips_objects_that_storage_cannot_delete(db: Session) -> None:
+    app_user = AppUser()
+    db.add(app_user)
+    db.commit()
+    db.refresh(app_user)
+    expired_at = datetime.now(UTC) - timedelta(minutes=1)
+    upload = AppUpload(
+        app_user_id=app_user.id,
+        url=f"/uploads/images/{app_user.id}/failed.png",
+        object_key=f"vireal/images/{app_user.id}/failed.png",
+        content_type="image/png",
+        size=10,
+        expires_at=expired_at,
+    )
+    task = AppVideoTask(
+        app_user_id=app_user.id,
+        idempotency_key=f"cleanup-fail-{uuid.uuid4()}",
+        template_id="dance",
+        upload_ids_json="[]",
+        model="minimax/video-01",
+        status="succeeded",
+        duration=5,
+        seed=1,
+        output_object_key=f"vireal/videos/{app_user.id}/failed.mp4",
+        expires_at=expired_at,
+    )
+    db.add(upload)
+    db.add(task)
+    db.commit()
+    failures = {upload.object_key, task.output_object_key}
+    assert cleanup_expired_media(storage=SelectiveFailingCleanupStorage(failures)) == 0
+    db.expire_all()
+    assert db.get(AppUpload, upload.id).status == "active"  # type: ignore[union-attr]
+    assert db.get(AppVideoTask, task.id).status == "succeeded"  # type: ignore[union-attr]
