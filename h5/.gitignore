@@ -2,5 +2,7 @@
 dist/
 node_modules/
 tests/__pycache__/
+test-results/
+work/v1.2-*.png
 server/
 .worktrees/

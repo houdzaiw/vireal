@@ -1,0 +1,26 @@
+sequenceDiagram
+  participant U as 用户 H5
+  participant A as 应用 API
+  participant D as PostgreSQL
+  participant Q as 生成队列
+  participant M as 模型服务
+  participant S as 对象存储
+  U->>A: 提交 effect variant upload_ids 和幂等键
+  A->>D: 校验配置 配额 余额并创建任务快照
+  D-->>A: 返回任务和扣费结果
+  A-->>U: 返回 queued 与最新余额额度
+  A->>Q: 投递生成任务
+  Q->>M: 使用服务端模型和提示词执行
+  alt 生成成功
+    M-->>Q: 返回视频结果
+    Q->>S: 写入生成视频
+    Q->>D: 更新 succeeded 和结果对象
+    U->>A: 轮询任务
+    A-->>U: 返回播放地址和最新余额额度
+  else 生成失败
+    M-->>Q: 返回错误
+    Q->>D: 更新 failed 并执行退款补偿
+    U->>A: 轮询任务
+    A-->>U: 返回失败原因和退款结果
+  end
+  Note over U,A: 网络中断后使用任务 ID 恢复轮询 不重复提交

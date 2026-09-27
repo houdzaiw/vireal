@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vireal 内容驱动 H5 UI 升级 · PRD v1.2</title>
+  <style>
+    :root {
+      --ink: #0b1215;
+      --ink-soft: #29363b;
+      --paper: #f4f7f7;
+      --card: #ffffff;
+      --line: #dce5e7;
+      --mist: #9de8f4;
+      --mist-deep: #21798a;
+      --mint: #a8ead3;
+      --coral: #f19a86;
+      --warning: #fff5d8;
+      --danger: #fff0ec;
+      --success: #eaf9f2;
+      --shadow: 0 18px 48px rgba(22, 52, 60, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 6% 0%, rgba(157, 232, 244, .25), transparent 32rem),
+        var(--paper);
+      font-family: "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: inherit; }
+    code {
+      padding: .12rem .38rem;
+      overflow-wrap: anywhere;
+      color: #126273;
+      background: #eaf6f8;
+      border-radius: .4rem;
+      font-size: .9em;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 255px minmax(0, 1fr);
+      gap: 24px;
+      width: min(1420px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 72px;
+    }
+    .toc {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      padding: 20px;
+      color: #d9edf0;
+      background: linear-gradient(160deg, #101a1e, #071014);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+    .toc .brand { margin-bottom: 18px; }
+    .toc .brand strong { display: block; letter-spacing: .16em; color: var(--mist); }
+    .toc .brand small { color: #789097; }
+    .toc a {
+      display: block;
+      padding: 8px 10px;
+      color: #a9bec3;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+    .toc a:hover { color: white; background: rgba(255,255,255,.07); }
+    .content { min-width: 0; overflow: hidden; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      color: white;
+      background: linear-gradient(135deg, #0d171b 0%, #123840 58%, #1d5964 100%);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      position: absolute;
+      right: -90px;
+      bottom: -120px;
+      width: 380px;
+      height: 380px;
+      content: "";
+      background: radial-gradient(circle, rgba(157,232,244,.34), transparent 68%);
+    }
+    h1 { position: relative; z-index: 1; max-width: 850px; margin: 0 0 14px; font-size: clamp(34px, 5vw, 58px); line-height: 1.06; letter-spacing: -.035em; }
+    .hero p { position: relative; z-index: 1; max-width: 72ch; margin: 0; color: #bdd3d8; }
+    .version-select {
+      position: absolute;
+      z-index: 2;
+      top: 28px;
+      right: 28px;
+      padding: 10px 12px;
+      color: white;
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.17);
+      border-radius: 12px;
+    }
+    section {
+      margin-top: 22px;
+      padding: 30px;
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(11,18,21,.06);
+      border-radius: 24px;
+      box-shadow: 0 10px 32px rgba(22,52,60,.055);
+    }
+    h2 { margin: 0 0 18px; font-size: 26px; line-height: 1.25; letter-spacing: -.025em; }
+    h3 { margin: 28px 0 10px; color: var(--ink-soft); font-size: 18px; }
+    h4 { margin: 18px 0 8px; font-size: 15px; }
+    p { margin: 0 0 16px; }
+    ul, ol { margin: 8px 0 18px; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    .lead { max-width: 75ch; color: #526268; font-size: 16px; line-height: 1.75; }
+    .grid-2, .grid-3 { display: grid; gap: 14px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      padding: 18px;
+      background: #f8fbfb;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+    }
+    .card strong { display: block; margin-bottom: 6px; }
+    .card p { margin: 0; color: #5c6c72; font-size: 14px; }
+    .callout {
+      margin: 16px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--mist-deep);
+      border-radius: 12px;
+      background: #edf8fa;
+    }
+    .callout.warning { border-color: #c38c16; background: var(--warning); }
+    .callout.danger { border-color: #c8533b; background: var(--danger); }
+    .callout.success { border-color: #35916e; background: var(--success); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    th, td { padding: 12px 13px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); line-height: 1.55; }
+    th { color: #33454b; background: #f0f5f6; font-weight: 800; }
+    tr:last-child td { border-bottom: 0; }
+    .priority, .status {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 11px;
+    }
+    .p0 { color: #8b3322; background: #ffe3dc; }
+    .p1 { color: #805b00; background: #fff0bf; }
+    .draft { color: #176b55; background: #dff6ed; }
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 14px 0 20px;
+    }
+    .flow span { padding: 8px 12px; background: #ecf5f6; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .flow i { color: #80959b; font-style: normal; }
+    .schema-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+    .schema {
+      padding: 17px;
+      background: #0d171b;
+      border-radius: 16px;
+      color: #cfe2e6;
+    }
+    .schema h4 { margin-top: 0; color: var(--mist); }
+    .schema ul { margin-bottom: 0; padding-left: 18px; font-size: 12px; }
+    .placeholder {
+      padding: 28px;
+      color: #687b81;
+      text-align: center;
+      border: 1px dashed #aebfc3;
+      border-radius: 16px;
+      background: #f7fafb;
+    }
+    .feature-module {
+      margin-top: 18px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #f8fbfb;
+    }
+    .feature-module > h3 { margin: 0 0 6px; color: var(--ink); font-size: 21px; }
+    .feature-summary { margin: 0 0 18px; color: #617278; font-size: 14px; }
+    .feature-layout { display: grid; grid-template-columns: minmax(0,1fr) 420px; gap: 18px; align-items: start; }
+    .feature-layout.admin { grid-template-columns: minmax(0,1fr); }
+    .logic-panel { min-width: 0; }
+    .logic-panel h4 { margin-top: 0; }
+    .mermaid-shell { overflow: auto; padding: 14px; border: 1px solid #d6e2e4; border-radius: 14px; background: white; }
+    .mermaid-shell .mermaid { min-width: 520px; display: flex; justify-content: center; }
+    .rule-list { margin: 12px 0 0; padding-left: 20px; color: #4f6268; font-size: 13px; }
+    .sandbox-panel { min-width: 0; }
+    .sandbox-panel h4 { margin-top: 0; }
+    .sandbox-frame {
+      width: 390px;
+      max-width: 100%;
+      height: 760px;
+      display: block;
+      margin: 0 auto;
+      border: 0;
+      border-radius: 20px;
+      background: #020304;
+      box-shadow: 0 16px 42px rgba(22,52,60,.16);
+    }
+    .sandbox-frame.admin { width: 100%; max-width: none; height: 650px; border-radius: 16px; }
+    .module-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .module-meta span { padding: 5px 9px; border-radius: 999px; background: #e9f5f6; color: #3d666f; font-size: 11px; font-weight: 800; }
+    footer { padding: 22px 4px; color: #718389; text-align: center; font-size: 12px; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .toc { position: relative; top: 0; max-height: none; }
+      .toc nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .feature-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .layout { width: min(100% - 20px, 1420px); padding-top: 10px; }
+      .hero, section { padding: 22px; border-radius: 20px; }
+      .version-select { position: relative; top: auto; right: auto; margin-bottom: 18px; }
+      .grid-2, .grid-3, .schema-grid { grid-template-columns: 1fr; }
+      .mermaid-shell .mermaid { min-width: 0; }
+      .mermaid-shell .mermaid svg { max-width: 100% !important; height: auto; }
+      .toc nav { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="toc">
+      <div class="brand"><strong>VIREAL</strong><small>PRD · v1.2 最终版</small></div>
+      <nav>
+        <a href="#meta">项目信息与版本</a>
+        <a href="#background">一、需求背景</a>
+        <a href="#goals">二、需求目标</a>
+        <a href="#users">三、用户与使用场景</a>
+        <a href="#features">四、需求功能清单</a>
+        <a href="#solution">五、详细方案</a>
+        <a href="#flowcharts">六、业务流程图</a>
+        <a href="#exceptions">七、异常与边界</a>
+        <a href="#tracking">八、数据追踪与埋点</a>
+        <a href="#roadmap">九、未来演进规划</a>
+        <a href="#annex">十、附件</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="hero">
+        <select id="versionSelect" class="version-select" aria-label="切换 PRD 版本">
+          <option value="prd_v1.0.html">v1.0 · 历史版本</option>
+          <option value="prd_v1.1.html">v1.1 · 历史版本</option>
+          <option value="prd_v1.2.html" selected>v1.2 · 最终版</option>
+        </select>
+        <h1>内容驱动的手机 H5 UI 升级</h1>
+        <p>以外部 prototype_v1.1.html 为唯一视觉基准，将首页、效果详情与生成流程接入当前 FastAPI、PostgreSQL、对象存储和管理台，实现可运营的动态分类与效果模板。</p>
+      </header>
+
+      <section id="meta">
+        <h2>项目信息与版本记录</h2>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><th>项目名称</th><td>Vireal 内容驱动 H5 UI 升级</td><th>文档版本</th><td>v1.2 最终版</td></tr>
+              <tr><th>目标终端</th><td>手机 H5，桌面端仅保证可访问和基础响应式</td><th>项目状态</th><td><span class="status draft">原型已确认 / 可进入实施</span></td></tr>
+              <tr><th>视觉基准</th><td colspan="3">/Users/liqihui/Documents/vireal/prototype/prototype_v1.1.html，以该外部文件为准</td></tr>
+              <tr><th>实施代码</th><td colspan="3">server/backend、server/frontend、server/h5</td></tr>
+              <tr><th>数据参考</th><td colspan="3">/Users/liqihui/Desktop/backend_data_v1.1.json（categories、videos、generationConfig、routes）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>版本记录</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>版本</th><th>日期</th><th>核心内容</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>v1.0</td><td>2026-09</td><td>单人视频生成、上传、任务和媒体生命周期基线。</td><td>历史版本</td></tr>
+              <tr><td>v1.1</td><td>2026-09</td><td>双模式、配额与本地演示降级方案。</td><td>历史版本</td></tr>
+              <tr><td>v1.2</td><td>2026-09-27</td><td>外部视觉迁移、动态分类/效果、后台运营、双图规则、真实价格/额度、三项底部导航、高保真原型和完整流程图。</td><td>最终版</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="background">
+        <h2>一、需求背景</h2>
+        <h3>1.1 现状问题</h3>
+        <p class="lead">当前项目已具备登录、图片上传、生成任务、配额、作品、支付、后台和对象存储能力，但用户端首页与生成页仍以旧信息架构为主；外部原型已经形成更明确的沉浸式视频效果浏览体验，却仍使用前端硬编码、固定三条效果、单图上传和静态 20 ✦。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>现状</th><th>问题</th><th>本次机会</th></tr></thead>
+            <tbody>
+              <tr><td>外部原型</td><td>分类、效果、余额和价格均为静态演示；媒体为空；生成按钮不连接真实任务。</td><td>保留视觉语言，替换为后端目录、真实上传和生成状态。</td></tr>
+              <tr><td>当前 H5</td><td>业务能力完整，但首页和创作页与新的 Vireal 内容体验不一致。</td><td>保留认证、支付、任务、作品与异常处理，仅更换用户可见界面和内容数据源。</td></tr>
+              <tr><td>当前管理台</td><td>已有用户、内容、生成、订单和键值配置，缺少分类、效果、变体与运营媒体管理。</td><td>增加独立的“效果模板管理”，让运营无需改代码即可发布内容。</td></tr>
+              <tr><td>当前后端</td><td><code>AppVideoTaskCreate</code> 仅允许 dance、单图、5/10 秒，模型和提示词写在代码中。</td><td>将图片数量、时长、价格、模型和提示词收敛为服务端管理的效果配置。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>1.2 为什么现在做</h3>
+        <p>本次视觉基准、列表数据草案和目标代码库均已明确。先完成可运营的数据模型与 H5 迁移，可以让后续新增效果只通过管理台完成，并避免每次新增分类都重新发布前端。</p>
+
+        <h3>1.3 范围边界</h3>
+        <div class="grid-2">
+          <div class="card"><strong>本期包含</strong><p>首页与生成页视觉迁移；动态目录；默认三条缺省效果；管理台 CRUD；对象存储媒体；单/双图；动态时长、价格、模型、提示词；任务与余额联动。</p></div>
+          <div class="card"><strong>本期不改变</strong><p>现有登录体系、用户作品权限、支付入口、任务幂等、失败补偿、媒体清理和管理员权限模型。成人授权前后端校验暂时关闭，但保留未来恢复所需的配置能力。</p></div>
+        </div>
+        <div class="callout warning"><strong>关键约束：</strong>分类可见不等于效果可生成。后台发布效果前必须至少存在一个启用的生成变体，并完成模型、时长、价格和提示词配置；否则效果只能保存为草稿。</div>
+      </section>
+
+      <section id="goals">
+        <h2>二、需求目标</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>目标类型</th><th>描述</th><th>衡量指标</th><th>目标值</th></tr></thead>
+            <tbody>
+              <tr><td>视觉一致性</td><td>线上首页和生成页使用外部原型的视觉语言与核心布局。</td><td>375×812 关键页面视觉评审</td><td>首页、单图生成页、双图生成页全部通过</td></tr>
+              <tr><td>内容动态化</td><td>分类、效果数量、媒体和排序不再由 H5 硬编码。</td><td>前端硬编码业务目录数量</td><td>0</td></tr>
+              <tr><td>运营自助</td><td>管理员可维护分类、效果、变体、推荐和预览媒体。</td><td>新增效果是否需要发版</td><td>不需要</td></tr>
+              <tr><td>生成正确性</td><td>亲吻、浪漫时刻要求两图，其余要求一图；服务端按配置校验。</td><td>图片数量规则自动化测试</td><td>全部通过</td></tr>
+              <tr><td>商业数据真实</td><td>价格、余额、可用时长和任务状态均来自后端。</td><td>用户端静态价格/余额</td><td>0</td></tr>
+              <tr><td>兼容稳定</td><td>保留登录、上传、任务、作品、支付与失败处理。</td><td>现有关键回归测试</td><td>100% 通过</td></tr>
+              <tr><td>缺省可用</td><td>新建分类默认生成三条效果；无媒体时展示原型式渐变占位。</td><td>空媒体破图率</td><td>0</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>2.1 上线验收门槛</h3>
+        <ul>
+          <li>六个首期分类均可从数据库读取，分类下效果数量可增减；初始迁移共创建 18 条效果。</li>
+          <li>无封面、无预览视频时，首页与详情页均使用分类色调、序号和标题生成缺省视觉。</li>
+          <li>后台上传的封面与预览视频能写入当前对象存储，并在 H5 生效。</li>
+          <li>任意价格、时长、图片数量或启用状态变更，无需重新构建 H5。</li>
+          <li>任务提交时客户端不能覆盖模型、提示词或价格；服务端以已发布变体为唯一依据。</li>
+        </ul>
+      </section>
+
+      <section id="users">
+        <h2>三、用户与使用场景</h2>
+        <div class="grid-3">
+          <div class="card"><strong>手机浏览用户</strong><p>在短时间内滑动分类、观看效果并挑选想体验的模板，期待页面沉浸、加载快、无破图。</p></div>
+          <div class="card"><strong>生成用户</strong><p>希望知道要上传几张图、需要多少金币、能生成多长，并能清楚看到排队、处理中、成功或失败。</p></div>
+          <div class="card"><strong>内容运营管理员</strong><p>需要上传媒体、配置模型与价格、调整排序和上下线效果，同时可追溯每次配置变更。</p></div>
+        </div>
+
+        <h3>3.1 User Journey Map</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>阶段</th><th>用户触点</th><th>用户行为</th><th>痛点 / 情绪</th><th>产品机会点</th></tr></thead>
+            <tbody>
+              <tr><td>发现</td><td><code>#home</code> 首页</td><td>查看默认“亲吻”分类，横向切换其他分类。</td><td>媒体尚未配置时担心页面空白。</td><td>用原型一致的渐变、编号和标题占位；目录加载失败提供重试。</td></tr>
+              <tr><td>挑选</td><td>效果卡片</td><td>观看静音循环预览或查看封面，点击目标效果。</td><td>不知道效果是否真的可生成。</td><td>仅展示已发布且有有效变体的效果；不可生成内容不进入公共目录。</td></tr>
+              <tr><td>了解</td><td><code>#generate</code> 详情页</td><td>查看效果、推荐、时长、价格和剩余额度。</td><td>静态 20 ✦ 与实际收费不一致。</td><td>选择时长后由后端变体返回金币价格，并同步刷新余额。</td></tr>
+              <tr><td>上传</td><td>上传区域</td><td>亲吻/浪漫上传两张图；其他上传一张图。</td><td>不清楚每张图代表什么，或误传数量。</td><td>双图使用“人物 A / 人物 B”独立卡片；客户端预检，服务端再次校验。</td></tr>
+              <tr><td>登录与支付</td><td>登录门槛、钱包</td><td>未登录时先登录；余额不足时进入现有充值流程。</td><td>担心上传后跳转导致内容丢失。</td><td>登录前保留所选效果；上传动作只在有效会话后发生。</td></tr>
+              <tr><td>生成</td><td>生成按钮、任务页</td><td>确认价格并提交，查看排队和生成进度。</td><td>重复点击、网络中断或任务失败。</td><td>幂等键、防重复提交、断线恢复、失败补偿沿用现有能力。</td></tr>
+              <tr><td>查看结果</td><td>结果预览、作品页</td><td>播放、保存或下载生成结果。</td><td>结果过期或媒体不可用。</td><td>显示有效期，沿用签名 URL、作品权限和媒体生命周期。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>3.2 管理员旅程</h3>
+        <div class="flow">
+          <span>进入效果模板管理</span><i>→</i><span>创建/编辑分类</span><i>→</i><span>默认生成 3 条效果</span><i>→</i><span>上传媒体</span><i>→</i><span>配置变体</span><i>→</i><span>预览并发布</span><i>→</i><span>H5 自动生效</span>
+        </div>
+      </section>
+
+      <section id="features">
+        <h2>四、需求功能清单</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>模块</th><th>优先级</th><th>基础逻辑与验收</th></tr></thead>
+            <tbody>
+              <tr><td>F-01</td><td>动态分类导航</td><td><span class="priority p0">P0</span></td><td>按后台启用状态和排序读取一级分类；默认选择 URL 指定分类，否则选择第一项。</td></tr>
+              <tr><td>F-02</td><td>动态效果列表</td><td><span class="priority p0">P0</span></td><td>数量完全由数据库决定；新分类事务内默认创建 3 条占位效果，可继续增删排序。</td></tr>
+              <tr><td>F-03</td><td>缺省媒体视觉</td><td><span class="priority p0">P0</span></td><td>封面或视频为空、加载失败时，使用 tones、序号、标题生成与视觉基准一致的卡片。</td></tr>
+              <tr><td>F-04</td><td>效果详情/生成页</td><td><span class="priority p0">P0</span></td><td>完整迁移原型 hero、上传面板、结果区与同类推荐；数据全部来自效果详情。</td></tr>
+              <tr><td>F-05</td><td>单图/双图上传</td><td><span class="priority p0">P0</span></td><td>kiss、romance 默认 2；其他默认 1；最终以效果的 <code>input_image_count</code> 为准，范围 1–2。</td></tr>
+              <tr><td>F-06</td><td>时长与价格变体</td><td><span class="priority p0">P0</span></td><td>每个效果可配置多个启用变体；用户选择时长后显示服务端价格，不允许客户端自报价格。</td></tr>
+              <tr><td>F-07</td><td>动态模型与提示词</td><td><span class="priority p0">P0</span></td><td>服务端从已发布变体解析 provider、model、prompt 和版本；客户端只提交效果、变体与素材 ID。</td></tr>
+              <tr><td>F-08</td><td>余额、额度和任务</td><td><span class="priority p0">P0</span></td><td>显示真实余额、可用时长和任务状态；保留幂等、配额、失败退款/补偿和断线恢复。</td></tr>
+              <tr><td>F-09</td><td>路由兼容</td><td><span class="priority p0">P0</span></td><td>支持 <code>#home?category=</code>、<code>#generate?category=&amp;video=</code>；旧 <code>#create</code> 重定向到默认或最近效果。</td></tr>
+              <tr><td>F-10</td><td>分类管理</td><td><span class="priority p0">P0</span></td><td>管理台新增分类增改、排序、启停、色调配置；删除前校验关联效果。</td></tr>
+              <tr><td>F-11</td><td>效果管理</td><td><span class="priority p0">P0</span></td><td>维护双语名称、排序、图片数量、封面、预览、发布状态、推荐关系和生成变体。</td></tr>
+              <tr><td>F-12</td><td>运营媒体上传</td><td><span class="priority p0">P0</span></td><td>管理员上传图片/视频到当前对象存储；与用户 24 小时素材隔离，不自动过期。</td></tr>
+              <tr><td>F-13</td><td>配置审计</td><td><span class="priority p1">P1</span></td><td>新增、修改、上下线、媒体替换和删除写入现有管理员操作日志。</td></tr>
+              <tr><td>F-14</td><td>成人授权开关</td><td><span class="priority p0">P0</span></td><td>本期前端不展示、服务端不阻断；保留配置开关和未来恢复点，不删除历史字段。</td></tr>
+              <tr><td>F-15</td><td>异常与空状态</td><td><span class="priority p0">P0</span></td><td>覆盖目录失败、空分类、媒体失败、余额不足、配置失效、上传失败和任务失败。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="solution">
+        <h2>五、详细方案</h2>
+        <p class="lead">本节为已确认的最终方案。每个核心模块同时包含 Mermaid 交互流程、实现规则和开启 Focus 锁定的 v1.2 原型沙盒；正式实现以本节与服务端数据约束为验收依据。</p>
+
+        <h3>5.1 H5 页面与路由</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>页面</th><th>路由</th><th>数据来源</th><th>核心规则</th></tr></thead>
+            <tbody>
+              <tr><td>首页</td><td><code>#home?category={slug}</code></td><td>效果目录 API</td><td>仅返回已启用分类和已发布效果；媒体缺失时使用视觉占位；分类数量与效果数量不设前端上限。</td></tr>
+              <tr><td>生成页</td><td><code>#generate?category={slug}&amp;video={effectSlug}</code></td><td>目录缓存 + 效果详情</td><td>页面外观按外部原型；上传格数量由 <code>input_image_count</code> 决定；时长和价格来自启用变体。</td></tr>
+              <tr><td>旧创作入口</td><td><code>#create</code></td><td>最近选择或目录默认项</td><td>兼容旧链接，重定向到生成页，不保留旧创作 UI。</td></tr>
+              <tr><td>任务与结果</td><td>沿用现有生成/作品路由</td><td>现有任务查询和媒体接口</td><td>在原型结果区域内展示真实进度、错误、播放和下载。</td></tr>
+              <tr><td>底部导航</td><td>发现 / 作品 / 我的</td><td>当前会话与路由状态</td><td>底部不展示“金币”入口；钱包仍可通过顶部余额按钮和余额不足提示进入。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5.2 核心功能模块化方案</h3>
+
+        <article class="feature-module" id="feature-catalog">
+          <h3>功能一：动态分类与效果目录</h3>
+          <p class="feature-summary">首页完全沿用已确认原型的视觉结构，但分类、效果数量、排序、媒体和价格摘要均由目录 API 决定。</p>
+          <div class="module-meta"><span>关联 F-01 至 F-03</span><span>手机 H5</span><span>Focus: home</span></div>
+          <div class="feature-layout">
+            <div class="logic-panel">
+              <h4>交互逻辑流程图</h4>
+              <div class="mermaid-shell"><pre class="mermaid">
+flowchart TD
+  A[打开 H5 首页] --> B{目录请求成功}
+  B -- 否 --> C{存在可用缓存}
+  C -- 是 --> D[只读展示缓存并标记需刷新]
+  C -- 否 --> E[展示加载失败和重试入口]
+  E --> B
+  B -- 是 --> F[按后台排序展示启用分类]
+  F --> G{分类有已发布效果}
+  G -- 否 --> H[公共目录隐藏该分类]
+  G -- 是 --> I[渲染任意数量效果]
+  I --> J{封面或预览可用}
+  J -- 是 --> K[展示真实媒体]
+  J -- 否 --> L[展示色调编号标题缺省卡片]
+  K --> M[用户选择效果]
+  L --> M
+  M --> N[进入效果生成页]
+              </pre></div>
+              <h4>详细规则</h4>
+              <ul class="rule-list">
+                <li><strong>排序：</strong>分类和效果均按 <code>sort_order ASC, created_at ASC</code>。</li>
+                <li><strong>数量：</strong>前端不假设固定三条；新分类仅在创建时由后端默认生成三条效果，之后可任意增删排序。</li>
+                <li><strong>媒体降级：</strong>预览视频失败后退化为封面，封面为空或失败后使用分类 tones、序号和标题绘制已确认的缺省卡片。</li>
+                <li><strong>空分类：</strong>公共目录隐藏没有已发布效果的分类；管理台仍显示并提示运营补充内容。</li>
+                <li><strong>失败恢复：</strong>目录请求失败时不回退到代码硬编码；有缓存则只读展示并标记，完全无数据时展示重试。</li>
+              </ul>
+            </div>
+            <div class="sandbox-panel">
+              <h4>专注模式沙盒</h4>
+              <iframe class="sandbox-frame" title="动态效果目录原型" src="../prototype/prototype_v1.2.html?sandbox=true&amp;focus=home#home?category=kiss" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-module" id="feature-generation">
+          <h3>功能二：单图或双图生成配置</h3>
+          <p class="feature-summary">亲吻和浪漫时刻默认要求两张图片，其余分类默认一张；最终上传数量、可选时长和金币价格以效果发布快照为准。</p>
+          <div class="module-meta"><span>关联 F-04 至 F-07</span><span>真实价格</span><span>Focus: generate</span></div>
+          <div class="feature-layout">
+            <div class="logic-panel">
+              <h4>交互逻辑流程图</h4>
+              <div class="mermaid-shell"><pre class="mermaid">
+flowchart TD
+  A[进入效果生成页] --> B[读取效果详情和启用变体]
+  B --> C{效果仍可生成}
+  C -- 否 --> D[提示效果已更新并返回推荐]
+  C -- 是 --> E[按配置显示一个或两个上传槽]
+  E --> F[用户上传图片]
+  F --> G{上传成功且数量匹配}
+  G -- 否 --> H[定位失败槽位并允许重试]
+  H --> F
+  G -- 是 --> I[选择后端支持的时长]
+  I --> J[显示实际金币价格和生成后余额]
+  J --> K{余额和额度充足}
+  K -- 否 --> L[保留上传并进入充值或稍后重试]
+  K -- 是 --> M[提交效果变体素材和幂等键]
+  M --> N{服务端校验通过}
+  N -- 否 --> O[不创建任务且不扣费并刷新详情]
+  N -- 是 --> P[创建任务并进入任务状态页]
+              </pre></div>
+              <h4>详细规则</h4>
+              <ul class="rule-list">
+                <li><strong>图片数量：</strong><code>input_image_count</code> 仅允许 1 或 2；kiss、romance 的种子数据为 2，其他种子数据为 1。</li>
+                <li><strong>上传：</strong>每张图片独立上传并返回 upload_id；失败仅重试对应槽位，成功素材保留在当前页面。</li>
+                <li><strong>变体：</strong>时长选项来自启用的 effect variant；禁用时长不允许提交。</li>
+                <li><strong>价格：</strong>客户端只展示服务端价格，不提交 coin_cost、model 或 prompt，防止篡改。</li>
+                <li><strong>提交：</strong>请求仅包含 effect_id、variant_id、upload_ids 和 Idempotency-Key；重复提交返回同一任务。</li>
+              </ul>
+              <div class="callout danger"><strong>成人授权校验：</strong>本期前端不展示，服务端不阻断，任务请求不要求 consent；配置和历史字段保留，以便后续恢复。</div>
+            </div>
+            <div class="sandbox-panel">
+              <h4>专注模式沙盒</h4>
+              <iframe class="sandbox-frame" title="双图生成原型" src="../prototype/prototype_v1.2.html?sandbox=true&amp;focus=generate#generate?category=kiss&amp;video=kiss-1" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-module" id="feature-task">
+          <h3>功能三：任务状态、失败补偿与作品</h3>
+          <p class="feature-summary">生成任务在服务端持久化；用户可以离开页面，重新进入后通过任务 ID 恢复状态，不产生重复扣费。</p>
+          <div class="module-meta"><span>关联 F-08</span><span>异步任务</span><span>Focus: generation</span></div>
+          <div class="feature-layout">
+            <div class="logic-panel">
+              <h4>交互逻辑流程图</h4>
+              <div class="mermaid-shell"><pre class="mermaid">
+sequenceDiagram
+  participant U as 用户 H5
+  participant A as 应用 API
+  participant D as PostgreSQL
+  participant Q as 生成队列
+  participant M as 模型服务
+  participant S as 对象存储
+  U->>A: 提交效果变体素材和幂等键
+  A->>D: 校验配置配额余额并创建任务快照
+  D-->>A: 返回任务和扣费结果
+  A-->>U: 返回 queued 和最新余额额度
+  A->>Q: 投递生成任务
+  Q->>M: 使用服务端模型和提示词执行
+  alt 生成成功
+    M-->>Q: 返回视频结果
+    Q->>S: 写入生成视频
+    Q->>D: 更新 succeeded 和结果对象
+    U->>A: 轮询任务
+    A-->>U: 返回播放地址和最新余额额度
+  else 生成失败
+    M-->>Q: 返回错误
+    Q->>D: 更新 failed 并执行退款补偿
+    U->>A: 轮询任务
+    A-->>U: 返回失败原因和退款结果
+  end
+  Note over U,A: 网络中断后使用任务 ID 恢复轮询
+              </pre></div>
+              <h4>详细规则</h4>
+              <ul class="rule-list">
+                <li><strong>任务快照：</strong>保存效果、变体、价格、模型、prompt_version 和实际执行 provider，避免运营修改影响历史任务。</li>
+                <li><strong>状态：</strong>至少包含 queued、processing、succeeded、failed；客户端根据服务端状态渲染，不自行推断完成。</li>
+                <li><strong>断线：</strong>任务 ID 写入会话恢复点；网络恢复后继续轮询，禁止自动重新创建。</li>
+                <li><strong>失败：</strong>模型失败记录可审计错误码并执行退款或补偿，H5 展示可理解原因和重试入口。</li>
+                <li><strong>作品：</strong>成功结果进入作品列表；无作品时展示已确认空状态并引导返回发现页。</li>
+              </ul>
+            </div>
+            <div class="sandbox-panel">
+              <h4>专注模式沙盒</h4>
+              <iframe class="sandbox-frame" title="生成任务状态原型" src="../prototype/prototype_v1.2.html?sandbox=true&amp;focus=generation#generation" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-module" id="feature-wallet">
+          <h3>功能四：余额展示与钱包入口</h3>
+          <p class="feature-summary">底部导航只保留发现、作品和我的；钱包仍可从顶部实时余额或余额不足提示进入。</p>
+          <div class="module-meta"><span>真实余额</span><span>支付连续性</span><span>Focus: wallet</span></div>
+          <div class="feature-layout">
+            <div class="logic-panel">
+              <h4>交互逻辑流程图</h4>
+              <div class="mermaid-shell"><pre class="mermaid">
+flowchart TD
+  A[用户查看顶部余额] --> B{余额足够生成}
+  B -- 是 --> C[在生成页直接确认消耗]
+  B -- 否 --> D[余额不足提示]
+  D --> E[通过提示进入钱包]
+  A --> F[点击顶部余额进入钱包]
+  E --> G[选择金币包]
+  F --> G
+  G --> H{支付通知确认成功}
+  H -- 否 --> I[保留原余额并允许重试]
+  H -- 是 --> J[服务端入账并返回最新余额]
+  J --> K[返回生成页继续提交]
+  L[底部导航] --> M[仅保留发现 作品 我的]
+              </pre></div>
+              <h4>详细规则</h4>
+              <ul class="rule-list">
+                <li><strong>入口：</strong>顶部余额在首页和生成页可点击；余额不足提示提供明确的充值动作。</li>
+                <li><strong>底部导航：</strong>固定为发现、作品、我的三项，不展示金币按钮。</li>
+                <li><strong>余额真值：</strong>展示账户服务返回值；提交任务和支付确认后都刷新余额与额度。</li>
+                <li><strong>支付：</strong>仅服务端确认支付通知后入账；客户端成功动画不能作为入账依据。</li>
+              </ul>
+            </div>
+            <div class="sandbox-panel">
+              <h4>专注模式沙盒</h4>
+              <iframe class="sandbox-frame" title="钱包与余额原型" src="../prototype/prototype_v1.2.html?sandbox=true&amp;focus=wallet#wallet" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-module" id="feature-admin">
+          <h3>功能五：分类、效果与对象存储运营</h3>
+          <p class="feature-summary">管理员在现有后台维护整个效果目录；新增分类默认生成三条效果，但后续数量完全由数据决定。</p>
+          <div class="module-meta"><span>关联 F-10 至 F-13</span><span>管理台</span><span>Focus: admin</span></div>
+          <div class="feature-layout admin">
+            <div class="logic-panel">
+              <h4>交互逻辑流程图</h4>
+              <div class="mermaid-shell"><pre class="mermaid">
+flowchart TD
+  A[管理员进入分类或效果管理] --> B{新建分类}
+  B -- 是 --> C[事务内创建分类和三条缺省效果]
+  B -- 否 --> D[选择现有效果]
+  C --> D
+  D --> E[维护双语名称图片数排序和推荐]
+  E --> F[配置时长金币模型和提示词]
+  F --> G{上传封面或预览视频}
+  G -- 是 --> H[媒体写入当前对象存储]
+  H --> I{媒体校验成功}
+  I -- 否 --> J[保留旧媒体并提示重试]
+  J --> G
+  I -- 是 --> K[保存媒体资产记录]
+  G -- 否 --> L[继续使用缺省媒体视觉]
+  K --> M[执行发布校验]
+  L --> M
+  M --> N{存在启用变体且配置有效}
+  N -- 否 --> O[阻止发布并显示字段错误]
+  N -- 是 --> P[发布目录数据并写入审计日志]
+  P --> Q[H5 下次目录请求动态生效]
+              </pre></div>
+              <h4>详细规则</h4>
+              <ul class="rule-list">
+                <li><strong>分类：</strong>维护双语名称、slug、色调、排序和启停；创建分类和三条缺省效果必须同事务。</li>
+                <li><strong>效果：</strong>维护名称、描述、图片数量、排序、推荐关系、发布状态和任意数量变体。</li>
+                <li><strong>媒体：</strong>封面和预览直接上传当前对象存储，使用独立目录和长期资产策略，不套用用户素材 24 小时过期规则。</li>
+                <li><strong>发布校验：</strong>至少一个启用变体；图片数量为 1 或 2；时长价格有效；模型和提示词完整。</li>
+                <li><strong>审计：</strong>创建、编辑、排序、启停、发布、媒体替换和删除均记录管理员与变更摘要。</li>
+              </ul>
+            </div>
+            <div class="sandbox-panel">
+              <h4>专注模式沙盒</h4>
+              <iframe class="sandbox-frame admin" title="管理台效果编辑原型" src="../prototype/prototype_v1.2.html?sandbox=true&amp;focus=admin#admin-effect-edit?video=kiss-1" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+        </article>
+
+        <h3>5.3 公共 API</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>方法</th><th>路径</th><th>用途</th><th>服务端约束</th></tr></thead>
+            <tbody>
+              <tr><td>GET</td><td><code>/api/v1/app/effect-catalog</code></td><td>一次返回已发布分类、效果摘要与可选变体。</td><td>不返回生成提示词、存储对象 Key 或内部模型密钥；支持 ETag/短缓存。</td></tr>
+              <tr><td>GET</td><td><code>/api/v1/app/effects/{slug}</code></td><td>生成页效果详情和推荐项。</td><td>效果、分类和至少一个变体必须启用。</td></tr>
+              <tr><td>POST</td><td><code>/api/v1/app/uploads/images</code></td><td>上传一张用户图片。</td><td>沿用现有类型、大小、归属和有效期校验。</td></tr>
+              <tr><td>POST</td><td><code>/api/v1/app/video-tasks</code></td><td>创建真实生成任务。</td><td><code>Idempotency-Key</code> 必填；根据 variant 解析图片数、价格、模型和 prompt；原子扣减/预留。</td></tr>
+              <tr><td>GET</td><td><code>/api/v1/app/video-tasks/{id}</code></td><td>轮询任务和取得播放地址。</td><td>只能访问本人任务；返回最新余额/额度摘要。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5.4 管理台 API</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>资源</th><th>路径前缀</th><th>能力</th></tr></thead>
+            <tbody>
+              <tr><td>分类</td><td><code>/api/v1/admin/app/effect-categories</code></td><td>列表、创建、编辑、排序、启停；创建时默认生成三条效果。</td></tr>
+              <tr><td>效果</td><td><code>/api/v1/admin/app/effects</code></td><td>列表、创建、编辑、复制、发布、下线、删除和推荐关系管理。</td></tr>
+              <tr><td>变体</td><td><code>/api/v1/admin/app/effects/{id}/variants</code></td><td>维护时长、金币、模型、提示词与启用状态。</td></tr>
+              <tr><td>运营媒体</td><td><code>/api/v1/admin/app/media-assets</code></td><td>multipart 上传图片/视频、读取元数据、替换和删除对象。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5.5 后端数据结构</h3>
+        <p>采用独立关系表承载可运营目录，不将复杂模板塞入现有 <code>AppConfig.value</code>。现有 <code>AppVideoTask</code> 继续作为任务事实表，并新增效果与变体快照字段。</p>
+        <div class="schema-grid">
+          <div class="schema">
+            <h4>app_effect_category</h4>
+            <ul>
+              <li>id UUID PK；slug 唯一</li>
+              <li>name_zh、name_en</li>
+              <li>tones_json：三色视觉配置</li>
+              <li>sort_order、is_enabled</li>
+              <li>created_at、updated_at</li>
+            </ul>
+          </div>
+          <div class="schema">
+            <h4>app_effect</h4>
+            <ul>
+              <li>id UUID PK；category_id FK；slug 唯一</li>
+              <li>title_zh、title_en、description</li>
+              <li>input_image_count：1 或 2</li>
+              <li>poster_asset_id、preview_asset_id</li>
+              <li>sort_order、publish_status、is_enabled</li>
+              <li>created_at、updated_at</li>
+            </ul>
+          </div>
+          <div class="schema">
+            <h4>app_effect_variant</h4>
+            <ul>
+              <li>id UUID PK；effect_id FK</li>
+              <li>duration_seconds、coin_cost</li>
+              <li>provider、model、model_type</li>
+              <li>prompt、negative_prompt、prompt_version</li>
+              <li>is_default、is_enabled</li>
+              <li>唯一键 effect_id + duration_seconds</li>
+            </ul>
+          </div>
+          <div class="schema">
+            <h4>app_managed_media_asset</h4>
+            <ul>
+              <li>id UUID PK；kind：poster / preview_video</li>
+              <li>object_key、content_type、size、checksum</li>
+              <li>width、height、duration_ms、status</li>
+              <li>uploaded_by、created_at、deleted_at</li>
+              <li>catalog 资源独立前缀，不使用用户 24 小时过期规则</li>
+            </ul>
+          </div>
+          <div class="schema">
+            <h4>app_effect_recommendation</h4>
+            <ul>
+              <li>effect_id、recommended_effect_id</li>
+              <li>sort_order</li>
+              <li>联合唯一，禁止自推荐</li>
+              <li>推荐不足时同分类自动补齐</li>
+            </ul>
+          </div>
+          <div class="schema">
+            <h4>app_video_task 扩展</h4>
+            <ul>
+              <li>effect_id、variant_id，可空以兼容历史任务</li>
+              <li>coin_cost_snapshot</li>
+              <li>prompt_version_snapshot</li>
+              <li>现有 model、provider 保留为实际执行快照</li>
+              <li>template_id 兼容读取，v1.2 新任务改用 effect 关系</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>5.6 种子数据与迁移</h3>
+        <ol>
+          <li>从 <code>backend_data_v1.1.json</code> 导入 6 个分类及 tones、排序和启用状态。</li>
+          <li>导入 18 条初始效果，每个分类默认 3 条；poster/preview 为空，前端展示视觉占位。</li>
+          <li>kiss、romance 的 <code>input_image_count=2</code>；charm、outfit、dance、anime 为 1。</li>
+          <li>现有 dance 任务保持可查询；新任务通过 effect/variant 创建，历史 <code>template_id</code> 不做破坏性迁移。</li>
+          <li>发布前必须为每条可生成效果配置至少一个启用变体；数据库迁移与种子导入需幂等。</li>
+        </ol>
+
+        <h3>5.7 管理台页面</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>页面</th><th>主要内容</th><th>关键操作</th></tr></thead>
+            <tbody>
+              <tr><td>效果分类</td><td>名称、slug、色调、排序、状态、效果数量。</td><td>新增、编辑、启停、排序；新增后自动出现 3 条默认效果。</td></tr>
+              <tr><td>效果模板</td><td>封面/占位、分类、双语名称、图片数、变体数、发布状态。</td><td>筛选、创建、复制、编辑、预览、发布、下线、删除。</td></tr>
+              <tr><td>效果编辑</td><td>基础信息、媒体、生成配置、推荐效果。</td><td>上传封面/视频；管理时长和价格；配置模型与提示词；发布前校验。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5.8 数据流与原型入口</h3>
+        <div class="flow">
+          <span>管理员配置分类/效果</span><i>→</i><span>媒体写入对象存储</span><i>→</i><span>配置写入 PostgreSQL</span><i>→</i><span>目录 API 发布</span><i>→</i><span>H5 动态渲染</span><i>→</i><span>用户上传 1/2 图</span><i>→</i><span>服务端解析变体</span><i>→</i><span>任务执行与结果回写</span>
+        </div>
+        <div class="callout success"><strong>已确认原型：</strong><a href="../prototype/prototype_v1.2.html?review=1#home" target="_blank"><code>prototype/prototype_v1.2.html</code></a>。原型内演示数据仅用于验证交互，正式页面的余额、额度、价格、时长和状态必须来自 API。</div>
+      </section>
+
+      <section id="flowcharts">
+        <h2>六、业务流程图</h2>
+        <p class="lead">详细功能流程已分别嵌入第五章。本节提供跨模块的端到端主线与后台发布总览，独立 Mermaid 源文件位于 <code>flowcharts/</code>。</p>
+        <h3>6.1 用户端端到端主线</h3>
+        <div class="mermaid-shell"><pre class="mermaid">
+flowchart TD
+  A[进入首页] --> B[读取动态分类和效果]
+  B --> C{目录可用}
+  C -- 否 --> D[展示缓存或重试]
+  C -- 是 --> E[选择效果]
+  E --> F{效果需要几张图片}
+  F -- 一张 --> G[上传一张图片]
+  F -- 两张 --> H[上传两张图片]
+  G --> I{上传完整}
+  H --> I
+  I -- 否 --> J[定位失败槽位并重试]
+  J --> I
+  I -- 是 --> K[选择可用时长]
+  K --> L[展示实际消耗和剩余余额]
+  L --> M{登录余额额度均有效}
+  M -- 否 --> N[登录充值或稍后重试]
+  M -- 是 --> O[使用幂等键创建任务]
+  O --> P{任务终态}
+  P -- 成功 --> Q[作品列表展示结果]
+  P -- 失败 --> R[退款补偿并提供重试]
+  P -- 网络中断 --> S[使用任务 ID 恢复轮询]
+  S --> P
+        </pre></div>
+        <h3>6.2 运营发布与数据生效</h3>
+        <div class="mermaid-shell"><pre class="mermaid">
+flowchart LR
+  A[分类与效果配置] --> B[时长价格模型提示词]
+  B --> C{配置媒体}
+  C -- 是 --> D[上传当前对象存储]
+  C -- 否 --> E[使用缺省媒体视觉]
+  D --> F[媒体校验和资产记录]
+  E --> G[发布校验]
+  F --> G
+  G --> H{校验通过}
+  H -- 否 --> I[显示字段错误并保留草稿]
+  H -- 是 --> J[发布目录并写审计日志]
+  J --> K[H5 目录 API 动态返回]
+        </pre></div>
+        <h3>6.3 Mermaid 源文件</h3>
+        <ul>
+          <li><code>flowcharts/01_catalog_browse_v1.2.mmd</code>：目录加载、空分类和媒体降级。</li>
+          <li><code>flowcharts/02_generation_submit_v1.2.mmd</code>：单双图上传、变体、余额与提交校验。</li>
+          <li><code>flowcharts/03_task_lifecycle_v1.2.mmd</code>：任务、队列、模型、对象存储、成功与退款。</li>
+          <li><code>flowcharts/04_wallet_access_v1.2.mmd</code>：顶部余额入口、余额不足和三项底部导航。</li>
+          <li><code>flowcharts/05_admin_publish_v1.2.mmd</code>：分类默认效果、媒体上传、发布校验和审计。</li>
+        </ul>
+      </section>
+
+      <section id="exceptions">
+        <h2>七、异常与边界处理</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>场景</th><th>服务端行为</th><th>H5 / 管理台反馈</th></tr></thead>
+            <tbody>
+              <tr><td>目录请求失败</td><td>返回明确错误码，不回退到过期硬编码目录。</td><td>保留品牌页骨架，显示重试；已缓存目录可标记后只读展示。</td></tr>
+              <tr><td>分类无已发布效果</td><td>公共目录过滤该分类。</td><td>管理台显示空分类警告。</td></tr>
+              <tr><td>媒体为空或加载失败</td><td>效果数据仍可返回。</td><td>按 tones + 序号 + 标题显示缺省视觉。</td></tr>
+              <tr><td>效果或变体已下线</td><td>创建任务返回 409，不按旧缓存继续提交。</td><td>提示“效果已更新”，刷新详情并推荐其他效果。</td></tr>
+              <tr><td>图片数量不匹配</td><td>422；任务不创建、不扣费。</td><td>定位缺少的图片槽位。</td></tr>
+              <tr><td>余额不足</td><td>409；任务不创建。</td><td>展示所需金币与当前余额，进入现有充值入口。</td></tr>
+              <tr><td>重复提交</td><td>同用户 + Idempotency-Key 返回同一任务。</td><td>按钮进入提交中，不产生第二次扣费。</td></tr>
+              <tr><td>模型配置无效</td><td>后台禁止发布；运行时仍异常则任务失败并按现有规则补偿。</td><td>管理员看到字段级错误；用户看到可理解的失败提示。</td></tr>
+              <tr><td>运营媒体上传失败</td><td>不写入有效资产记录；清理孤立对象。</td><td>保留原媒体，允许重试。</td></tr>
+              <tr><td>网络中断</td><td>任务状态保存在服务端。</td><td>恢复后使用任务 ID 继续轮询。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tracking">
+        <h2>八、数据追踪与埋点</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>事件</th><th>触发</th><th>关键参数</th><th>目的</th></tr></thead>
+            <tbody>
+              <tr><td><code>catalog_loaded</code></td><td>目录加载成功/失败</td><td>category_count、effect_count、cache_hit、error_code</td><td>监控目录可用性。</td></tr>
+              <tr><td><code>category_selected</code></td><td>切换分类</td><td>category_id、source</td><td>判断分类兴趣。</td></tr>
+              <tr><td><code>effect_opened</code></td><td>打开生成页</td><td>effect_id、category_id、has_preview、input_count</td><td>衡量卡片转化。</td></tr>
+              <tr><td><code>variant_selected</code></td><td>选择时长</td><td>effect_id、variant_id、duration、coin_cost</td><td>分析时长和价格偏好。</td></tr>
+              <tr><td><code>generation_submitted</code></td><td>提交任务</td><td>effect_id、variant_id、upload_count、balance_before</td><td>生成漏斗。</td></tr>
+              <tr><td><code>generation_result</code></td><td>任务终态</td><td>effect_id、model、status、duration_ms、error_code</td><td>质量、稳定性和成本监控。</td></tr>
+              <tr><td><code>admin_effect_published</code></td><td>管理员发布</td><td>effect_id、variant_count、has_poster、has_preview</td><td>运营审计和内容供给。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout success"><strong>隐私要求：</strong>埋点和普通日志不得记录原图内容、完整媒体签名 URL、生成提示词正文、访问令牌、支付令牌或对象存储密钥。</div>
+      </section>
+
+      <section id="roadmap">
+        <h2>九、未来演进规划</h2>
+        <div class="grid-3">
+          <div class="card"><strong>Phase 1 · v1.2</strong><p>完成 UI 迁移、动态目录、后台管理、对象存储媒体、单/双图和真实价格/额度闭环。</p></div>
+          <div class="card"><strong>Phase 2</strong><p>增加批量导入、模板复制、定时发布、草稿预览和模型效果 A/B 实验。</p></div>
+          <div class="card"><strong>Phase 3</strong><p>根据数据扩展个性化推荐、多语言内容、更多媒体类型和地区化模型路由。</p></div>
+        </div>
+      </section>
+
+      <section id="annex">
+        <h2>十、附件</h2>
+        <h3>10.1 输入资料</h3>
+        <ul>
+          <li>视觉基准：<code>/Users/liqihui/Documents/vireal/prototype/prototype_v1.1.html</code></li>
+          <li>数据草案：<code>/Users/liqihui/Desktop/backend_data_v1.1.json</code></li>
+          <li>当前后端模型：<code>server/backend/app/models.py</code></li>
+          <li>当前生成任务：<code>server/backend/app/api/routes/app_video_tasks.py</code></li>
+          <li>当前管理台：<code>server/frontend/src/routes/_layout/</code></li>
+        </ul>
+        <h3>10.2 已完成原型资产</h3>
+        <ul>
+          <li>高保真单文件原型：<code>server/h5/outputs/vireal-wan-video-h5/prototype/prototype_v1.2.html</code></li>
+          <li>产品真值：<code>server/PRODUCT.md</code></li>
+          <li>确认后的设计系统：<code>server/DESIGN.md</code></li>
+          <li>机器可读设计令牌：<code>server/.impeccable/design.json</code></li>
+          <li>页面方向约定：<code>server/h5/outputs/vireal-wan-video-h5/annex/vireal-h5-surface.md</code></li>
+        </ul>
+        <h3>10.3 研发附件</h3>
+        <ul>
+          <li>数据库 DDL 草案：<code>annex/backend_schema_v1.2.sql</code>，实施前转换为 Alembic migration。</li>
+          <li>API 请求与响应示例：<code>annex/api_contract_v1.2.json</code>，实施后以 OpenAPI 为最终真值。</li>
+          <li>五份 Mermaid 源文件：<code>flowcharts/01_catalog_browse_v1.2.mmd</code> 至 <code>05_admin_publish_v1.2.mmd</code>。</li>
+          <li>交付清单与验证证据：<code>annex/release_manifest_v1.2.md</code>。</li>
+        </ul>
+        <h3>10.4 交付检查</h3>
+        <ul>
+          <li>☑ 包含完整用户旅程图、目标、功能优先级和异常边界。</li>
+          <li>☑ 五个核心功能模块均包含 Mermaid 流程、详细规则和 Focus 原型切片。</li>
+          <li>☑ 所有 iframe 指向 <code>prototype_v1.2.html</code> 并使用 <code>sandbox="allow-scripts allow-same-origin"</code>。</li>
+          <li>☑ 断网、空数据、媒体失败、权限/登录、余额不足、配置下线、重复提交和任务失败均有处理规则。</li>
+          <li>☑ 版本切换器保留 v1.0、v1.1 和当前 v1.2，未覆盖历史文件。</li>
+          <li>☑ 原型底部导航固定为发现、作品、我的；钱包仅从顶部余额和余额不足场景进入。</li>
+        </ul>
+      </section>
+
+      <footer>Vireal · PRD v1.2 最终版 · 2026-09-27</footer>
+    </main>
+  </div>
+  <script>
+    document.getElementById('versionSelect').addEventListener('change', function () {
+      if (this.value && !location.pathname.endsWith(this.value)) location.href = this.value;
+    });
+  </script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#eaf6f8',
+        primaryTextColor: '#0b1215',
+        primaryBorderColor: '#6bb9c7',
+        lineColor: '#52727a',
+        secondaryColor: '#f8fbfb',
+        tertiaryColor: '#ffffff',
+        fontFamily: 'PingFang SC, Microsoft YaHei, ui-sans-serif, system-ui, sans-serif'
+      },
+      flowchart: { curve: 'basis', htmlLabels: true },
+      sequence: { useMaxWidth: true, wrap: true }
+    });
+    mermaid.run({ querySelector: '.mermaid' });
+  </script>
+</body>
+</html>

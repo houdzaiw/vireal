@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#090b0d" />
+  <meta name="vireal-api-base-url" content="__VIREAL_API_BASE_URL__" />
+  <meta name="vireal-backend-mode" content="__VIREAL_BACKEND_MODE__" />
+  <meta name="clerk-publishable-key" content="__VIREAL_CLERK_PUBLISHABLE_KEY__" />
+  <meta name="vireal-release" content="v1.2-production" />
+  <title>Vireal · AI 动态效果</title>
+  <link rel="stylesheet" href="/assets/vireal-v1.2.css" />
+  <link rel="stylesheet" href="/assets/vireal-production.css" />
+  <script defer src="/assets/vireal-auth.js"></script>
+  <script defer src="/assets/vireal-app.js"></script>
+</head>
+<body>
+  <div id="app" class="stage" aria-live="polite">
+    <main class="phone-shell"><section class="page screen-page"><p class="loading-copy">正在载入 Vireal…</p></section></main>
+  </div>
+  <div id="overlayRoot"></div>
+  <div id="toastRoot" aria-live="polite"></div>
+  <noscript>Vireal 需要启用 JavaScript。</noscript>
+</body>
+</html>

@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-27T00:00:00+08:00",
+  "title": "Design System: Vireal",
+  "extensions": {
+    "colorMeta": {
+      "ink-deep": {
+        "role": "neutral",
+        "displayName": "Night Field",
+        "canonical": "#020304",
+        "tonalRamp": ["#020304", "#090b0d", "#151a1d", "#20272b", "#3f4b50", "#73848a", "#b9c5c8", "#f4f8f9"]
+      },
+      "mist": {
+        "role": "primary",
+        "displayName": "Mist Signal",
+        "canonical": "#b7f2ff",
+        "tonalRamp": ["#08242b", "#123e49", "#1f5b69", "#347b8b", "#58a3b4", "#83cad8", "#b7f2ff", "#e8fbff"]
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Recovery Red",
+        "canonical": "#ff9f9f",
+        "tonalRamp": ["#321313", "#5b2424", "#853838", "#b55252", "#d97878", "#ff9f9f", "#ffc7c7", "#fff0f0"]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Completion Mint",
+        "canonical": "#8cebc5",
+        "tonalRamp": ["#0b2c21", "#154b39", "#216b51", "#358d6c", "#56b48d", "#8cebc5", "#bff6df", "#eafcf5"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Generation hero titles and major task states." },
+      "headline": { "displayName": "Headline", "purpose": "Home promise and mobile page headings." },
+      "title": { "displayName": "Title", "purpose": "Generator panels and admin form sections." },
+      "body": { "displayName": "Body", "purpose": "Short H5 explanation and operational copy." },
+      "label": { "displayName": "Label", "purpose": "Metadata, compact state, and measurement." }
+    },
+    "shadows": [
+      { "name": "device-ambient", "value": "0 30px 100px rgba(0, 0, 0, 0.75)", "purpose": "Desktop presentation of the centered H5 shell." },
+      { "name": "overlay-lift", "value": "0 28px 70px rgba(0, 0, 0, 0.58)", "purpose": "Protected-focus drawer and modal surfaces." },
+      { "name": "action-lift", "value": "0 10px 26px rgba(113, 216, 237, 0.20)", "purpose": "Primary generation action only." }
+    ],
+    "motion": [
+      { "name": "ease-material", "value": "cubic-bezier(.22, 1, .36, 1)", "purpose": "Route reveal, drawer entry, and focused state transition." }
+    ],
+    "breakpoints": [
+      { "name": "phone-shell", "value": "760px" },
+      { "name": "admin-collapse", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Generation Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Submits the complete effect configuration after upload and balance validation.",
+      "html": "<button class=\"ds-btn-primary\">生成我的版本</button>",
+      "css": ".ds-btn-primary{min-height:54px;padding:0 16px;border:1px solid rgba(213,249,255,.74);border-radius:16px;background:#b7f2ff;color:#090b0d;font:700 14px system-ui;cursor:pointer;box-shadow:0 10px 26px rgba(113,216,237,.20);transition:transform .2s,box-shadow .2s}.ds-btn-primary:hover{transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid #b7f2ff;outline-offset:3px}.ds-btn-primary:active{transform:none}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral action used for cancellation and secondary navigation.",
+      "html": "<button class=\"ds-btn-secondary\">取消</button>",
+      "css": ".ds-btn-secondary{min-height:46px;padding:0 14px;border:1px solid rgba(205,239,245,.15);border-radius:14px;background:#151a1d;color:#f7fbfc;font:650 12px system-ui;cursor:pointer;transition:border-color .2s,background .2s}.ds-btn-secondary:hover{border-color:rgba(183,242,255,.34);background:#20272b}.ds-btn-secondary:focus-visible{outline:2px solid #b7f2ff;outline-offset:3px}"
+    },
+    {
+      "name": "Operational Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Dark admin field with quiet structure and a visible mist focus state.",
+      "html": "<label class=\"ds-field\"><span>英文名称</span><input value=\"KISS MOTION 01\"></label>",
+      "css": ".ds-field{display:grid;gap:7px;color:#9caeb5;font:600 10px system-ui}.ds-field input{min-height:44px;padding:0 12px;border:1px solid rgba(205,239,245,.15);border-radius:12px;background:#090b0d;color:#f7fbfc;caret-color:#b7f2ff}.ds-field input:focus-visible{outline:2px solid #b7f2ff;outline-offset:2px}"
+    },
+    {
+      "name": "Category Chip",
+      "kind": "chip",
+      "refersTo": "category-chip",
+      "description": "Touch-safe horizontal category control with one selected state.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">亲吻</button>",
+      "css": ".ds-chip{min-height:44px;padding:0 16px;border:1px solid rgba(183,242,255,.38);border-radius:999px;background:rgba(183,242,255,.11);color:#b7f2ff;font:600 12px system-ui;cursor:pointer}.ds-chip:hover{background:rgba(183,242,255,.16)}.ds-chip:focus-visible{outline:2px solid #b7f2ff;outline-offset:3px}"
+    },
+    {
+      "name": "Three-Destination Mobile Navigation",
+      "kind": "nav",
+      "description": "Equal-width Discover, Works, and Account destinations; Wallet is intentionally absent.",
+      "html": "<nav class=\"ds-nav\"><button aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\"><path d=\"m4 10 8-6 8 6v9H4v-9Z\"/></svg>发现</button><button>作品</button><button>我的</button></nav>",
+      "css": ".ds-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding-top:12px;border-top:1px solid rgba(205,239,245,.15);background:#090b0d}.ds-nav button{min-height:48px;border:0;border-radius:12px;background:transparent;color:#9caeb5;font:600 10px system-ui;cursor:pointer}.ds-nav button[aria-current=page]{background:rgba(183,242,255,.07);color:#b7f2ff}.ds-nav button:focus-visible{outline:2px solid #b7f2ff;outline-offset:2px}.ds-nav svg{display:block;width:18px;height:18px;margin:0 auto 4px;stroke-width:1.6}"
+    },
+    {
+      "name": "Upload Slot",
+      "kind": "custom",
+      "description": "Independent image slot used once or twice according to effect configuration.",
+      "html": "<button class=\"ds-upload\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\"><path d=\"M12 5v14M5 12h14\"/></svg><strong>照片 1</strong><span>JPG / PNG</span></button>",
+      "css": ".ds-upload{min-height:148px;display:grid;place-items:center;padding:12px;border:1px dashed rgba(183,242,255,.34);border-radius:16px;background:rgba(183,242,255,.045);color:#f7fbfc;cursor:pointer}.ds-upload:hover{border-color:rgba(183,242,255,.60)}.ds-upload:focus-visible{outline:2px solid #b7f2ff;outline-offset:3px}.ds-upload svg{width:28px;height:28px;color:#b7f2ff}.ds-upload strong{font:650 12px system-ui}.ds-upload span{color:#9caeb5;font:10px system-ui}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Midnight Motion Catalogue",
+    "overview": "Vireal presents AI video effects as a compact cinematic catalogue used primarily on a phone in low ambient light. The interface stays near-black so numbered covers and real preview media carry the emotion, while mist-cyan controls make state and action legible without turning the screen into a neon dashboard. The system is operational beneath the atmosphere: upload requirements, duration, price, balance, quota, and task state are always explicit backend truth.",
+    "keyCharacteristics": [
+      "Near-black field with one cool mist accent.",
+      "Media or intentional numbered fallback leads each public screen.",
+      "Compact mobile hierarchy with 44px minimum interactive targets.",
+      "Data-driven quantity, pricing, availability, and state.",
+      "Inline SVG icons with a consistent light stroke."
+    ],
+    "rules": [
+      { "name": "The Truth Accent Rule", "body": "Mist cyan highlights an actionable or truthful current state; it is not scattered as decoration.", "section": "colors" },
+      { "name": "The Compact Copy Rule", "body": "Small type is limited to short labels and secondary facts; instructions and errors must remain readable without relying on capitalization or tracking.", "section": "typography" },
+      { "name": "The Tonal-First Rule", "body": "Use background value and a quiet border before adding a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve the external prototype as the visual authority for the H5 catalogue and generation screens.",
+      "Do render every catalogue quantity and order from backend data.",
+      "Do show current cost, balance, quota, available duration, and task state from API responses.",
+      "Do fall back from preview video to cover and then to the numbered gradient treatment.",
+      "Do keep public interactions at least 44px high and keep keyboard focus visible."
+    ],
+    "donts": [
+      "Don't hard-code three visible effects; three is only the new-category seed count.",
+      "Don't expose model prompts, storage keys, or internal provider secrets to the H5.",
+      "Don't place Wallet or Coins in bottom navigation.",
+      "Don't invent static prices, balances, quotas, or durations in production.",
+      "Don't turn prototype-specific metadata labels, brand glow, or the text coin mark into general-purpose design-system decoration."
+    ]
+  }
+}

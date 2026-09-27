@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "bash scripts/build-vireal-pages.sh",
-    "test": "python3 -m unittest tests/test_vireal_h5_prototype.py"
+    "test": "python3 -m unittest tests/test_vireal_h5_prototype.py",
+    "test:browser": "playwright test -c playwright.config.ts"
   },
   "dependencies": {
     "@clerk/clerk-js": "^6.32.1",

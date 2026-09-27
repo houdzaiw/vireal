@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @source "../outputs/vireal-wan-video-h5/prototype/prototype_v1.1.html";
+@source "../src/vireal-v1.2.html";
+@source "../src/vireal-app.js";
 
 @theme {
   --color-ink: #071b1b;
