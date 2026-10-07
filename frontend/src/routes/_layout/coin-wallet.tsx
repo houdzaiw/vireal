@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createIdempotencyKey } from "@/utils"
 
 export const Route = createFileRoute("/_layout/coin-wallet")({
   component: CoinWallet,
@@ -52,7 +53,7 @@ function CoinWallet() {
           app_user_id: appUserId,
           delta,
           reason,
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: createIdempotencyKey(),
         },
       }),
     onSuccess: ({ data }) => {
@@ -114,23 +115,26 @@ function CoinWallet() {
               <Coins />
             </div>
             <div className="space-y-2">
-              <Label>App User ID</Label>
+              <Label htmlFor="coin-adjust-user">App User ID</Label>
               <Input
+                id="coin-adjust-user"
                 value={appUserId}
                 onChange={(event) => setAppUserId(event.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>调整数量（可为负数）</Label>
+              <Label htmlFor="coin-adjust-amount">调整数量（可为负数）</Label>
               <Input
+                id="coin-adjust-amount"
                 type="number"
                 value={delta}
                 onChange={(event) => setDelta(Number(event.target.value))}
               />
             </div>
             <div className="space-y-2">
-              <Label>原因</Label>
+              <Label htmlFor="coin-adjust-reason">原因</Label>
               <Input
+                id="coin-adjust-reason"
                 placeholder="例如：活动赠送 / 客诉补偿"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
