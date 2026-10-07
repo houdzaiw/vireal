@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
+import { logInUser } from "./utils/user.ts"
 
 const apiUrl = process.env.VITE_API_URL ?? "http://localhost:8000"
 
@@ -313,6 +314,9 @@ test.describe("App admin pages", () => {
   test("Admin can publish an effect, upload media, grant coins, and audit it", async ({
     page,
   }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(crypto, "randomUUID", { value: undefined })
+    })
     const categorySlug = uniqueId("e2e-effects")
     const categoryName = uniqueId("效果分类")
     const nickname = uniqueId("Wallet User E2E")
@@ -351,6 +355,11 @@ test.describe("App admin pages", () => {
     await page.getByRole("button", { name: "发布" }).click()
     await expect(page.getByText(/发布失败/)).toBeVisible()
 
+    const posterUpload = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/admin/app/media-assets") &&
+        response.request().method() === "POST",
+    )
     await page
       .locator("label")
       .filter({ hasText: "上传封面" })
@@ -360,7 +369,13 @@ test.describe("App admin pages", () => {
         mimeType: "image/png",
         buffer: Buffer.from("89504e470d0a1a0a706c6179777269676874", "hex"),
       })
-    await expect(page.getByText("媒体已上传，请保存效果以生效")).toBeVisible()
+    expect((await posterUpload).ok()).toBeTruthy()
+    await expect(page.getByText(/封面\s+已绑定/)).toBeVisible()
+    const previewUpload = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/admin/app/media-assets") &&
+        response.request().method() === "POST",
+    )
     await page
       .locator("label")
       .filter({ hasText: "上传预览视频" })
@@ -370,7 +385,10 @@ test.describe("App admin pages", () => {
         mimeType: "video/mp4",
         buffer: Buffer.from("00000018667479706d703432766964656f", "hex"),
       })
-    await expect(page.getByText("媒体已上传，请保存效果以生效")).toBeVisible()
+    expect((await previewUpload).ok()).toBeTruthy()
+    await expect(
+      page.getByText(/封面\s+已绑定\s+·\s*视频\s+已绑定/),
+    ).toBeVisible()
     await page.getByRole("button", { name: "保存", exact: true }).click()
     await expect(page.getByText("效果已保存")).toBeVisible()
 
@@ -385,12 +403,23 @@ test.describe("App admin pages", () => {
     await expect(
       page.getByRole("heading", { name: "Coin Wallet", exact: true }),
     ).toBeVisible()
-    await page.getByRole("textbox").nth(1).fill(appUserId)
-    await page.getByRole("spinbutton").fill("50")
+    await page.getByLabel("App User ID", { exact: true }).fill(appUserId)
+    await page.getByLabel("调整数量（可为负数）").fill("50")
     await page
       .getByPlaceholder("例如：活动赠送 / 客诉补偿")
       .fill("Playwright staging grant")
+    const adjustment = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/admin/app/coin-adjustments") &&
+        response.request().method() === "POST",
+    )
     await page.getByRole("button", { name: "确认调整" }).click()
+    const adjustmentResponse = await adjustment
+    expect(adjustmentResponse.ok()).toBeTruthy()
+    expect(await adjustmentResponse.json()).toMatchObject({
+      balance: 50,
+      applied: true,
+    })
     await expect(page.getByText("调整成功，余额 50")).toBeVisible()
 
     await page.goto("/app-operation-logs")
@@ -402,7 +431,7 @@ test.describe("App admin pages", () => {
     await expect(auditRow.getByText("coin.adjust")).toBeVisible()
   })
 
-  test("Non-superuser is redirected away from App admin pages", async ({
+  test("Non-superuser cannot log in as an administrator or access App admin pages", async ({
     page,
   }) => {
     const adminToken = await getAdminToken()
@@ -429,8 +458,19 @@ test.describe("App admin pages", () => {
     await page.goto("/login")
     await page.getByTestId("email-input").fill(email)
     await page.getByTestId("password-input").fill(password)
+    const deniedLogin = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/admin/login/access-token") &&
+        response.request().method() === "POST",
+    )
     await page.getByRole("button", { name: "Log In" }).click()
-    await page.waitForURL("/")
+    expect((await deniedLogin).status()).toBe(403)
+    await expect(page).toHaveURL(/\/login$/)
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("access_token")))
+      .toBeNull()
+
+    await logInUser(page, email, password)
 
     await page.goto("/app-users")
 
