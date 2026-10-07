@@ -43,6 +43,11 @@ jobs:
     needs:
       - changes
     if: ${{ needs.changes.outputs.changed == 'true' }}
+    env:
+      # Public registration stays disabled by default in every deployed
+      # environment. The legacy registration and password-reset browser tests
+      # enable it only inside their isolated CI stack.
+      ADMIN_PUBLIC_SIGNUP_ENABLED: "true"
     timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
