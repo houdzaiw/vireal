@@ -28,6 +28,10 @@ if [[ "$h5_html" != *"name=\"vireal-backend-mode\" content=\"1\""* ]]; then
   echo "H5 production backend mode is not enabled" >&2
   exit 1
 fi
+if [[ "$h5_html" != *"name=\"vireal-release\" content=\"v1.2-production\""* ]]; then
+  echo "H5 is not the v1.2 production build" >&2
+  exit 1
+fi
 if [[ "$h5_html" != *"name=\"clerk-publishable-key\" content=\"pk_live_"* ]]; then
   echo "H5 does not contain a Clerk production publishable key" >&2
   exit 1
@@ -39,12 +43,37 @@ for forbidden_marker in "123456" "device-login" "virealAppAccessToken"; do
   fi
 done
 
+h5_app_js="$(curl --fail --silent --show-error "$h5_url/assets/vireal-app.js")"
+for forbidden_marker in "data-pack" "确认充值" "adult_authorization"; do
+  if [[ "$h5_app_js" == *"$forbidden_marker"* ]]; then
+    echo "H5 contains a forbidden v1.2 marker: $forbidden_marker" >&2
+    exit 1
+  fi
+done
+if [[ "$h5_app_js" != *"/api/v1/app/effect-catalog"* ]]; then
+  echo "H5 does not load the dynamic effect catalog" >&2
+  exit 1
+fi
+
 echo "Checking API health"
 health_body="$(curl --fail --silent --show-error "$api_url/api/v1/utils/health-check/")"
 if [[ "$health_body" != "true" ]]; then
   echo "Unexpected API health response: $health_body" >&2
   exit 1
 fi
+
+echo "Checking the public v1.2 effect catalog"
+catalog_body="$(curl --fail --silent --show-error "$api_url/api/v1/app/effect-catalog")"
+if [[ "$catalog_body" != *'"categories"'* ]]; then
+  echo "Effect catalog response is invalid" >&2
+  exit 1
+fi
+for secret_field in '"prompt"' '"object_key"' '"model"'; do
+  if [[ "$catalog_body" == *"$secret_field"* ]]; then
+    echo "Public catalog leaks internal field: $secret_field" >&2
+    exit 1
+  fi
+done
 
 echo "Checking production authentication and documentation policy"
 device_login_status="$(curl --silent --show-error --output /dev/null \

@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#090b0d" />
+  <title>Vireal · 动态效果目录与 AI 生成</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { ink: '#090b0d', mist: '#b7f2ff', cyan: '#71d8ed' },
+          fontFamily: { sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #090b0d;
+      --ink-deep: #020304;
+      --panel: #151a1d;
+      --panel-2: #20272b;
+      --line: rgba(205, 239, 245, .15);
+      --line-strong: rgba(183, 242, 255, .34);
+      --mist: #b7f2ff;
+      --cyan: #71d8ed;
+      --text: #f7fbfc;
+      --muted: #9caeb5;
+      --danger: #ff9f9f;
+      --success: #8cebc5;
+      --warning: #ffd58f;
+      --ease: cubic-bezier(.22, 1, .36, 1);
+    }
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--ink-deep); scroll-behavior: smooth; }
+    body {
+      min-height: 100%; margin: 0; overflow-x: hidden; color: var(--text);
+      background:
+        radial-gradient(circle at 50% -12%, rgba(92, 157, 174, .20), transparent 34rem),
+        radial-gradient(circle at 50% 112%, rgba(20, 54, 63, .14), transparent 30rem),
+        var(--ink-deep);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { color: #041014; background: var(--mist); }
+    button, input, textarea, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--mist); outline-offset: 3px;
+    }
+    a { color: inherit; text-underline-offset: 3px; }
+    svg { width: 1.15em; height: 1.15em; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .hidden { display: none !important; }
+    .stage { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+    .phone-shell {
+      position: relative; width: min(100%, 430px); height: min(920px, calc(100vh - 40px)); min-height: 720px;
+      overflow: hidden; border: 1px solid rgba(214, 244, 249, .17); border-radius: 34px; background: var(--ink);
+      box-shadow: 0 30px 100px rgba(0, 0, 0, .75), 0 0 0 7px rgba(255, 255, 255, .025);
+    }
+    .phone-shell::after { content: ""; position: absolute; inset: 0; z-index: 20; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 90px rgba(0, 0, 0, .30); }
+    .page { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(183,242,255,.26) transparent; background: var(--ink); }
+    .page::-webkit-scrollbar { width: 4px; }
+    .page::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(183,242,255,.26); }
+    .page-enter { animation: page-enter .42s var(--ease) both; }
+    .top-safe { padding-top: max(3px, env(safe-area-inset-top)); }
+    .home-page { padding: 16px 16px 28px; }
+    .brand-button { min-height: 44px; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+    .brand-mark { color: var(--mist); font-size: 18px; font-weight: 650; letter-spacing: .18em; text-shadow: 0 0 20px rgba(183, 242, 255, .40); }
+    .brand-sub { margin-top: 2px; color: #6f8289; font-size: 9px; letter-spacing: .25em; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .energy-pill, .avatar-button {
+      min-height: 44px; border: 1px solid var(--line-strong); background: rgba(183, 242, 255, .08); color: var(--mist); cursor: pointer;
+      box-shadow: 0 0 24px rgba(113, 216, 237, .08);
+    }
+    .energy-pill { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .avatar-button { display: grid; width: 44px; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 800; }
+    .segmented-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 3px 2px 10px; margin-top: 15px; scrollbar-width: none; scroll-snap-type: x proximity; touch-action: pan-x; mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 22px), transparent 100%); }
+    .segmented-scroll::-webkit-scrollbar { display: none; }
+    .segment { flex: 0 0 auto; min-height: 44px; padding: 0 16px; color: #879aa1; border: 1px solid transparent; border-radius: 999px; background: transparent; cursor: pointer; scroll-snap-align: center; transition: color .2s ease, background .2s ease, border .2s ease; }
+    .segment[aria-selected="true"] { color: var(--mist); border-color: rgba(183, 242, 255, .38); background: rgba(183, 242, 255, .11); box-shadow: 0 0 16px rgba(113, 216, 237, .09); }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-top: 14px; }
+    .section-head h1 { margin: 0; max-width: 270px; font-size: 25px; line-height: 1.08; letter-spacing: -.035em; font-weight: 650; }
+    .section-head h1 span { color: var(--mist); }
+    .category-meta { margin-bottom: 8px; color: #82969e; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+    .live-hint { display: flex; align-items: center; gap: 7px; padding-bottom: 2px; color: #8ba0a7; font-size: 10px; white-space: nowrap; }
+    .live-hint i { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+    .effect-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .effect-card { position: relative; min-height: 245px; overflow: hidden; isolation: isolate; padding: 0; border: 1px solid rgba(235, 251, 255, .14); border-radius: 24px; background: #12171a; cursor: pointer; text-align: left; transition: transform .25s var(--ease), border-color .25s ease, box-shadow .25s ease; }
+    .effect-card:first-child { grid-column: 1 / -1; min-height: 390px; }
+    .effect-card:hover { transform: translateY(-3px); border-color: rgba(183, 242, 255, .62); box-shadow: 0 16px 40px rgba(0, 0, 0, .40), 0 0 20px rgba(113, 216, 237, .11); }
+    .effect-card:active { transform: translateY(-1px) scale(.995); }
+    .media-surface { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(circle at 68% 22%, var(--tone-light), transparent 24%), radial-gradient(circle at 26% 68%, var(--tone-dark), transparent 40%), linear-gradient(145deg, var(--tone-a), var(--tone-b)); }
+    .media-surface img, .media-surface video { width: 100%; height: 100%; object-fit: cover; }
+    .media-surface::before, .media-surface::after { content: ""; position: absolute; border-radius: 999px; opacity: .55; animation: drift 8s ease-in-out infinite alternate; }
+    .media-surface::before { width: 72%; height: 72%; left: 12%; top: 10%; background: linear-gradient(140deg, rgba(255,255,255,.36), transparent 45%); transform: rotate(19deg); }
+    .media-surface::after { width: 90%; height: 44%; left: 18%; bottom: -10%; background: radial-gradient(ellipse, rgba(0,0,0,.52), transparent 70%); animation-delay: -2s; }
+    .surface-orb { position: absolute; width: 52%; aspect-ratio: 1; right: -12%; top: 16%; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.58), rgba(255,255,255,.04) 42%, transparent 70%); opacity: .62; animation: pulse 4.5s ease-in-out infinite; }
+    .surface-label { position: absolute; z-index: 1; top: 22%; left: 10%; color: rgba(255,255,255,.72); font-size: 10px; letter-spacing: .24em; }
+    .surface-number { position: absolute; z-index: 1; top: 28%; left: 9%; color: rgba(255,255,255,.92); font-size: 48px; font-weight: 800; letter-spacing: -.04em; line-height: 1; text-shadow: 0 10px 28px rgba(0,0,0,.26); font-variant-numeric: tabular-nums; }
+    .effect-card:first-child .surface-number { font-size: 82px; }
+    .card-shade { position: absolute; inset: 0; z-index: 2; background: linear-gradient(to bottom, rgba(0,0,0,.08) 0%, transparent 42%, rgba(0,0,0,.84) 100%); }
+    .card-meta { position: absolute; z-index: 3; left: 16px; right: 16px; bottom: 16px; }
+    .card-meta small { display: block; color: rgba(231, 246, 249, .68); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
+    .card-meta h2 { margin: 5px 0 0; color: #fff; font-size: 16px; line-height: 1.1; }
+    .effect-card:first-child .card-meta h2 { font-size: 22px; }
+    .card-meta p { margin: 5px 0 0; color: rgba(236,248,250,.66); font-size: 10px; }
+    .play-orb { position: absolute; z-index: 3; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.34); border-radius: 50%; background: rgba(0,0,0,.22); color: white; backdrop-filter: blur(10px); }
+    .catalog-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; background: rgba(255,255,255,.025); }
+    .catalog-footer strong { display: block; font-size: 12px; font-weight: 650; }
+    .catalog-footer span { display: block; margin-top: 3px; color: #85979e; font-size: 10px; }
+    .arrow-orb { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(183,242,255,.35); border-radius: 50%; color: var(--mist); }
+    .utility-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+    .utility-nav button { min-height: 48px; border: 0; border-radius: 12px; background: transparent; color: #82959c; font-size: 10px; cursor: pointer; }
+    .utility-nav button svg { display: block; margin: 0 auto 4px; font-size: 16px; }
+    .utility-nav button[aria-current="page"] { color: var(--mist); background: rgba(183,242,255,.07); }
+    .detail-hero { position: relative; height: 49vh; min-height: 370px; overflow: hidden; }
+    .detail-shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.16), transparent 35%, rgba(9,11,13,.99) 100%); }
+    .detail-bar { position: absolute; z-index: 4; left: 18px; right: 18px; top: max(18px, env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; }
+    .icon-button { display: grid; min-width: 44px; min-height: 44px; place-items: center; border: 1px solid rgba(183,242,255,.28); border-radius: 50%; background: rgba(8,11,12,.38); color: var(--mist); cursor: pointer; backdrop-filter: blur(14px); }
+    .hero-copy { position: absolute; z-index: 3; left: 20px; right: 20px; bottom: 22px; }
+    .hero-copy .eyeline { color: rgba(183,242,255,.82); font-size: 10px; letter-spacing: .16em; }
+    .hero-copy h1 { margin: 8px 0 7px; font-size: 34px; line-height: 1; letter-spacing: -.035em; }
+    .hero-copy p { max-width: 320px; margin: 0; color: rgba(239,249,251,.74); font-size: 12px; line-height: 1.6; }
+    .generator-panel { position: relative; z-index: 4; margin: -1px 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(145deg, rgba(32,39,43,.98), rgba(15,19,21,.99)); box-shadow: 0 22px 44px rgba(0,0,0,.28); }
+    .panel-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .panel-head h2, .subsection-head h2 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
+    .panel-head p { margin: 5px 0 0; color: #9baeb5; font-size: 11px; line-height: 1.5; }
+    .data-badge { display: inline-flex; min-height: 28px; align-items: center; padding: 0 10px; border: 1px solid rgba(255,255,255,.10); border-radius: 999px; background: rgba(0,0,0,.20); color: #aebfc5; font-size: 9px; white-space: nowrap; }
+    .upload-grid { display: grid; gap: 10px; margin-top: 15px; }
+    .upload-grid.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .upload-tile { position: relative; min-height: 148px; display: grid; place-items: center; overflow: hidden; padding: 10px; border: 1px dashed rgba(183,242,255,.34); border-radius: 16px; background: rgba(183,242,255,.045); color: inherit; cursor: pointer; }
+    .upload-tile[aria-pressed="true"] { border-style: solid; border-color: rgba(183,242,255,.60); background: radial-gradient(circle at 64% 28%, rgba(183,242,255,.24), transparent 24%), linear-gradient(145deg, #3f5961, #162126); }
+    .upload-tile[aria-pressed="true"]::after { content: ""; position: absolute; inset: auto 0 0; height: 48%; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+    .upload-center { position: relative; z-index: 2; text-align: center; }
+    .plus-ring { display: grid; width: 46px; height: 46px; margin: 0 auto; place-items: center; border: 1px solid rgba(183,242,255,.65); border-radius: 50%; color: var(--mist); }
+    .upload-title { margin-top: 10px; color: #d9e6e9; font-size: 11px; font-weight: 650; }
+    .upload-hint { margin-top: 4px; color: #82949b; font-size: 9px; }
+    .upload-done { display: none; }
+    .upload-tile[aria-pressed="true"] .upload-empty { display: none; }
+    .upload-tile[aria-pressed="true"] .upload-done { display: block; }
+    .photo-initial { display: grid; width: 54px; height: 54px; margin: 0 auto; place-items: center; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(0,0,0,.24); color: white; font-size: 16px; font-weight: 800; }
+    .duration-wrap { margin-top: 16px; }
+    .field-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #dbe7e9; font-size: 11px; font-weight: 650; }
+    .field-label span { color: #82959c; font-size: 9px; font-weight: 500; }
+    .duration-group { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .duration-button { min-height: 50px; border: 1px solid rgba(255,255,255,.10); border-radius: 14px; background: rgba(0,0,0,.17); color: #91a3aa; cursor: pointer; }
+    .duration-button b { display: block; color: inherit; font-size: 12px; }
+    .duration-button small { display: block; margin-top: 3px; color: inherit; font-size: 9px; opacity: .72; font-variant-numeric: tabular-nums; }
+    .duration-button[aria-pressed="true"] { border-color: rgba(183,242,255,.52); background: rgba(183,242,255,.10); color: var(--mist); }
+    .duration-button:disabled { cursor: not-allowed; opacity: .35; }
+    .balance-line { display: grid; gap: 6px; margin-top: 14px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,.08); color: #91a4ab; font-size: 10px; }
+    .balance-line > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .balance-line b { color: #dce9eb; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .balance-line .insufficient { color: var(--danger); }
+    .generate-button { width: 100%; min-height: 54px; margin-top: 15px; border: 1px solid rgba(213,249,255,.74); border-radius: 16px; background: linear-gradient(100deg, #b7f2ff, #7bd8ed); color: #061014; cursor: pointer; font-weight: 750; box-shadow: 0 10px 26px rgba(113,216,237,.20); }
+    .generate-button:disabled { border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.06); color: #607078; cursor: not-allowed; box-shadow: none; }
+    .generate-button small { margin-left: 7px; opacity: .68; font-size: 10px; }
+    .subsection { padding: 26px 16px 2px; }
+    .subsection-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+    .subsection-head span { color: #7f9299; font-size: 10px; }
+    .recommend-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+    .recommend-card { position: relative; min-height: 142px; overflow: hidden; padding: 0; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; background: #141a1d; cursor: pointer; text-align: left; }
+    .recommend-card strong { position: absolute; z-index: 4; left: 12px; bottom: 12px; font-size: 11px; }
+    .recommend-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent, rgba(0,0,0,.78)); }
+    .screen-page { min-height: 100%; padding: 20px 16px 28px; background: var(--ink); }
+    .screen-page header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .screen-title { margin: 24px 0 0; font-size: 28px; letter-spacing: -.035em; }
+    .screen-copy { margin: 8px 0 0; color: #91a3aa; font-size: 12px; line-height: 1.6; }
+    .status-panel { margin-top: 24px; padding: 22px; border: 1px solid rgba(255,255,255,.10); border-radius: 20px; background: linear-gradient(145deg, #20272b, #111517); }
+    .status-visual { position: relative; min-height: 280px; overflow: hidden; border-radius: 16px; background: radial-gradient(circle at 70% 30%, rgba(183,242,255,.25), transparent 24%), linear-gradient(145deg, #293d43, #10171a 58%, #0b0e10); }
+    .status-visual .media-surface { opacity: .88; }
+    .status-center { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; padding: 30px; text-align: center; background: rgba(4,7,8,.44); }
+    .status-spinner { width: 54px; height: 54px; margin: 0 auto; border: 2px solid rgba(183,242,255,.18); border-top-color: var(--mist); border-radius: 50%; animation: spin 1s linear infinite; }
+    .status-center h2 { margin: 18px 0 0; font-size: 20px; }
+    .status-center p { margin: 7px auto 0; max-width: 260px; color: #a2b2b7; font-size: 11px; line-height: 1.6; }
+    .progress-track { width: min(240px, 100%); height: 4px; margin: 18px auto 0; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.10); }
+    .progress-track i { display: block; width: 58%; height: 100%; border-radius: inherit; background: var(--mist); box-shadow: 0 0 16px rgba(183,242,255,.45); }
+    .status-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-top: 14px; }
+    .secondary-button, .primary-button, .danger-button { min-height: 46px; border-radius: 14px; cursor: pointer; font-size: 11px; font-weight: 700; }
+    .secondary-button { border: 1px solid rgba(255,255,255,.12); background: transparent; color: #c5d3d7; }
+    .primary-button { border: 1px solid rgba(183,242,255,.60); background: var(--mist); color: #061014; }
+    .danger-button { border: 1px solid rgba(255,159,159,.28); background: rgba(255,159,159,.07); color: var(--danger); }
+    .list-stack { display: grid; gap: 10px; margin-top: 20px; }
+    .list-item { display: flex; align-items: center; gap: 12px; min-height: 78px; padding: 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 16px; background: #14191c; }
+    .list-thumb { position: relative; flex: 0 0 54px; height: 54px; overflow: hidden; border-radius: 12px; }
+    .list-thumb .surface-number { top: 17px; left: 10px; font-size: 18px; }
+    .list-content { min-width: 0; flex: 1; }
+    .list-content strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .list-content span { display: block; margin-top: 5px; color: #84979e; font-size: 9px; }
+    .status-chip { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; background: rgba(140,235,197,.10); color: var(--success); font-size: 9px; }
+    .empty-panel { margin-top: 22px; padding: 54px 22px; border: 1px dashed rgba(255,255,255,.14); border-radius: 18px; text-align: center; }
+    .empty-panel svg { font-size: 34px; color: #6d8087; }
+    .empty-panel h2 { margin: 15px 0 0; font-size: 18px; }
+    .empty-panel p { margin: 7px auto 0; max-width: 260px; color: #83969d; font-size: 11px; line-height: 1.6; }
+    .wallet-card { position: relative; overflow: hidden; margin-top: 22px; padding: 24px; border: 1px solid rgba(183,242,255,.16); border-radius: 20px; background: linear-gradient(145deg, #1d282d, #0e1214); }
+    .wallet-card::after { content: ""; position: absolute; width: 180px; height: 180px; right: -60px; top: -80px; border-radius: 50%; background: rgba(113,216,237,.09); filter: blur(22px); }
+    .wallet-card small { color: #82969d; font-size: 9px; letter-spacing: .14em; }
+    .wallet-card strong { position: relative; z-index: 2; display: block; margin-top: 12px; font-size: 54px; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+    .wallet-card p { margin: 8px 0 0; color: #93a6ad; font-size: 11px; line-height: 1.6; }
+    .pack-grid { display: grid; gap: 10px; margin-top: 18px; }
+    .pack-button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 68px; padding: 12px 15px; border: 1px solid rgba(255,255,255,.09); border-radius: 16px; background: #151a1d; cursor: pointer; text-align: left; }
+    .pack-button b { display: block; font-size: 13px; }
+    .pack-button span { display: block; margin-top: 4px; color: #84979e; font-size: 9px; }
+    .pack-button em { color: var(--mist); font-size: 12px; font-style: normal; font-weight: 700; }
+    .profile-card { margin-top: 20px; padding: 18px; border: 1px solid rgba(255,255,255,.09); border-radius: 18px; background: #14191c; }
+    .profile-row { display: flex; align-items: center; gap: 12px; }
+    .profile-avatar { display: grid; width: 52px; height: 52px; place-items: center; border: 1px solid rgba(183,242,255,.25); border-radius: 14px; background: rgba(183,242,255,.08); color: var(--mist); font-weight: 800; }
+    .settings-list { display: grid; margin-top: 14px; border-top: 1px solid rgba(255,255,255,.07); }
+    .settings-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 0; border: 0; border-bottom: 1px solid rgba(255,255,255,.07); background: transparent; cursor: pointer; text-align: left; }
+    .settings-list b { display: block; font-size: 11px; }
+    .settings-list small { display: block; margin-top: 4px; color: #7f9299; font-size: 9px; }
+    .login-panel { margin-top: 24px; padding: 22px; border: 1px solid rgba(255,255,255,.10); border-radius: 20px; background: #151a1d; }
+    .form-field { display: grid; gap: 7px; margin-top: 14px; color: #b6c5ca; font-size: 10px; }
+    .form-field input { min-height: 48px; padding: 0 13px; border: 1px solid rgba(255,255,255,.11); border-radius: 13px; background: #0d1113; color: white; caret-color: var(--mist); }
+    .drawer-root { position: fixed; inset: 0; z-index: 90; display: grid; place-items: end center; padding: 16px; background: rgba(0,0,0,.64); backdrop-filter: blur(10px); }
+    .drawer { width: min(100%, 420px); padding: 20px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: #161c1f; box-shadow: 0 28px 70px rgba(0,0,0,.58); animation: drawer-in .35s var(--ease) both; }
+    .drawer h2 { margin: 0; font-size: 20px; }
+    .drawer p { margin: 8px 0 0; color: #94a6ad; font-size: 11px; line-height: 1.6; }
+    .drawer-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-top: 18px; }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 120; width: min(calc(100% - 32px), 390px); transform: translateX(-50%); padding: 13px 15px; border: 1px solid rgba(183,242,255,.24); border-radius: 14px; background: #1b2326; color: #dce8eb; box-shadow: 0 18px 44px rgba(0,0,0,.45); font-size: 11px; text-align: center; animation: toast-in .3s var(--ease) both; }
+    .focus-locked { opacity: .28 !important; filter: grayscale(.65); pointer-events: none !important; user-select: none; }
+    .focus-badge { position: fixed; left: 50%; top: 10px; z-index: 130; transform: translateX(-50%); padding: 8px 12px; border-radius: 999px; background: var(--mist); color: #062027; box-shadow: 0 10px 28px rgba(0,0,0,.36); font-size: 10px; font-weight: 800; }
+    .review-trigger { position: fixed; right: 16px; bottom: 16px; z-index: 70; min-height: 40px; padding: 0 13px; border: 1px solid rgba(183,242,255,.28); border-radius: 999px; background: #11181b; color: var(--mist); cursor: pointer; box-shadow: 0 12px 34px rgba(0,0,0,.45); font-size: 10px; }
+    .review-menu { position: fixed; right: 16px; bottom: 66px; z-index: 69; width: 220px; padding: 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: #151b1e; box-shadow: 0 18px 50px rgba(0,0,0,.5); }
+    .review-menu button { width: 100%; min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: #c9d7da; cursor: pointer; font-size: 10px; text-align: left; }
+    .review-menu button:hover { background: rgba(183,242,255,.08); color: var(--mist); }
+    .admin-stage { min-height: 100vh; padding: 20px; background: #07090a; }
+    .admin-shell { width: min(100%, 1440px); min-height: calc(100vh - 40px); margin: 0 auto; display: grid; grid-template-columns: 232px minmax(0,1fr); overflow: hidden; border: 1px solid rgba(255,255,255,.10); border-radius: 24px; background: #0e1214; box-shadow: 0 28px 90px rgba(0,0,0,.55); }
+    .admin-sidebar { padding: 24px 18px; border-right: 1px solid rgba(255,255,255,.08); background: #0a0d0f; }
+    .admin-brand { padding: 0 8px 22px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .admin-brand .brand-sub { margin-top: 5px; }
+    .admin-nav { display: grid; gap: 6px; margin-top: 20px; }
+    .admin-nav button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: #82949b; cursor: pointer; text-align: left; }
+    .admin-nav button[aria-current="page"] { border-color: rgba(183,242,255,.18); background: rgba(183,242,255,.07); color: var(--mist); }
+    .admin-main { min-width: 0; padding: 28px; overflow: auto; color-scheme: dark; }
+    .admin-topbar { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
+    .admin-topbar h1 { margin: 0; font-size: 28px; letter-spacing: -.03em; }
+    .admin-topbar p { margin: 7px 0 0; color: #82959c; font-size: 11px; line-height: 1.5; }
+    .admin-primary { min-height: 44px; padding: 0 16px; border: 1px solid rgba(183,242,255,.55); border-radius: 13px; background: var(--mist); color: #061014; cursor: pointer; font-size: 11px; font-weight: 800; }
+    .admin-summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-top: 22px; }
+    .summary-cell { padding: 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 15px; background: #121719; }
+    .summary-cell span { color: #7f9299; font-size: 9px; }
+    .summary-cell strong { display: block; margin-top: 7px; font-size: 24px; font-variant-numeric: tabular-nums; }
+    .admin-table-wrap { margin-top: 18px; overflow-x: auto; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #111517; }
+    .admin-table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    .admin-table th, .admin-table td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: left; font-size: 10px; vertical-align: middle; }
+    .admin-table th { color: #74878e; font-weight: 650; letter-spacing: .06em; }
+    .admin-table td { color: #c4d1d5; }
+    .admin-table tr:last-child td { border-bottom: 0; }
+    .table-title { display: flex; align-items: center; gap: 11px; }
+    .table-icon { position: relative; flex: 0 0 42px; height: 42px; overflow: hidden; border-radius: 10px; }
+    .table-icon .surface-number { top: 13px; left: 8px; font-size: 15px; }
+    .table-title b { display: block; color: #edf7f9; font-size: 11px; }
+    .table-title small { display: block; margin-top: 4px; color: #72858c; font-size: 9px; }
+    .table-actions { display: flex; gap: 7px; }
+    .table-actions button { min-height: 34px; padding: 0 10px; border: 1px solid rgba(255,255,255,.10); border-radius: 10px; background: transparent; color: #b6c5ca; cursor: pointer; font-size: 9px; }
+    .drag-handle { color: #71838a; letter-spacing: -2px; }
+    .admin-form { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(280px,.6fr); gap: 18px; margin-top: 22px; }
+    .form-section { padding: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #111517; }
+    .form-section + .form-section { margin-top: 14px; }
+    .form-section h2 { margin: 0; font-size: 15px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 13px; margin-top: 15px; }
+    .form-grid .wide { grid-column: 1 / -1; }
+    .admin-field { display: grid; gap: 7px; color: #98aab0; font-size: 9px; }
+    .admin-field input, .admin-field textarea, .admin-field select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.10); border-radius: 11px; background: #0b0f11; color: #edf7f9; caret-color: var(--mist); }
+    .admin-field textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+    .media-uploader { display: grid; min-height: 150px; margin-top: 13px; place-items: center; padding: 18px; border: 1px dashed rgba(183,242,255,.28); border-radius: 14px; background: rgba(183,242,255,.035); text-align: center; cursor: pointer; }
+    .media-uploader strong { display: block; margin-top: 10px; font-size: 11px; }
+    .media-uploader span { display: block; margin-top: 5px; color: #7c8e95; font-size: 9px; }
+    .media-uploader.uploaded { border-style: solid; background: radial-gradient(circle at 65% 30%, rgba(183,242,255,.18), transparent 24%), linear-gradient(145deg,#33474e,#12191c); }
+    .variant-row { display: grid; grid-template-columns: 1fr 1fr 38px; gap: 8px; margin-top: 9px; }
+    .variant-row input { min-height: 42px; padding: 0 10px; border: 1px solid rgba(255,255,255,.10); border-radius: 10px; background: #0b0f11; color: white; }
+    .variant-row button { border: 1px solid rgba(255,159,159,.18); border-radius: 10px; background: transparent; color: var(--danger); cursor: pointer; }
+    .admin-sticky { position: sticky; top: 0; align-self: start; }
+    .admin-preview { position: relative; min-height: 330px; overflow: hidden; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; background: #141a1d; }
+    .admin-preview .surface-number { font-size: 64px; }
+    .admin-preview .card-meta h2 { font-size: 20px; }
+    .save-row { display: flex; justify-content: end; gap: 9px; margin-top: 14px; }
+    @keyframes page-enter { from { opacity: .7; transform: translateY(7px); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+    @keyframes drawer-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+    @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @keyframes drift { from { transform: translate3d(-4%, 2%, 0) rotate(17deg); } to { transform: translate3d(8%, -5%, 0) rotate(24deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(.94); opacity: .48; } 50% { transform: scale(1.05); opacity: .72; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 760px) {
+      .stage { padding: 0; }
+      .phone-shell { width: 100%; height: 100vh; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+      .phone-shell::after { border-radius: 0; }
+      .admin-stage { padding: 0; }
+      .admin-shell { min-height: 100vh; grid-template-columns: 1fr; border: 0; border-radius: 0; }
+      .admin-sidebar { display: none; }
+      .admin-main { padding: 20px 14px; }
+      .admin-topbar { align-items: end; }
+      .admin-topbar h1 { font-size: 22px; }
+      .admin-summary { grid-template-columns: 1fr 1fr; }
+      .admin-summary .summary-cell:last-child { grid-column: 1 / -1; }
+      .admin-form { grid-template-columns: 1fr; }
+      .admin-sticky { position: static; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .wide { grid-column: auto; }
+    }
+    @media (max-height: 760px) and (min-width: 761px) {
+      .phone-shell { min-height: 650px; }
+      .effect-card:first-child { min-height: 320px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="stage" aria-live="polite"></div>
+  <div id="overlayRoot"></div>
+  <div id="toastRoot" aria-live="polite"></div>
+
+  <script>
+    const API_SNAPSHOT = {
+      balance: 70,
+      quota: { dailyRemaining: 6, concurrentRemaining: 2 },
+      categories: [
+        { id: 'kiss', name: '亲吻', englishName: 'KISS', order: 10, enabled: true, tones: ['#8a4050', '#2b1728', '#d8908f'] },
+        { id: 'romance', name: '浪漫时刻', englishName: 'ROMANCE', order: 20, enabled: true, tones: ['#6b536e', '#172b37', '#dcb6cf'] },
+        { id: 'charm', name: '迷人魅力', englishName: 'CHARM', order: 30, enabled: true, tones: ['#5c6b81', '#182330', '#a9d5e2'] },
+        { id: 'outfit', name: '换装', englishName: 'OUTFIT', order: 40, enabled: true, tones: ['#765a44', '#1d1c2b', '#e0b374'] },
+        { id: 'dance', name: '舞蹈', englishName: 'DANCE', order: 50, enabled: true, tones: ['#3e6f73', '#111d38', '#a2e8d6'] },
+        { id: 'anime', name: '二次元', englishName: 'ANIME', order: 60, enabled: true, tones: ['#5a4d88', '#13152e', '#b7a8ff'] }
+      ],
+      effects: []
+    };
+
+    const titles = {
+      kiss: ['心动靠近', '温柔侧吻', '电影感拥吻'],
+      romance: ['雨中相遇', '日落依偎', '烛光约会'],
+      charm: ['镜头凝望', '魅力转身', '红毯时刻'],
+      outfit: ['复古礼服', '未来机能', '晚宴造型'],
+      dance: ['节拍律动', '舞台独舞', '霓虹舞步'],
+      anime: ['次元觉醒', '魔法变身', '樱花物语']
+    };
+
+    API_SNAPSHOT.effects = API_SNAPSHOT.categories.flatMap((category, categoryIndex) =>
+      titles[category.id].map((title, index) => ({
+        id: `${category.id}-${index + 1}`,
+        categoryId: category.id,
+        title,
+        englishName: `${category.englishName} MOTION ${String(index + 1).padStart(2, '0')}`,
+        sequence: index + 1,
+        order: (index + 1) * 10,
+        enabled: true,
+        coverUrl: '',
+        previewVideoUrl: '',
+        requiredImages: ['kiss', 'romance'].includes(category.id) ? 2 : 1,
+        modelType: category.id === 'dance' ? 'wan-video' : 'minimax-video',
+        prompt: `Create a cinematic ${category.englishName.toLowerCase()} motion while preserving facial identity and natural movement.`,
+        recommendation: index === 0 ? '热门' : (index === 1 ? '推荐' : ''),
+        durations: [
+          { seconds: 5, coinCost: 20 + categoryIndex * 2, enabled: true },
+          { seconds: 10, coinCost: 35 + categoryIndex * 3, enabled: true },
+          { seconds: 15, coinCost: 80 + categoryIndex * 4, enabled: category.id !== 'anime' }
+        ]
+      }))
+    );
+
+    const state = {
+      data: structuredClone(API_SNAPSHOT),
+      loggedIn: true,
+      activeCategoryId: 'kiss',
+      selectedEffectId: 'kiss-1',
+      selectedDuration: 5,
+      uploads: {},
+      generationStatus: 'processing',
+      worksEmpty: false,
+      adminMediaUploaded: {},
+      reviewOpen: false
+    };
+
+    const icons = {
+      arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M19 12H5m7 7-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      arrowRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m9 6 9 6-9 6V6Z"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>',
+      image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 4.7-4.7a2 2 0 0 1 2.8 0l1.1 1.1 1.2-1.2a2 2 0 0 1 2.8 0L20 15.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9Z" stroke-linejoin="round"/></svg>',
+      works: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m10 9 6 3-6 3V9Z" stroke-linejoin="round"/></svg>',
+      user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0" stroke-linecap="round"/></svg>',
+      grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
+      layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5" stroke-linejoin="round"/></svg>',
+      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" stroke-linejoin="round"/><path d="M12 9v5m0 3h.01" stroke-linecap="round"/></svg>',
+      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg>'
+    };
+
+    function route() {
+      const raw = location.hash.replace(/^#/, '') || 'home';
+      const [name, query = ''] = raw.split('?');
+      return { name: name === 'create' ? 'generate' : name, params: new URLSearchParams(query) };
+    }
+
+    function routeTo(name, params = {}) {
+      const query = new URLSearchParams(params).toString();
+      location.hash = `${name}${query ? `?${query}` : ''}`;
+    }
+
+    function categoryById(id) { return state.data.categories.find(item => item.id === id) || state.data.categories[0]; }
+    function effectById(id) { return state.data.effects.find(item => item.id === id) || state.data.effects[0]; }
+    function enabledEffects(categoryId) { return state.data.effects.filter(item => item.categoryId === categoryId && item.enabled).sort((a,b) => a.order - b.order); }
+    function chosenVariant(effect) { return effect.durations.find(item => item.seconds === state.selectedDuration && item.enabled) || effect.durations.find(item => item.enabled); }
+
+    function surface(item, sequence = item.sequence || 1, className = '') {
+      const category = categoryById(item.categoryId || item.id);
+      const [a,b,light] = category.tones;
+      return `<div class="media-surface ${className}" style="--tone-a:${a};--tone-b:${b};--tone-light:${light};--tone-dark:${b}">
+        ${item.coverUrl ? `<img src="${item.coverUrl}" alt="" onerror="this.remove()">` : ''}
+        <div class="surface-orb"></div><span class="surface-label">VIREAL / ${String(sequence).padStart(2,'0')}</span><span class="surface-number">${String(sequence).padStart(2,'0')}</span>
+      </div>`;
+    }
+
+    function publicHeader() {
+      return `<header class="top-safe flex items-center justify-between" data-focus-zone="header home generate">
+        <button class="brand-button" data-route="home" aria-label="返回发现页"><span class="brand-mark">VIREAL</span><span class="brand-sub">BECOME YOUR NEXT</span></button>
+        <div class="header-actions"><button class="energy-pill" data-route="wallet" aria-label="查看金币余额"><span>✦</span><span>${state.data.balance}</span></button><button class="avatar-button" data-route="${state.loggedIn ? 'account' : 'login'}" aria-label="${state.loggedIn ? '账户' : '登录'}">${state.loggedIn ? 'VI' : icons.user}</button></div>
+      </header>`;
+    }
+
+    function utilityNav(active) {
+      return `<nav class="utility-nav" aria-label="主要功能" data-focus-zone="navigation">
+        ${[['home',icons.home,'发现'],['works',icons.works,'作品'],['account',icons.user,'我的']].map(([id,icon,label]) => `<button data-route="${id}" aria-current="${active === id ? 'page' : 'false'}">${icon}${label}</button>`).join('')}
+      </nav>`;
+    }
+
+    function segments(activeCategoryId) {
+      return `<div class="segmented-scroll" role="tablist" aria-label="效果分类" data-focus-zone="home category">
+        ${state.data.categories.filter(item => item.enabled).sort((a,b) => a.order - b.order).map(category => `<button class="segment" role="tab" aria-selected="${category.id === activeCategoryId}" data-category="${category.id}">${category.name}</button>`).join('')}
+      </div>`;
+    }
+
+    function effectCard(effect) {
+      const category = categoryById(effect.categoryId);
+      const minCost = Math.min(...effect.durations.filter(item => item.enabled).map(item => item.coinCost));
+      return `<button class="effect-card" data-effect="${effect.id}" aria-label="打开${effect.title}生成页">
+        ${surface(effect)}<span class="card-shade"></span><span class="play-orb">${icons.play}</span>
+        <span class="card-meta"><small>${effect.englishName}</small><h2>${effect.title}</h2><p>${effect.requiredImages} 张照片 · ${minCost} ✦ 起</p></span>
+      </button>`;
+    }
+
+    function homePage(categoryId) {
+      const category = categoryById(categoryId);
+      const effects = enabledEffects(category.id);
+      return `<main class="phone-shell"><section class="page home-page page-enter" data-focus-zone="home">
+        ${publicHeader()}${segments(category.id)}
+        <div class="section-head"><div><div class="category-meta">${category.englishName} / ${effects.length} AI MOTIONS</div><h1>找到你的下一种<br><span>可能性</span></h1></div><div class="live-hint"><i></i>数据已同步</div></div>
+        ${effects.length ? `<div class="effect-grid" data-focus-zone="home effects">${effects.map(effectCard).join('')}</div>` : `<div class="empty-panel">${icons.layers}<h2>该分类暂无效果</h2><p>后台启用效果后会自动显示在这里，不需要重新发布 H5。</p></div>`}
+        <div class="catalog-footer"><div><strong>上传照片，体验 AI 变身</strong><span>点击任意效果，开始你的下一幕</span></div><span class="arrow-orb">${icons.arrowRight}</span></div>
+        ${utilityNav('home')}
+      </section></main>`;
+    }
+
+    function uploadTile(effect, index) {
+      const uploaded = Boolean(state.uploads[effect.id]?.[index]);
+      return `<button class="upload-tile" data-upload-index="${index}" aria-pressed="${uploaded}" aria-label="${uploaded ? `更换第${index + 1}张照片` : `上传第${index + 1}张照片`}">
+        <span class="upload-center upload-empty"><span class="plus-ring">${icons.plus}</span><span class="upload-title">${effect.requiredImages === 2 ? `照片 ${index + 1}` : '添加照片'}</span><span class="upload-hint">JPG / PNG · 点击模拟上传</span></span>
+        <span class="upload-center upload-done"><span class="photo-initial">P${index + 1}</span><span class="upload-title">照片已上传</span><span class="upload-hint">点击可重新选择</span></span>
+      </button>`;
+    }
+
+    function generatePage(effect) {
+      const category = categoryById(effect.categoryId);
+      const uploaded = state.uploads[effect.id] || [];
+      const complete = uploaded.filter(Boolean).length === effect.requiredImages;
+      const variant = chosenVariant(effect);
+      state.selectedDuration = variant.seconds;
+      const affordable = state.data.balance >= variant.coinCost;
+      const recommendations = enabledEffects(effect.categoryId).filter(item => item.id !== effect.id).slice(0,2);
+      return `<main class="phone-shell"><section class="page page-enter" data-focus-zone="generate">
+        <div class="detail-hero" data-focus-zone="generate hero">${surface(effect)}<div class="detail-shade"></div>
+          <div class="detail-bar"><button class="icon-button" data-route="home" data-route-category="${category.id}" aria-label="返回${category.name}">${icons.arrowLeft}</button><button class="energy-pill" data-route="wallet"><span>✦</span><span>${state.data.balance}</span></button></div>
+          <div class="hero-copy"><div class="eyeline">${effect.englishName}</div><h1>${effect.title}</h1><p>${effect.requiredImages === 2 ? '上传两张清晰的人像照片，让这一刻成为你们的专属片段。' : '上传一张清晰的人像照片，把这一幕变成你的专属版本。'}</p></div>
+        </div>
+        <section class="generator-panel" data-focus-zone="generate upload duration"><div class="panel-head"><div><h2>上传你的照片</h2><p>需要 ${effect.requiredImages} 张 · 正面清晰 · 避免遮挡</p></div><span class="data-badge">${effect.modelType}</span></div>
+          <div class="upload-grid ${effect.requiredImages === 2 ? 'two' : ''}">${Array.from({length: effect.requiredImages},(_,i) => uploadTile(effect,i)).join('')}</div>
+          <div class="duration-wrap"><div class="field-label">选择时长 <span>后台配置的可用时长</span></div><div class="duration-group">${effect.durations.map(item => `<button class="duration-button" data-duration="${item.seconds}" aria-pressed="${item.enabled && item.seconds === variant.seconds}" ${item.enabled ? '' : 'disabled'}><b>${item.seconds} 秒</b><small>${item.enabled ? `${item.coinCost} ✦` : '暂不可用'}</small></button>`).join('')}</div></div>
+          <div class="balance-line"><div><span>本次实际消耗</span><b>${variant.coinCost} ✦</b></div><div><span>生成后剩余</span><b class="${affordable ? '' : 'insufficient'}">${affordable ? state.data.balance - variant.coinCost : '余额不足'}</b></div><div><span>今日剩余次数 / 并发名额</span><b>${state.data.quota.dailyRemaining} / ${state.data.quota.concurrentRemaining}</b></div></div>
+          <button class="generate-button" data-generate ${complete && affordable ? '' : 'disabled'}>${!complete ? `请先上传 ${effect.requiredImages} 张照片` : (!affordable ? '金币余额不足' : '生成我的版本')}<small>${variant.coinCost} ✦</small></button>
+        </section>
+        <section class="subsection" data-focus-zone="generate recommendations"><div class="subsection-head"><h2>同类推荐</h2><span>${recommendations.length} 个效果</span></div><div class="recommend-grid">${recommendations.map(item => `<button class="recommend-card" data-effect="${item.id}">${surface(item)}<strong>${item.title}</strong></button>`).join('')}</div></section>
+        <div style="padding:0 16px 24px">${utilityNav('home')}</div>
+      </section></main>`;
+    }
+
+    function generationPage(effect) {
+      const status = state.generationStatus;
+      const isProcessing = status === 'processing';
+      const isSuccess = status === 'success';
+      const title = isProcessing ? '正在生成你的专属视频' : (isSuccess ? '视频已经生成完成' : '本次生成未完成');
+      const copy = isProcessing ? '任务已进入队列，可安全离开。完成后会自动出现在作品中。' : (isSuccess ? '结果已保存至作品，扣费与剩余额度均已按任务结果更新。' : '模型服务暂时不可用，本次金币已自动退回，可以稍后重试。');
+      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="generation">
+        <header><button class="icon-button" data-route="home" aria-label="返回发现">${icons.arrowLeft}</button><span class="data-badge">任务 VR-240927-018</span></header>
+        <h1 class="screen-title">生成任务</h1><p class="screen-copy">状态、扣费和结果均来自同一个后端任务记录。</p>
+        <div class="status-panel"><div class="status-visual">${surface(effect)}<div class="status-center">${isProcessing ? `<div><div class="status-spinner"></div><h2>${title}</h2><p>${copy}</p><div class="progress-track"><i></i></div></div>` : `<div>${isSuccess ? `<span style="display:grid;width:54px;height:54px;margin:auto;place-items:center;border:1px solid rgba(140,235,197,.45);border-radius:50%;color:var(--success);font-size:25px">${icons.check}</span>` : `<span style="display:grid;width:54px;height:54px;margin:auto;place-items:center;border:1px solid rgba(255,159,159,.35);border-radius:50%;color:var(--danger);font-size:24px">${icons.warning}</span>`}<h2>${title}</h2><p>${copy}</p></div>`}</div></div>
+          <div class="status-actions"><button class="secondary-button" data-route="works">查看作品</button><button class="primary-button" data-route="${isProcessing ? 'home' : (isSuccess ? 'works' : 'generate')}" ${!isProcessing && !isSuccess ? `data-effect-route="${effect.id}"` : ''}>${isProcessing ? '继续浏览' : (isSuccess ? '打开结果' : '重新生成')}</button></div>
+        </div>${utilityNav('works')}
+      </section></main>`;
+    }
+
+    function worksPage() {
+      const effect = effectById(state.selectedEffectId);
+      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="works">${publicHeader()}<h1 class="screen-title">我的作品</h1><p class="screen-copy">生成任务与结果统一保存在当前账户下。</p>
+        ${state.worksEmpty ? `<div class="empty-panel">${icons.works}<h2>还没有作品</h2><p>选择一个效果，上传照片生成你的第一条 AI 视频。</p><button class="primary-button" style="margin-top:18px;padding:0 20px" data-route="home">开始创作</button></div>` : `<div class="list-stack"><div class="list-item"><div class="list-thumb">${surface(effect)}</div><div class="list-content"><strong>${effect.title} · ${chosenVariant(effect).seconds} 秒</strong><span>处理中 · 刚刚创建 · ${effect.modelType}</span></div><button class="status-chip" data-route="generation">查看</button></div><div class="list-item"><div class="list-thumb">${surface(effectById('dance-1'))}</div><div class="list-content"><strong>节拍律动 · 10 秒</strong><span>已完成 · 昨天 · wan-video</span></div><span class="status-chip">完成</span></div></div>`}
+        ${utilityNav('works')}
+      </section></main>`;
+    }
+
+    function walletPage() {
+      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="wallet">${publicHeader()}<h1 class="screen-title">金币与额度</h1><p class="screen-copy">余额、消耗与可用额度均以服务端返回为准。</p>
+        <div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${state.data.balance} ✦</strong><p>今日剩余 ${state.data.quota.dailyRemaining} 次 · 当前可并发 ${state.data.quota.concurrentRemaining} 个任务</p></div>
+        <div class="pack-grid"><button class="pack-button" data-pack="120"><span><b>120 金币</b><span>适合轻量体验</span></span><em>去支付</em></button><button class="pack-button" data-pack="360"><span><b>360 金币</b><span>适合连续创作</span></span><em>去支付</em></button><button class="pack-button" data-pack="800"><span><b>800 金币</b><span>适合高频使用</span></span><em>去支付</em></button></div>${utilityNav('wallet')}
+      </section></main>`;
+    }
+
+    function accountPage() {
+      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="account">${publicHeader()}<h1 class="screen-title">账户与偏好</h1><div class="profile-card"><div class="profile-row"><div class="profile-avatar">VI</div><div><strong style="font-size:13px">Vireal User</strong><span style="display:block;margin-top:5px;color:#84979e;font-size:10px">viewer@example.com</span></div></div><div class="settings-list"><button data-toast="界面语言已跟随浏览器设置"><span><b>界面语言</b><small>简体中文</small></span>${icons.arrowRight}</button><button data-toast="上传与生成结果遵循当前数据保留策略"><span><b>隐私与数据</b><small>查看数据保留与删除规则</small></span>${icons.arrowRight}</button><button data-route="admin-categories"><span><b>进入管理后台</b><small>维护分类、效果与媒体</small></span>${icons.arrowRight}</button></div></div><button class="danger-button" style="width:100%;margin-top:14px" data-logout>退出登录</button>${utilityNav('account')}</section></main>`;
+    }
+
+    function loginPage() {
+      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="login"><header><button class="icon-button" data-route="home">${icons.arrowLeft}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">登录后继续创作</h1><p class="screen-copy">登录用于同步金币、额度、任务状态和作品记录。</p><form class="login-panel" data-login-form><label class="form-field">邮箱<input type="email" value="viewer@example.com" required></label><label class="form-field">密码<input type="password" value="prototype" required></label><button class="primary-button" style="width:100%;margin-top:18px" type="submit">登录</button></form></section></main>`;
+    }
+
+    function adminSidebar(active) {
+      return `<aside class="admin-sidebar"><div class="admin-brand"><div class="brand-mark">VIREAL</div><div class="brand-sub">CONTENT OPERATIONS</div></div><nav class="admin-nav" aria-label="管理后台"><button data-route="admin-categories" aria-current="${active === 'categories' ? 'page' : 'false'}">${icons.grid}分类管理</button><button data-route="admin-effects" aria-current="${active === 'effects' ? 'page' : 'false'}">${icons.layers}效果管理</button><button data-toast="生成记录沿用当前管理模块">${icons.works}生成记录</button><button data-toast="对象存储配置沿用当前环境">${icons.settings}存储与配置</button><button data-route="home">${icons.arrowLeft}返回 H5</button></nav></aside>`;
+    }
+
+    function adminCategoriesPage() {
+      const categories = state.data.categories.slice().sort((a,b) => a.order - b.order);
+      return `<main class="admin-stage"><div class="admin-shell">${adminSidebar('categories')}<section class="admin-main page-enter" data-focus-zone="admin categories"><div class="admin-topbar"><div><h1>分类管理</h1><p>一级分类数量与顺序完全由后台数据决定；新建分类默认生成 3 条效果记录。</p></div><button class="admin-primary" data-add-category>新建分类</button></div><div class="admin-summary"><div class="summary-cell"><span>分类总数</span><strong>${categories.length}</strong></div><div class="summary-cell"><span>已启用效果</span><strong>${state.data.effects.filter(item => item.enabled).length}</strong></div><div class="summary-cell"><span>缺少媒体</span><strong>${state.data.effects.filter(item => !item.coverUrl || !item.previewVideoUrl).length}</strong></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>排序</th><th>分类</th><th>效果数量</th><th>上传规则</th><th>状态</th><th>操作</th></tr></thead><tbody>${categories.map(category => `<tr><td class="drag-handle">••• ${category.order}</td><td><div class="table-title"><div class="table-icon">${surface(category,1)}</div><div><b>${category.name}</b><small>${category.englishName}</small></div></div></td><td>${enabledEffects(category.id).length} 条</td><td>${['kiss','romance'].includes(category.id) ? '默认 2 张' : '默认 1 张'}</td><td><span class="status-chip">${category.enabled ? '已启用' : '已停用'}</span></td><td><div class="table-actions"><button data-filter-effects="${category.id}">查看效果</button><button data-toggle-category="${category.id}">${category.enabled ? '停用' : '启用'}</button></div></td></tr>`).join('')}</tbody></table></div></section></div></main>`;
+    }
+
+    function adminEffectsPage(filterCategoryId = '') {
+      const effects = state.data.effects.filter(item => !filterCategoryId || item.categoryId === filterCategoryId).sort((a,b) => a.categoryId.localeCompare(b.categoryId) || a.order - b.order);
+      return `<main class="admin-stage"><div class="admin-shell">${adminSidebar('effects')}<section class="admin-main page-enter" data-focus-zone="admin effects"><div class="admin-topbar"><div><h1>效果管理</h1><p>${filterCategoryId ? `当前筛选：${categoryById(filterCategoryId).name}` : '维护名称、图片数量、时长价格、模型、提示词、推荐关系和媒体。'}</p></div><button class="admin-primary" data-add-effect="${filterCategoryId || 'kiss'}">新增效果</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>排序</th><th>效果</th><th>分类</th><th>图片</th><th>可用时长 / 价格</th><th>模型</th><th>操作</th></tr></thead><tbody>${effects.map(effect => `<tr><td class="drag-handle">••• ${effect.order}</td><td><div class="table-title"><div class="table-icon">${surface(effect)}</div><div><b>${effect.title}</b><small>${effect.coverUrl ? '封面已上传' : '使用缺省封面'} · ${effect.enabled ? '已启用' : '已停用'}</small></div></div></td><td>${categoryById(effect.categoryId).name}</td><td>${effect.requiredImages} 张</td><td>${effect.durations.filter(item => item.enabled).map(item => `${item.seconds}s/${item.coinCost}✦`).join(' · ')}</td><td>${effect.modelType}</td><td><div class="table-actions"><button data-edit-effect="${effect.id}">编辑</button><button data-toggle-effect="${effect.id}">${effect.enabled ? '停用' : '启用'}</button></div></td></tr>`).join('')}</tbody></table></div></section></div></main>`;
+    }
+
+    function adminEffectEditPage(effect) {
+      const mediaUploaded = state.adminMediaUploaded[effect.id] || {};
+      return `<main class="admin-stage"><div class="admin-shell">${adminSidebar('effects')}<section class="admin-main page-enter" data-focus-zone="admin edit"><div class="admin-topbar"><div><h1>编辑效果</h1><p>${categoryById(effect.categoryId).name} / ${effect.id} · 保存后由 H5 动态读取。</p></div><button class="admin-primary" data-save-effect>保存修改</button></div><div class="admin-form"><div><section class="form-section"><h2>基础信息</h2><div class="form-grid"><label class="admin-field">中文名称<input id="adminTitle" value="${effect.title}"></label><label class="admin-field">英文名称<input id="adminEnglish" value="${effect.englishName}"></label><label class="admin-field">一级分类<select id="adminCategory">${state.data.categories.map(item => `<option value="${item.id}" ${item.id === effect.categoryId ? 'selected' : ''}>${item.name}</option>`).join('')}</select></label><label class="admin-field">上传图片数量<select id="adminRequiredImages"><option value="1" ${effect.requiredImages === 1 ? 'selected' : ''}>1 张</option><option value="2" ${effect.requiredImages === 2 ? 'selected' : ''}>2 张</option></select></label><label class="admin-field">模型类型<select id="adminModel"><option ${effect.modelType === 'minimax-video' ? 'selected' : ''}>minimax-video</option><option ${effect.modelType === 'wan-video' ? 'selected' : ''}>wan-video</option><option ${effect.modelType === 'kling-video' ? 'selected' : ''}>kling-video</option></select></label><label class="admin-field">推荐效果<input id="adminRecommendation" value="${effect.recommendation}" placeholder="热门 / 推荐 / 留空"></label><label class="admin-field wide">生成提示词<textarea id="adminPrompt">${effect.prompt}</textarea></label></div></section><section class="form-section"><h2>时长与金币价格</h2><div id="variantRows">${effect.durations.map(item => `<div class="variant-row"><input aria-label="支持时长" type="number" value="${item.seconds}" data-variant-seconds><input aria-label="金币价格" type="number" value="${item.coinCost}" data-variant-cost><button aria-label="删除该时长" data-remove-variant>${icons.close}</button></div>`).join('')}</div><button class="secondary-button" style="margin-top:10px;padding:0 14px" data-add-variant>添加时长</button></section></div><aside class="admin-sticky"><section class="form-section"><h2>对象存储媒体</h2><button class="media-uploader ${mediaUploaded.cover ? 'uploaded' : ''}" data-admin-upload="cover">${mediaUploaded.cover ? icons.check : icons.upload}<strong>${mediaUploaded.cover ? '封面图片已上传' : '上传封面图片'}</strong><span>${mediaUploaded.cover ? 'object-storage/effects/cover.webp' : '未上传时使用编号渐变缺省图'}</span></button><button class="media-uploader ${mediaUploaded.video ? 'uploaded' : ''}" data-admin-upload="video">${mediaUploaded.video ? icons.check : icons.upload}<strong>${mediaUploaded.video ? '预览视频已上传' : '上传预览视频'}</strong><span>${mediaUploaded.video ? 'object-storage/effects/preview.mp4' : 'MP4 / WebM · 上传至当前对象存储'}</span></button></section><section class="form-section"><h2>H5 缺省预览</h2><div class="admin-preview">${surface(effect)}<span class="card-shade"></span><span class="card-meta"><small>${effect.englishName}</small><h2>${effect.title}</h2><p>${effect.requiredImages} 张照片 · ${Math.min(...effect.durations.map(item => item.coinCost))} ✦ 起</p></span></div><div class="save-row"><button class="secondary-button" style="padding:0 14px" data-route="admin-effects">取消</button><button class="primary-button" style="padding:0 14px" data-save-effect>保存</button></div></section></aside></div></section></div></main>`;
+    }
+
+    function render() {
+      const current = route();
+      if (current.params.get('category')) state.activeCategoryId = current.params.get('category');
+      if (current.params.get('video')) state.selectedEffectId = current.params.get('video');
+      const effect = effectById(state.selectedEffectId);
+      const map = {
+        home: () => homePage(state.activeCategoryId),
+        generate: () => generatePage(effect),
+        generation: () => generationPage(effect),
+        works: worksPage,
+        wallet: walletPage,
+        account: accountPage,
+        login: loginPage,
+        'admin-categories': adminCategoriesPage,
+        'admin-effects': () => adminEffectsPage(current.params.get('category') || ''),
+        'admin-effect-edit': () => adminEffectEditPage(effect)
+      };
+      document.getElementById('app').outerHTML = `<div id="app" class="${current.name.startsWith('admin-') ? '' : 'stage'}" aria-live="polite">${(map[current.name] || map.home)()}</div>`;
+      applyFocus();
+      renderReviewTools();
+    }
+
+    function applyFocus() {
+      const focus = new URLSearchParams(location.search).get('focus');
+      document.querySelectorAll('.focus-badge').forEach(item => item.remove());
+      if (!focus) return;
+      document.querySelectorAll('[data-focus-zone]').forEach(element => {
+        const zones = (element.dataset.focusZone || '').split(/\s+/);
+        if (!zones.includes(focus) && !zones.includes('all')) element.classList.add('focus-locked');
+      });
+      const badge = document.createElement('div'); badge.className = 'focus-badge'; badge.textContent = `Focus · ${focus}`; document.body.appendChild(badge);
+    }
+
+    function showToast(message) {
+      const root = document.getElementById('toastRoot'); root.innerHTML = `<div class="toast">${message}</div>`;
+      clearTimeout(showToast.timer); showToast.timer = setTimeout(() => root.innerHTML = '', 2200);
+    }
+
+    function openDrawer(title, copy, primaryLabel, action) {
+      const root = document.getElementById('overlayRoot');
+      root.innerHTML = `<div class="drawer-root" role="presentation" data-close-drawer><section class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle"><h2 id="drawerTitle">${title}</h2><p>${copy}</p><div class="drawer-actions"><button class="secondary-button" data-close-drawer>取消</button><button class="primary-button" data-drawer-primary>${primaryLabel}</button></div></section></div>`;
+      root.querySelector('[data-drawer-primary]').addEventListener('click', () => { action?.(); root.innerHTML = ''; });
+    }
+
+    function renderReviewTools() {
+      const search = new URLSearchParams(location.search);
+      document.querySelectorAll('.review-trigger,.review-menu').forEach(item => item.remove());
+      if (search.get('review') !== '1') return;
+      const trigger = document.createElement('button'); trigger.className = 'review-trigger'; trigger.textContent = '原型状态'; trigger.addEventListener('click', () => { state.reviewOpen = !state.reviewOpen; renderReviewTools(); }); document.body.appendChild(trigger);
+      if (!state.reviewOpen) return;
+      const menu = document.createElement('div'); menu.className = 'review-menu'; menu.innerHTML = `<button data-review="two">亲吻双图生成</button><button data-review="one">舞蹈单图生成</button><button data-review="processing">任务处理中</button><button data-review="success">任务已完成</button><button data-review="failure">任务失败退款</button><button data-review="empty">作品空状态</button><button data-review="admin">后台效果编辑</button>`; document.body.appendChild(menu);
+    }
+
+    document.addEventListener('click', event => {
+      const routeButton = event.target.closest('[data-route]');
+      if (routeButton) { const name = routeButton.dataset.route; if (name === 'home' && routeButton.dataset.routeCategory) routeTo('home',{category:routeButton.dataset.routeCategory}); else routeTo(name); return; }
+      const categoryButton = event.target.closest('[data-category]');
+      if (categoryButton) { state.activeCategoryId = categoryButton.dataset.category; routeTo('home',{category:state.activeCategoryId}); return; }
+      const effectButton = event.target.closest('[data-effect]');
+      if (effectButton) { const effect = effectById(effectButton.dataset.effect); state.selectedEffectId = effect.id; state.selectedDuration = effect.durations.find(item => item.enabled).seconds; routeTo('generate',{category:effect.categoryId,video:effect.id}); return; }
+      const uploadButton = event.target.closest('[data-upload-index]');
+      if (uploadButton) { const effect = effectById(state.selectedEffectId); state.uploads[effect.id] ||= []; const index = Number(uploadButton.dataset.uploadIndex); state.uploads[effect.id][index] = !state.uploads[effect.id][index]; render(); showToast(state.uploads[effect.id][index] ? `照片 ${index + 1} 上传完成` : `已移除照片 ${index + 1}`); return; }
+      const durationButton = event.target.closest('[data-duration]');
+      if (durationButton) { state.selectedDuration = Number(durationButton.dataset.duration); render(); return; }
+      if (event.target.closest('[data-generate]')) { const effect = effectById(state.selectedEffectId); const variant = chosenVariant(effect); if (state.data.balance < variant.coinCost) { openDrawer('金币余额不足',`当前余额 ${state.data.balance} ✦，本次需要 ${variant.coinCost} ✦。充值完成后可以继续提交，已上传照片会保留。`,'前往充值',() => routeTo('wallet')); return; } openDrawer('确认生成',`将消耗 ${variant.coinCost} ✦ 生成 ${variant.seconds} 秒视频。提交后可在作品中查看进度。`,'确认并生成',() => { state.data.balance -= variant.coinCost; state.data.quota.dailyRemaining -= 1; state.generationStatus = 'processing'; state.worksEmpty = false; routeTo('generation'); }); return; }
+      const pack = event.target.closest('[data-pack]');
+      if (pack) { const amount = Number(pack.dataset.pack); openDrawer('确认充值',`原型将模拟支付成功，并把 ${amount} 金币写入账户余额。`,'确认支付',() => { state.data.balance += amount; render(); showToast(`${amount} 金币已到账`); }); return; }
+      const toastButton = event.target.closest('[data-toast]'); if (toastButton) { showToast(toastButton.dataset.toast); return; }
+      if (event.target.closest('[data-logout]')) { state.loggedIn = false; routeTo('login'); return; }
+      const filter = event.target.closest('[data-filter-effects]'); if (filter) { routeTo('admin-effects',{category:filter.dataset.filterEffects}); return; }
+      const edit = event.target.closest('[data-edit-effect]'); if (edit) { state.selectedEffectId = edit.dataset.editEffect; routeTo('admin-effect-edit',{video:state.selectedEffectId}); return; }
+      const toggleEffect = event.target.closest('[data-toggle-effect]'); if (toggleEffect) { const effect = effectById(toggleEffect.dataset.toggleEffect); effect.enabled = !effect.enabled; render(); showToast(`效果已${effect.enabled ? '启用' : '停用'}`); return; }
+      const toggleCategory = event.target.closest('[data-toggle-category]'); if (toggleCategory) { const category = categoryById(toggleCategory.dataset.toggleCategory); category.enabled = !category.enabled; render(); showToast(`分类已${category.enabled ? '启用' : '停用'}`); return; }
+      const addCategory = event.target.closest('[data-add-category]'); if (addCategory) { openDrawer('新建分类','保存后会自动创建 3 条缺省效果记录，运营人员可以继续增删和排序。','创建分类',() => { const n = state.data.categories.length + 1; const id = `category-${n}`; state.data.categories.push({id,name:`新分类 ${n}`,englishName:`CATEGORY ${n}`,order:n*10,enabled:true,tones:['#476b70','#18262c','#98d9de']}); [1,2,3].forEach(sequence => state.data.effects.push({id:`${id}-${sequence}`,categoryId:id,title:`新效果 ${sequence}`,englishName:`NEW MOTION ${String(sequence).padStart(2,'0')}`,sequence,order:sequence*10,enabled:true,coverUrl:'',previewVideoUrl:'',requiredImages:1,modelType:'minimax-video',prompt:'Create a cinematic AI motion while preserving identity.',recommendation:'',durations:[{seconds:5,coinCost:20,enabled:true},{seconds:10,coinCost:35,enabled:true}]})); render(); showToast('分类和 3 条缺省效果已创建'); }); return; }
+      const addEffect = event.target.closest('[data-add-effect]'); if (addEffect) { const categoryId = addEffect.dataset.addEffect; const sequence = enabledEffects(categoryId).length + 1; const effect = {id:`${categoryId}-${Date.now()}`,categoryId,title:`新效果 ${sequence}`,englishName:`NEW MOTION ${String(sequence).padStart(2,'0')}`,sequence,order:sequence*10,enabled:true,coverUrl:'',previewVideoUrl:'',requiredImages:['kiss','romance'].includes(categoryId)?2:1,modelType:'minimax-video',prompt:'Create a cinematic AI motion while preserving identity.',recommendation:'',durations:[{seconds:5,coinCost:20,enabled:true},{seconds:10,coinCost:35,enabled:true}]}; state.data.effects.push(effect); state.selectedEffectId = effect.id; routeTo('admin-effect-edit',{video:effect.id}); return; }
+      const mediaUpload = event.target.closest('[data-admin-upload]'); if (mediaUpload) { const id = state.selectedEffectId; state.adminMediaUploaded[id] ||= {}; state.adminMediaUploaded[id][mediaUpload.dataset.adminUpload] = true; render(); showToast('媒体已模拟上传到当前对象存储'); return; }
+      if (event.target.closest('[data-add-variant]')) { const rows = document.getElementById('variantRows'); rows.insertAdjacentHTML('beforeend',`<div class="variant-row"><input aria-label="支持时长" type="number" value="20" data-variant-seconds><input aria-label="金币价格" type="number" value="95" data-variant-cost><button aria-label="删除该时长" data-remove-variant>${icons.close}</button></div>`); return; }
+      const removeVariant = event.target.closest('[data-remove-variant]'); if (removeVariant) { removeVariant.closest('.variant-row').remove(); return; }
+      if (event.target.closest('[data-save-effect]')) { const effect = effectById(state.selectedEffectId); effect.title = document.getElementById('adminTitle').value.trim() || effect.title; effect.englishName = document.getElementById('adminEnglish').value.trim() || effect.englishName; effect.categoryId = document.getElementById('adminCategory').value; effect.requiredImages = Number(document.getElementById('adminRequiredImages').value); effect.modelType = document.getElementById('adminModel').value; effect.recommendation = document.getElementById('adminRecommendation').value.trim(); effect.prompt = document.getElementById('adminPrompt').value.trim(); effect.durations = [...document.querySelectorAll('.variant-row')].map(row => ({seconds:Number(row.querySelector('[data-variant-seconds]').value),coinCost:Number(row.querySelector('[data-variant-cost]').value),enabled:true})).filter(item => item.seconds > 0 && item.coinCost >= 0); showToast('效果配置已保存'); render(); return; }
+      const review = event.target.closest('[data-review]'); if (review) { state.reviewOpen = false; const type = review.dataset.review; if (type === 'two') { state.selectedEffectId='kiss-1'; state.selectedDuration=5; state.uploads['kiss-1']=[true,true]; routeTo('generate',{category:'kiss',video:'kiss-1'}); } if (type === 'one') { state.selectedEffectId='dance-1'; state.selectedDuration=5; state.uploads['dance-1']=[true]; routeTo('generate',{category:'dance',video:'dance-1'}); } if (['processing','success','failure'].includes(type)) { state.generationStatus=type === 'failure' ? 'failure' : type; routeTo('generation'); } if (type === 'empty') { state.worksEmpty=true; routeTo('works'); } if (type === 'admin') { routeTo('admin-effect-edit',{video:state.selectedEffectId}); } render(); return; }
+      if (event.target.matches('[data-close-drawer]')) document.getElementById('overlayRoot').innerHTML = '';
+    });
+
+    document.addEventListener('submit', event => { if (!event.target.matches('[data-login-form]')) return; event.preventDefault(); state.loggedIn = true; showToast('登录成功'); routeTo('home'); });
+    window.addEventListener('hashchange', render);
+    render();
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
-# Vireal: Cloudflare Pages + Railway + Neon
+# Vireal v1.2: Cloudflare Pages + Railway + Neon
 
-This runbook deploys the current FastAPI and PostgreSQL worker implementation without rewriting it for Cloudflare Workers.
+This runbook deploys the v1.2 dynamic effect catalog, real coin wallet, FastAPI task API, and PostgreSQL worker without rewriting them for Cloudflare Workers.
 
 ## Resource map
 
@@ -76,7 +76,7 @@ Do not deploy until the working tree changes have been reviewed and committed, l
 3. Copy the direct SSL connection string. Keep `sslmode=require` in the URL.
 4. Do not expose the connection string in H5, Cloudflare Pages variables, source control, or build logs.
 
-The PoC uses the direct Neon URL because the API and worker have low, fixed connection counts. Add pooling only when service replicas increase.
+The initial release uses the direct Neon URL because the API and worker have low, fixed connection counts. Add pooling only when service replicas increase.
 
 ## 2. Railway services
 
@@ -167,39 +167,74 @@ PUBLIC_API_DOCS_ENABLED=false
 
 Do not add arbitrary `*.pages.dev` preview origins to CORS. Use the custom H5 domain for real API verification.
 
-## 5. Safe rollout
+## 5. Preproduction acceptance
 
-1. Deploy Neon, `vireal-api`, and `vireal-video-worker` with `REPLICATE_ENABLED=False` and `LOCAL_DEMO_ENABLED=True`.
-2. Deploy Pages and bind both custom domains.
-3. Run the edge checks:
+Use a separate preproduction database, R2 prefix, Clerk instance, and domains. The
+runtime configuration must use `REPLICATE_ENABLED=True` and
+`LOCAL_DEMO_ENABLED=False`; v1.2 does not substitute a simulated result when a
+real-generation quota or provider is unavailable.
+
+1. Take a restorable database snapshot and record its identifier and timestamp.
+2. Deploy the API migration, then confirm `alembic current` reports
+   `f2a3b4c5d6e7` and the catalog contains 6 categories and 18 effects.
+3. Deploy the API and worker, then the protected administration UI. Grant test
+   coins to an invited test account through the coin adjustment page and confirm
+   the corresponding operation log and immutable wallet entry.
+4. Deploy the v1.2 H5 build to the preproduction Pages project. Confirm the
+   bottom navigation contains only Discover, Works, and Account; prices, balance,
+   duration, daily quota, and concurrency are server values.
+5. Run one paid generation through each whitelisted model: MiniMax Video-01, Wan
+   2.7 R2V, and Seedance 2.0. Include at least one two-image kiss or romance task.
+6. For every task, verify the signed webhook, worker transfer into private R2,
+   short-lived playback URL, wallet debit, task history, and absence of prompts,
+   model identifiers, object keys, tokens, or image URLs in application logs.
+7. Force one definitive provider failure and confirm exactly one refund. Force one
+   ambiguous submission timeout and confirm the task remains
+   `submission_unknown` without automatic refund or resubmission.
+8. Verify the configured daily and per-user concurrency limits return a real
+   quota error and do not create another paid prediction.
+
+Never automatically resubmit, refund, or locally downgrade a task in
+`submission_unknown`. Inspect the task, Replicate dashboard, and billing before
+resolving it.
+
+## 6. Full production cutover
+
+The production release is an all-traffic switch, not a percentage rollout.
+
+1. Preserve the current v1.1 Pages deployment and verify that the new build also
+   contains `fallback/v1.1/index.html`.
+2. Take and verify a fresh production database backup.
+3. Apply the single incremental migration and confirm revision
+   `f2a3b4c5d6e7`; do not run a downgrade during an incident.
+4. Deploy the backward-compatible API and worker. The old v1.1
+   `template_id/mode/duration` request remains accepted during this step.
+5. Verify the 6 seeded categories and 18 effects, then grant production users any
+   required launch balance through the administration UI. New and existing users
+   otherwise start at zero coins.
+6. Deploy and smoke-test the protected administration UI, including category,
+   effect, variant, media, recommendation, coin, and audit workflows.
+7. Publish the v1.2 Pages build to `app.usevireal.com`, replacing all H5 traffic.
+8. Run the production edge checks:
 
    ```bash
    H5_URL=https://app.usevireal.com \
    API_URL=https://api.usevireal.com \
+   R2_PRIVATE_OBJECT_URL=https://example-private-object \
    bash scripts/verify-production.sh
    ```
 
-4. Confirm `/device-login` returns 410, `/docs` returns 404, and the deployed H5
-   source contains no fixed OTP or legacy device-token code.
-5. With an invited account, verify email code, Google, and Apple sign-in. Confirm
-   refresh restores the session and sign-out calls `/app/auth/logout`; replaying
-   the previous token must return 403 immediately.
-6. Confirm the first login creates exactly one Clerk AppUser and that the admin UI
-   shows email, providers, registration time, recent login, and login count.
-7. Disable the user in the Access-protected admin UI and confirm the H5 receives
-   403 on its next API call.
-8. Verify authenticated upload, R2 private read, and a direct unsigned R2 denial.
-9. Submit one task and confirm the Worker produces a labeled local demo without any Replicate prediction.
-10. Confirm the worker is running and polling without database, FFmpeg, or R2 errors.
-11. Set `REPLICATE_ENABLED=True` in both Railway services and redeploy them only when the Replicate account is ready.
-12. Submit one authorized adult full-body photo in standard mode and confirm one MiniMax prediction, signed webhook receipt, R2 transfer, and H5 playback.
-13. Verify the shared user limit of five real predictions per UTC day and the Wan global limit of three per UTC day; quota overflow must produce a labeled local demo without another prediction.
+9. Complete one low-cost production generation and verify balance, task state,
+   R2 playback, worker health, and sanitized logs.
 
-Never automatically resubmit or locally downgrade a task in `submission_unknown`. Inspect the task, Replicate dashboard, and billing before resolving it.
+If the H5 must be rolled back, republish the preserved v1.1 artifact only. Keep
+the v1.2 database structures, migration revision, seed data, and compatible APIs
+in place.
 
-## 6. Post-PoC checks
+## 7. Post-release checks
 
 - Confirm no R2 object can be opened without a signed URL.
 - Keep the application worker running for precise expiration and configure an R2 lifecycle rule for prefix `vireal/` as a backup cleanup mechanism.
-- Review Railway API/worker logs, Neon connection count, Replicate billing, and R2 objects.
+- Review Railway API/worker logs, Neon connection count, Replicate billing, coin
+  ledger reconciliation, failure refunds, and R2 objects.
 - Rotate any Replicate or R2 credential that has previously appeared in plaintext before production traffic.

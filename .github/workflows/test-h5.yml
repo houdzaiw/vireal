@@ -1,0 +1,80 @@
+name: Test Vireal H5
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - h5/**
+      - scripts/verify-production.sh
+      - .github/workflows/test-h5.yml
+  pull_request:
+    paths:
+      - h5/**
+      - scripts/verify-production.sh
+      - .github/workflows/test-h5.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test-h5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: h5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          # h5/bun.lock uses Bun lockfile version 2.
+          bun-version: 1.4.0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Install H5 dependencies
+        run: bun ci
+      - name: Run H5 contract tests
+        run: bun run test
+      - name: Build production H5
+        run: bun run build
+        env:
+          VIREAL_API_BASE_URL: https://api.example.com
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ci_dummy
+      - name: Enforce production UI policy
+        run: |
+          set -euo pipefail
+          test -f dist/vireal-pages/index.html
+          if grep -Eq 'adult_authorization|确认充值|data-pack' dist/vireal-pages/assets/vireal-app.js; then
+            echo "Production H5 contains a forbidden adult authorization or simulated payment marker" >&2
+            exit 1
+          fi
+          if grep -q '>金币<' dist/vireal-pages/index.html; then
+            echo "Production H5 still contains a bottom-navigation coin entry" >&2
+            exit 1
+          fi
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Run 390px, 430px, and desktop browser acceptance
+        run: bun run test:browser
+      - name: Validate release check script syntax
+        run: bash -n ../scripts/verify-production.sh
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vireal-h5-browser-evidence
+          path: |
+            .impeccable/review/user-390.png
+            .impeccable/review/generate-mobile.png
+            .impeccable/review/mobile.png
+            .impeccable/review/desktop.png
+            h5/test-results
+          if-no-files-found: ignore
+          retention-days: 14

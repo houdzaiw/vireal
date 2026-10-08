@@ -1,0 +1,158 @@
+{
+  "meta": {
+    "document": "Vireal v1.2 API contract examples",
+    "illustrative": true,
+    "sourceOfTruth": "The implemented OpenAPI schema and database migration supersede these examples."
+  },
+  "publicApi": {
+    "catalog": {
+      "method": "GET",
+      "path": "/api/v1/app/effect-catalog",
+      "response": {
+        "balance": 70,
+        "quota": {
+          "dailyRemaining": 6,
+          "concurrentRemaining": 2
+        },
+        "categories": [
+          {
+            "id": "a89ddaf0-bc58-44ca-a81a-e9803e2ed8d7",
+            "slug": "kiss",
+            "nameZh": "亲吻",
+            "nameEn": "KISS",
+            "tones": ["#8a4050", "#2b1728", "#d8908f"],
+            "sortOrder": 10,
+            "effects": [
+              {
+                "id": "02ca57de-2b51-4e8f-872c-8595dad3ca7a",
+                "slug": "kiss-1",
+                "titleZh": "心动靠近",
+                "titleEn": "KISS MOTION 01",
+                "inputImageCount": 2,
+                "posterUrl": null,
+                "previewVideoUrl": null,
+                "sortOrder": 10,
+                "recommendation": "热门",
+                "variants": [
+                  {
+                    "id": "13ce21f8-6fb9-40e1-82a8-f9ddb99f5bf3",
+                    "durationSeconds": 5,
+                    "coinCost": 20,
+                    "isDefault": true
+                  },
+                  {
+                    "id": "702454be-b668-4b5f-bc1a-097c5cb97795",
+                    "durationSeconds": 10,
+                    "coinCost": 35,
+                    "isDefault": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "effectDetail": {
+      "method": "GET",
+      "path": "/api/v1/app/effects/kiss-1",
+      "response": {
+        "id": "02ca57de-2b51-4e8f-872c-8595dad3ca7a",
+        "categorySlug": "kiss",
+        "slug": "kiss-1",
+        "titleZh": "心动靠近",
+        "titleEn": "KISS MOTION 01",
+        "description": "上传两张清晰的人像照片，让这一刻成为你们的专属片段。",
+        "inputImageCount": 2,
+        "posterUrl": null,
+        "previewVideoUrl": null,
+        "variants": [
+          {
+            "id": "13ce21f8-6fb9-40e1-82a8-f9ddb99f5bf3",
+            "durationSeconds": 5,
+            "coinCost": 20
+          }
+        ],
+        "recommendations": ["kiss-2", "kiss-3"]
+      }
+    },
+    "createTask": {
+      "method": "POST",
+      "path": "/api/v1/app/video-tasks",
+      "headers": {
+        "Idempotency-Key": "08f62d7f-98e7-4d2c-a7b6-65d55e356b81"
+      },
+      "request": {
+        "effectId": "02ca57de-2b51-4e8f-872c-8595dad3ca7a",
+        "variantId": "13ce21f8-6fb9-40e1-82a8-f9ddb99f5bf3",
+        "uploadIds": [
+          "8912d45c-5532-4504-a8ca-cd63a12ee528",
+          "b468a487-f0ab-44fd-a69b-74b0d4be841f"
+        ]
+      },
+      "response": {
+        "id": "cc61e10f-2f40-44eb-a6f0-c0c8d5946280",
+        "effectId": "02ca57de-2b51-4e8f-872c-8595dad3ca7a",
+        "variantId": "13ce21f8-6fb9-40e1-82a8-f9ddb99f5bf3",
+        "status": "queued",
+        "durationSeconds": 5,
+        "coinCost": 20,
+        "balance": 50,
+        "quota": {
+          "dailyRemaining": 5,
+          "concurrentRemaining": 1
+        }
+      }
+    }
+  },
+  "adminApi": {
+    "createCategory": {
+      "method": "POST",
+      "path": "/api/v1/admin/app/effect-categories",
+      "request": {
+        "slug": "new-category",
+        "nameZh": "新分类",
+        "nameEn": "NEW CATEGORY",
+        "tones": ["#476b70", "#18262c", "#98d9de"],
+        "sortOrder": 70,
+        "isEnabled": true
+      },
+      "response": {
+        "id": "84190986-ad40-4258-afdb-63a26158a282",
+        "defaultEffectsCreated": 3
+      }
+    },
+    "updateEffect": {
+      "method": "PUT",
+      "path": "/api/v1/admin/app/effects/02ca57de-2b51-4e8f-872c-8595dad3ca7a",
+      "request": {
+        "titleZh": "心动靠近",
+        "titleEn": "KISS MOTION 01",
+        "inputImageCount": 2,
+        "modelType": "minimax-video",
+        "recommendation": "热门",
+        "variants": [
+          {
+            "durationSeconds": 5,
+            "coinCost": 20,
+            "provider": "configured-provider",
+            "model": "configured-model",
+            "promptVersion": "v1",
+            "isEnabled": true
+          }
+        ]
+      }
+    },
+    "uploadManagedMedia": {
+      "method": "POST",
+      "path": "/api/v1/admin/app/media-assets",
+      "contentType": "multipart/form-data",
+      "response": {
+        "id": "fe8949ee-8886-45fe-8720-e7ea71ca198f",
+        "kind": "poster",
+        "objectKey": "catalog/effects/kiss-1/poster.webp",
+        "status": "active"
+      }
+    }
+  }
+}

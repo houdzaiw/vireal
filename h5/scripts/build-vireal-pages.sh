@@ -3,8 +3,10 @@
 set -euo pipefail
 
 workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source_dir="$workspace_dir/outputs/vireal-wan-video-h5/prototype"
-source_file="$source_dir/prototype_v1.1.html"
+prototype_dir="$workspace_dir/outputs/vireal-wan-video-h5/prototype"
+source_dir="$workspace_dir/src"
+source_file="$source_dir/vireal-v1.2.html"
+fallback_file="$prototype_dir/prototype_v1.1.html"
 output_dir="$workspace_dir/dist/vireal-pages"
 api_base_url="${VIREAL_API_BASE_URL:-}"
 clerk_publishable_key="${VITE_CLERK_PUBLISHABLE_KEY:-}"
@@ -38,6 +40,7 @@ escaped_clerk_publishable_key="${escaped_clerk_publishable_key//|/\\|}"
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
 mkdir -p "$output_dir/assets"
+mkdir -p "$output_dir/fallback/v1.1"
 
 sed \
   -e "s|__VIREAL_API_BASE_URL__|$escaped_api_base_url|g" \
@@ -45,19 +48,39 @@ sed \
   -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
   "$source_file" > "$output_dir/index.html"
 
-bunx esbuild "$source_dir/vireal-auth.js" \
+sed \
+  -e "s|__VIREAL_API_BASE_URL__|$escaped_api_base_url|g" \
+  -e "s|__VIREAL_BACKEND_MODE__|1|g" \
+  -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
+  "$fallback_file" > "$output_dir/fallback/v1.1/index.html"
+
+bunx esbuild "$prototype_dir/vireal-auth.js" \
   --bundle \
   --format=iife \
   --platform=browser \
   --minify \
   --outfile="$output_dir/assets/vireal-auth.js"
 
+bunx esbuild "$source_dir/vireal-app.js" \
+  --bundle \
+  --format=iife \
+  --platform=browser \
+  --minify \
+  --outfile="$output_dir/assets/vireal-app.js"
+
+awk '/<style>/{capture=1;next}/<\/style>/{capture=0}capture' \
+  "$prototype_dir/prototype_v1.2.html" > "$output_dir/assets/vireal-v1.2.css"
+
+bunx esbuild "$source_dir/vireal-production.css" \
+  --minify \
+  --outfile="$output_dir/assets/vireal-production.css"
+
 bunx tailwindcss \
   --input "$workspace_dir/styles/vireal.css" \
   --output "$output_dir/assets/vireal.css" \
   --minify
 
-cp "$source_dir/_headers" "$output_dir/_headers"
+cp "$prototype_dir/_headers" "$output_dir/_headers"
 printf 'User-agent: *\nDisallow: /\n' > "$output_dir/robots.txt"
 
 if grep -Eq '__VIREAL_API_BASE_URL__|__VIREAL_BACKEND_MODE__|__VIREAL_CLERK_PUBLISHABLE_KEY__' "$output_dir/index.html"; then
