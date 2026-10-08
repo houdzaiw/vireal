@@ -11,14 +11,24 @@ before any live release. Do not reactivate the previously disabled QA accounts.
 Read-only release check on 2026-10-08: neither Railway API environment has the four
 PayPal credentials configured. The production API health endpoint is healthy and
 the new PayPal config endpoint is still 404, confirming this feature is not deployed.
-After the owner unlocked Chrome, PayPal Developer showed an existing Sandbox
-`Default Application` and explicitly required upgrading the account to Business
-to view Live credentials. Opening the Sandbox application details redirected to
-PayPal sign-in, so merchant identity, application capabilities and webhooks remain
-unverified. The owner must complete reauthentication; any financial account upgrade,
-identity verification or binding agreement remains owner-only. Pending gates are
-owner account readiness, secret provisioning, actual sandbox acceptance, fresh
-production backup/deployment and owner-operated live acceptance.
+After the owner reauthenticated in Chrome, the Sandbox seller showed Business,
+Verified and region C2. The owner created a dedicated `Vireal Staging` Merchant
+application; its JavaScript SDK v6 and Customer disputes capabilities are selected.
+The agent registered and verified the ten specific webhook events listed below at
+`https://staging-api.usevireal.com/api/v1/webhooks/payments/paypal`. This is configuration
+verification only, not actual transaction or webhook-signature acceptance. Live
+credentials still require the owner to upgrade the account to Business.
+
+Railway staging currently has three pre-existing, unrelated drafts: changed
+`CLERK_SECRET_KEY` values on the API and worker, and an API Healthcheck Path change
+whose displayed old/new paths are identical. None was applied or discarded. Resolve
+these with the owner before a deployment that could include them. No PayPal secrets
+have been provisioned to Railway yet; staging health is 200 and PayPal config is
+still 404. Production remains unchanged and closed to public signup/recharge.
+Pending gates are draft resolution, secret provisioning, actual sandbox acceptance,
+owner Live readiness, fresh production backup/deployment and owner-operated live
+acceptance. Any financial account upgrade, identity verification or binding agreement
+remains owner-only.
 
 ## Locked business rules
 
