@@ -428,18 +428,27 @@ def test_renderer_and_normalizer_build_ffmpeg_commands(
     assert normalized.read_bytes() == MP4_BYTES
 
 
-def test_worker_normalizes_standard_provider_output_and_handles_empty_queue(
+@pytest.mark.parametrize(
+    ("mode", "execution_type"),
+    [("standard", "wan"), ("effect", "minimax")],
+)
+def test_worker_normalizes_minimax_provider_output_and_handles_empty_queue(
     db: Session,
+    mode: str,
+    execution_type: str,
 ) -> None:
     task = _create_saving_task(db)
-    task.mode = "standard"
+    task.mode = mode
+    task.execution_type = execution_type
     db.add(task)
     db.commit()
     storage = LocalDemoStorage()
+    normalized_durations: list[int] = []
 
     def normalizer(source: Path, output: Path, duration: int) -> None:
         assert source.read_bytes() == MP4_BYTES
         assert duration == 5
+        normalized_durations.append(duration)
         output.write_bytes(MP4_BYTES)
 
     with httpx.Client(
@@ -455,6 +464,7 @@ def test_worker_normalizes_standard_provider_output_and_handles_empty_queue(
             provider_video_normalizer=normalizer,
         )
     assert storage.stored_content == MP4_BYTES
+    assert normalized_durations == [5]
     assert process_next_video_task(storage=storage) is False
 
 
