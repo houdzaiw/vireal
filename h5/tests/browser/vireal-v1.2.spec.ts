@@ -188,3 +188,39 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
   await expect(page.getByRole("textbox", { name: "Late QA email" })).toBeVisible()
   await expect(page.locator("#clerkStatus")).toContainText("仅限受邀请用户登录")
 })
+
+test("already-loaded Clerk still observes the subsequent signed-in session", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `(() => {
+        const listeners = []
+        window.VirealClerk = {
+          session: null, user: null,
+          addListener(listener) { listeners.push(listener) },
+        }
+        window.activateQaSession = () => {
+          window.VirealClerk.session = {id: 'qa-session', getToken: async () => 'qa-session-token'}
+          window.VirealClerk.user = {id: 'qa-clerk-user'}
+          listeners.forEach(listener => listener())
+        }
+      })()`,
+    })
+  })
+  await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
+    await route.fulfill({ json: { app_user: { id: "qa-app-user", nickname: "QA User" } } })
+  })
+  await page.route("https://api.example.com/api/v1/app/wallet", async (route) => {
+    await route.fulfill({ json: { balance: 500, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+    await route.fulfill({ json: { data: [] } })
+  })
+  await page.goto("/#home")
+  await expect(page.locator(".effect-card")).toHaveCount(4)
+  await page.evaluate(() => (window as unknown as { activateQaSession: () => void }).activateQaSession())
+  await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
+  await page.getByRole("button", { name: "账户", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
+})

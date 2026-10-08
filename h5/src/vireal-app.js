@@ -30,6 +30,15 @@
     currentTask: null,
     polling: null,
   }
+  const observedClerks = new WeakSet()
+
+  function observeClerk(clerk) {
+    if (!observedClerks.has(clerk)) {
+      observedClerks.add(clerk)
+      clerk.addListener(() => void syncSession())
+    }
+    void syncSession()
+  }
 
   const app = () => document.getElementById("app")
   const esc = (value = "") => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char])
@@ -456,13 +465,11 @@
   window.addEventListener("online", () => toast("网络已恢复"))
   window.addEventListener("offline", () => toast("网络连接已断开", true))
   window.addEventListener("vireal:clerk-ready", (event) => {
-    const clerk = event.detail
-    clerk.addListener(() => void syncSession())
-    void syncSession()
+    observeClerk(event.detail)
   })
   window.addEventListener("vireal:clerk-error", (event) => { state.authReady = true; toast(event.detail?.message || "登录组件加载失败", true); render() })
 
   render()
   void loadCatalog()
-  if (window.VirealClerk) void syncSession()
+  if (window.VirealClerk) observeClerk(window.VirealClerk)
 })()
