@@ -284,6 +284,7 @@ async def create_video_task(
             or effect.publish_status != "published"
             or not effect.is_enabled
             or not variant.is_enabled
+            or variant.duration_seconds > settings.APP_EFFECT_MAX_DURATION_SECONDS
         ):
             raise HTTPException(status_code=409, detail="Effect is no longer available")
         if len(body.upload_ids) != effect.input_image_count:

@@ -312,7 +312,9 @@ def process_next_video_task(
                         http_client=client,
                     )
                     video_path = downloaded_path
-                    if task.mode == "standard":
+                    # v1.2 uses mode="effect" for every catalog variant. Keep
+                    # MiniMax's five-second normalization model-driven too.
+                    if task.mode == "standard" or task.execution_type == "minimax":
                         with tempfile.NamedTemporaryFile(
                             suffix=".mp4",
                             delete=False,

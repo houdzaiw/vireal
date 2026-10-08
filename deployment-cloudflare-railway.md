@@ -19,6 +19,15 @@ backend from the repository root, while Cloudflare Pages builds the H5 from the
 
 The production domain is `usevireal.com`.
 
+### v1.2 duration release gate
+
+Keep `APP_EFFECT_MAX_DURATION_SECONDS=10` on both API and worker for the initial
+5/10-second release. The API omits longer variants from the public catalog and
+effect detail, and rejects new tasks using those variants before charging coins
+or contacting the provider. Administrator configuration and historical tasks
+remain intact. After separate 15-second acceptance, set the value to `15` and
+redeploy; no database migration or recreation of variants is needed.
+
 ## Domain registration and hostnames
 
 Keep the registered `usevireal.com` domain on Cloudflare DNS and Registrar.

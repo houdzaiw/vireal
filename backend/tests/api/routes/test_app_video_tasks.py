@@ -204,7 +204,9 @@ def _publish_effect(
             "model": model,
             "model_type": "reference-to-video",
             "prompt": "Create a safe natural cinematic moment.",
-            "negative_prompt": "blur, distortion",
+            "negative_prompt": (
+                None if model == "bytedance/seedance-2.0" else "blur, distortion"
+            ),
             "prompt_version": "test-v1",
             "is_default": True,
             "is_enabled": True,
@@ -237,6 +239,94 @@ def _grant_coins(
         },
     )
     assert response.status_code == 200
+
+
+def test_duration_gate_rejects_new_long_tasks_but_preserves_existing_tasks(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    provider = FakeProvider()
+    _enable_mock_replicate(monkeypatch, provider)
+    monkeypatch.setattr(settings, "LOCAL_DEMO_ENABLED", False)
+    category = client.post(
+        f"{settings.API_V1_STR}/admin/app/effect-categories",
+        headers=superuser_token_headers,
+        json={
+            "slug": f"long-task-{uuid.uuid4().hex[:8]}",
+            "name_zh": "时长门控",
+            "name_en": "DURATION GATE",
+            "tones": ["#123456", "#345678", "#abcdef"],
+            "sort_order": 999,
+            "is_enabled": True,
+        },
+    ).json()
+    effect = client.get(
+        f"{settings.API_V1_STR}/admin/app/effects",
+        params={"category_id": category["id"]},
+        headers=superuser_token_headers,
+    ).json()["data"][0]
+    configured = _publish_effect(
+        client=client,
+        admin_headers=superuser_token_headers,
+        effect=effect,
+        input_image_count=1,
+        model="bytedance/seedance-2.0",
+        duration_seconds=15,
+        coin_cost=12,
+    )
+    headers, login = app_authentication_headers(client=client)
+    _grant_coins(
+        client=client,
+        admin_headers=superuser_token_headers,
+        app_user_id=str(login["app_user"]["id"]),
+        amount=30,
+    )
+    upload = _upload_image(client, headers)
+    body = {
+        "effect_id": configured["effect"]["id"],
+        "variant_id": configured["variant"]["id"],
+        "upload_ids": [upload["id"]],
+    }
+    task_headers = {**headers, "Idempotency-Key": "long-task-existing"}
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 10)
+    rejected = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers=task_headers,
+        json=body,
+    )
+    assert rejected.status_code == 409
+    assert provider.calls == []
+    assert (
+        client.get(f"{settings.API_V1_STR}/app/wallet", headers=headers).json()[
+            "balance"
+        ]
+        == 30
+    )
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 15)
+    created = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers=task_headers,
+        json=body,
+    )
+    assert created.status_code == 202
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 10)
+    duplicate = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers=task_headers,
+        json=body,
+    )
+    assert duplicate.status_code == 202
+    assert duplicate.json()["id"] == created.json()["id"]
+    assert duplicate.json()["duration"] == 15
+    assert duplicate.json()["balance"] == 18
+    assert len(provider.calls) == 1
+    existing = client.get(
+        f"{settings.API_V1_STR}/app/video-tasks/{created.json()['id']}",
+        headers=headers,
+    )
+    assert existing.status_code == 200
+    assert existing.json()["duration"] == 15
 
 
 def test_effect_task_double_image_debit_idempotency_concurrency_and_refund(

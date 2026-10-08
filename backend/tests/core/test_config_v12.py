@@ -122,6 +122,7 @@ def test_database_url_is_normalized_and_email_defaults_are_computed() -> None:
         ({"APP_USER_DAILY_REAL_SUBMISSIONS": 0}, "SUBMISSIONS must be positive"),
         ({"APP_USER_MAX_CONCURRENT_VIDEO_TASKS": 0}, "TASKS must be positive"),
         ({"APP_WAN_DAILY_GLOBAL_SUBMISSIONS": 0}, "SUBMISSIONS must be positive"),
+        ({"APP_EFFECT_MAX_DURATION_SECONDS": 12}, "APP_EFFECT_MAX_DURATION_SECONDS"),
         ({"MAX_CATALOG_IMAGE_BYTES": 0}, "IMAGE_BYTES must be positive"),
         ({"MAX_CATALOG_VIDEO_BYTES": 0}, "VIDEO_BYTES must be positive"),
         ({"LOCAL_DEMO_FFMPEG_PATH": " "}, "FFMPEG_PATH must not be empty"),
@@ -164,6 +165,18 @@ def test_complete_external_service_configuration_is_accepted() -> None:
     )
     assert configured.REPLICATE_ENABLED is True
     assert configured.APP_AUTH_MODE == "clerk"
+
+
+def test_effect_duration_release_gate_defaults_to_ten_seconds() -> None:
+    assert _settings().APP_EFFECT_MAX_DURATION_SECONDS == 10
+    assert (
+        _settings(APP_EFFECT_MAX_DURATION_SECONDS="10").APP_EFFECT_MAX_DURATION_SECONDS
+        == 10
+    )
+    assert (
+        _settings(APP_EFFECT_MAX_DURATION_SECONDS=15).APP_EFFECT_MAX_DURATION_SECONDS
+        == 15
+    )
 
 
 def test_cross_service_configuration_guards() -> None:
