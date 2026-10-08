@@ -337,12 +337,13 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
   await expect(page.locator("#clerkStatus")).toContainText("仅限受邀请用户登录")
 })
 
-test("already-loaded Clerk still observes the subsequent signed-in session", async ({ page }) => {
-  await mockPublicApi(page)
-  await page.route("**/assets/vireal-auth.js", async (route) => {
-    await route.fulfill({
-      contentType: "application/javascript",
-      body: `(() => {
+for (const returnToAccount of [false, true]) {
+  test(`already-loaded Clerk observes sign-in${returnToAccount ? " when the return hash is unchanged" : " from the home page"}`, async ({ page }) => {
+    await mockPublicApi(page)
+    await page.route("**/assets/vireal-auth.js", async (route) => {
+      await route.fulfill({
+        contentType: "application/javascript",
+        body: `(() => {
         const listeners = []
         window.VirealClerk = {
           session: null, user: null,
@@ -354,21 +355,31 @@ test("already-loaded Clerk still observes the subsequent signed-in session", asy
           listeners.forEach(listener => listener())
         }
       })()`,
+      })
     })
+    await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
+      await route.fulfill({ json: { app_user: { id: "qa-app-user", nickname: "QA User" } } })
+    })
+    await page.route("https://api.example.com/api/v1/app/wallet", async (route) => {
+      await route.fulfill({ json: { balance: 500, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } })
+    })
+    await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+      await route.fulfill({ json: { data: [] } })
+    })
+    if (returnToAccount) {
+      await page.addInitScript(() => sessionStorage.setItem("vireal-after-login", "#account"))
+    }
+    await page.goto(returnToAccount ? "/#account" : "/#home")
+    if (returnToAccount) {
+      await expect(page.getByRole("heading", { name: "登录后继续创作" })).toBeVisible()
+    } else {
+      await expect(page.locator(".effect-card")).toHaveCount(4)
+    }
+    await page.evaluate(() => (window as unknown as { activateQaSession: () => void }).activateQaSession())
+    await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
+    if (!returnToAccount) await page.getByRole("button", { name: "账户", exact: true }).click()
+    await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
+    await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+    expect(await page.evaluate(() => sessionStorage.getItem("vireal-after-login"))).toBeNull()
   })
-  await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
-    await route.fulfill({ json: { app_user: { id: "qa-app-user", nickname: "QA User" } } })
-  })
-  await page.route("https://api.example.com/api/v1/app/wallet", async (route) => {
-    await route.fulfill({ json: { balance: 500, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } })
-  })
-  await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
-    await route.fulfill({ json: { data: [] } })
-  })
-  await page.goto("/#home")
-  await expect(page.locator(".effect-card")).toHaveCount(4)
-  await page.evaluate(() => (window as unknown as { activateQaSession: () => void }).activateQaSession())
-  await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
-  await page.getByRole("button", { name: "账户", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
-})
+}

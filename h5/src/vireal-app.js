@@ -143,7 +143,10 @@
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
         location.hash = afterLogin
-      } else render()
+      }
+      // Clerk may already have redirected to this hash. In that case no
+      // hashchange event fires, so render the newly authenticated state here.
+      render()
     } catch (error) {
       state.authReady = true
       toast(`登录同步失败：${errorDetail(error)}`, true)
