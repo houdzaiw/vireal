@@ -101,11 +101,14 @@
   async function syncSession() {
     const clerk = window.VirealClerk
     if (!clerk?.session || !clerk.user) {
+      // Clerk also notifies while the signed-out form is being edited. Only
+      // redraw on an auth transition; remounting would reset email/OTP state.
+      const authChanged = !state.authReady || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
       state.appUser = null
       state.wallet = null
       state.authSyncedSessionId = ""
       state.authReady = true
-      render()
+      if (authChanged) render()
       return
     }
     if (state.authSyncedSessionId === clerk.session.id && state.appUser) return
