@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import subprocess
 import unittest
 
 
@@ -11,6 +13,63 @@ PROTOTYPE = (
 )
 BUILD_SCRIPT = ROOT / "scripts" / "build-vireal-pages.sh"
 AUTH_ENTRY = PROTOTYPE.parent / "vireal-auth.js"
+VERIFY_SCRIPT = ROOT.parent / "scripts" / "verify-production.sh"
+
+
+class ProductionEdgeCheckTests(unittest.TestCase):
+    def run_edge_check(self, *, docs_status: int, private_status: int = 403):
+        # Export a shell curl stub so no real service or credential is used.
+        curl_stub = r"""
+curl() {
+  case "${@: -1}" in
+    https://h5.example.com/)
+      printf '%s' '<meta name="vireal-api-base-url" content="https://api.example.com"><meta name="vireal-backend-mode" content="1"><meta name="vireal-release" content="v1.2-production"><meta name="clerk-publishable-key" content="pk_live_test">' ;;
+    https://h5.example.com/assets/vireal-app.js)
+      printf '%s' '/api/v1/app/effect-catalog' ;;
+    https://api.example.com/api/v1/utils/health-check/)
+      printf '%s' 'true' ;;
+    https://api.example.com/api/v1/app/effect-catalog)
+      printf '%s' '{"categories":[]}' ;;
+    https://api.example.com/api/v1/app/auth/device-login)
+      printf '%s' '410' ;;
+    https://api.example.com/docs)
+      printf '%s' "$TEST_DOCS_STATUS" ;;
+    https://api.example.com/api/v1/webhooks/replicate)
+      printf '%s' '401 ' ;;
+    https://r2.example.com/private.mp4)
+      printf '%s' "$TEST_PRIVATE_STATUS" ;;
+    *) return 9 ;;
+  esac
+}
+export -f curl
+bash "$1"
+"""
+        return subprocess.run(
+            ["bash", "-c", curl_stub, "edge-check-test", str(VERIFY_SCRIPT)],
+            env={
+                **os.environ,
+                "H5_URL": "https://h5.example.com",
+                "API_URL": "https://api.example.com",
+                "R2_PRIVATE_OBJECT_URL": "https://r2.example.com/private.mp4",
+                "TEST_DOCS_STATUS": str(docs_status),
+                "TEST_PRIVATE_STATUS": str(private_status),
+            },
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+    def test_docs_must_be_inaccessible_at_edge_or_origin(self):
+        for status in [403, 404, 200, 302, 500]:
+            with self.subTest(status=status):
+                result = self.run_edge_check(docs_status=status)
+                self.assertEqual(result.returncode == 0, status in {403, 404})
+
+    def test_unsigned_r2_must_deny_access(self):
+        for status in [400, 401, 403, 404, 200, 302, 500]:
+            with self.subTest(status=status):
+                result = self.run_edge_check(docs_status=403, private_status=status)
+                self.assertEqual(result.returncode == 0, status in {400, 401, 403, 404})
 
 
 class VirealH5ProductionTests(unittest.TestCase):
