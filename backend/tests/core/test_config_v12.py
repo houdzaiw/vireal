@@ -170,6 +170,10 @@ def test_complete_external_service_configuration_is_accepted() -> None:
 def test_effect_duration_release_gate_defaults_to_ten_seconds() -> None:
     assert _settings().APP_EFFECT_MAX_DURATION_SECONDS == 10
     assert (
+        _settings(APP_EFFECT_MAX_DURATION_SECONDS="10").APP_EFFECT_MAX_DURATION_SECONDS
+        == 10
+    )
+    assert (
         _settings(APP_EFFECT_MAX_DURATION_SECONDS=15).APP_EFFECT_MAX_DURATION_SECONDS
         == 15
     )

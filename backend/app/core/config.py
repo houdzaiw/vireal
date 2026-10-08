@@ -97,6 +97,11 @@ class Settings(BaseSettings):
     SENTRY_DSN: HttpUrl | None = None
     DATABASE_URL: PostgresDsn
 
+    @field_validator("APP_EFFECT_MAX_DURATION_SECONDS", mode="before")
+    @classmethod
+    def _parse_effect_duration_release_gate(cls, value: int | str) -> int:
+        return int(value)
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def _use_psycopg_driver(cls, value: str | PostgresDsn) -> str:
