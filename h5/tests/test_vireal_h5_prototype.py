@@ -79,7 +79,8 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn("effect_id: effect.id", self.app)
         self.assertIn("variant_id: variant.id", self.app)
         self.assertIn("upload_ids: uploadIds", self.app)
-        self.assertIn('"Idempotency-Key": crypto.randomUUID()', self.app)
+        self.assertIn('"Idempotency-Key": attempt.key', self.app)
+        self.assertIn("key: crypto.randomUUID()", self.app)
 
     def test_upload_count_is_effect_driven(self) -> None:
         self.assertIn("effect.input_image_count", self.app)

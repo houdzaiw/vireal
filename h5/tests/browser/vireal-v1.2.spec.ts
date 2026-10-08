@@ -70,6 +70,79 @@ async function mockPublicApi(page: Page) {
   await page.route(/https:\/\/(?!api\.example\.com).*/, async (route) => route.abort())
 }
 
+async function mockSignedInApi(page: Page) {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.VirealClerk = {
+        session: {id: 'qa-session', getToken: async () => 'qa-session-token'},
+        user: {id: 'qa-user'}, addListener() {},
+      }`,
+    })
+  })
+  await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
+    await route.fulfill({ json: { app_user: { id: "qa-app-user", nickname: "QA User" } } })
+  })
+  await page.route("https://api.example.com/api/v1/app/wallet", async (route) => {
+    await route.fulfill({ json: { balance: 500, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+    await route.fulfill({ json: { data: [] } })
+  })
+}
+
+test("generation retries reuse the same idempotency key after a lost response", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/uploads/images", async (route) => {
+    await route.fulfill({ json: { id: "upload-1" } })
+  })
+  const keys: string[] = []
+  const task = { id: "qa-task", status: "pending", duration: 5, coin_cost: 12, effect_title: "节拍律动" }
+  await page.route("https://api.example.com/api/v1/app/video-tasks", async (route) => {
+    keys.push(route.request().headers()["idempotency-key"])
+    if (keys.length === 1) await route.abort("failed")
+    else await route.fulfill({ json: task })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-task", async (route) => {
+    await route.fulfill({ json: task })
+  })
+  await page.goto("/#generate?category=dance&video=dance-1")
+  await expect(page.locator(".energy-pill")).toContainText("500")
+  await page.locator("input[type=file]").setInputFiles({ name: "qa.png", mimeType: "image/png", buffer: Buffer.from("qa-image") })
+  await expect(page.locator("[data-generate]")).toBeEnabled()
+  await page.locator("[data-generate]").click()
+  await page.locator("[data-confirm-generation]").click()
+  await expect(page.locator("#toastRoot")).toContainText("提交失败")
+  await page.locator("[data-generate]").click()
+  await page.locator("[data-confirm-generation]").click()
+  await expect(page).toHaveURL(/#generation\?id=qa-task$/)
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toBeTruthy()
+  expect(keys[1]).toBe(keys[0])
+})
+
+test("terminal task refunds refresh the visible balance without leaving the page", async ({ page }) => {
+  await mockSignedInApi(page)
+  let balance = 488
+  const task = { id: "qa-refund-task", status: "pending", duration: 5, coin_cost: 12, effect_title: "节拍律动" }
+  await page.route("https://api.example.com/api/v1/app/wallet", async (route) => {
+    await route.fulfill({ json: { balance, daily_remaining: 4, concurrent_remaining: 1, ledger: [] } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+    await route.fulfill({ json: { data: [task] } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-refund-task", async (route) => {
+    balance = 500
+    await route.fulfill({ json: { ...task, status: "failed" } })
+  })
+  await page.goto("/#works")
+  await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("488")
+  await page.getByRole("button", { name: "排队中", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "失败已退款" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
+})
+
 async function expectNoHorizontalOverflow(page: Page) {
   const dimensions = await page.evaluate(() => ({
     body: document.body.scrollWidth,

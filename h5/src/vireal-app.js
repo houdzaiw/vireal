@@ -27,6 +27,8 @@
     authSyncedSessionId: "",
     uploads: [],
     selectedVariants: {},
+    generationAttempt: null,
+    isSubmitting: false,
     currentTask: null,
     polling: null,
   }
@@ -224,6 +226,7 @@
       buttonText = uploaded < effect.input_image_count ? `还需上传 ${effect.input_image_count - uploaded} 张照片` : !enough ? "金币余额不足" : "确认并生成"
       disabled = uploaded < effect.input_image_count
     }
+    if (state.isSubmitting) { buttonText = "正在提交"; disabled = true }
     return shell(`<section class="page page-enter"><div class="detail-hero">${surface(effect, category)}<div class="detail-shade"></div><div class="detail-bar"><button class="icon-button" data-route="home">${icons.back}</button><button class="energy-pill" data-route="wallet">✦ ${state.wallet ? state.wallet.balance : "--"}</button></div><div class="hero-copy"><div class="eyeline">${esc(effect.title_en)}</div><h1>${esc(effect.title_zh)}</h1><p>${esc(effect.description || "上传照片，由 AI 生成自然流畅的动态时刻。")}</p></div></div><div class="generator-panel"><div class="panel-head"><div><h2>上传${effect.input_image_count}张照片</h2><p>图片仅用于本次生成，并按当前素材保留策略处理。</p></div><span class="data-badge">服务端配置</span></div><div class="upload-grid${effect.input_image_count === 2 ? " two" : ""}">${uploadTiles}</div><div class="duration-wrap"><div class="field-label">选择时长 <span>实际金币价格</span></div><div class="duration-group">${variants}</div></div><div class="balance-line"><div><span>本次消耗</span><b>${variant?.coin_cost ?? "--"} ✦</b></div><div><span>剩余余额</span><b class="${state.appUser && !enough ? "insufficient" : ""}">${state.wallet ? state.wallet.balance : "登录后查看"} ${state.wallet ? "✦" : ""}</b></div><div><span>今日 / 并发可用</span><b>${state.wallet ? `${state.wallet.daily_remaining} / ${state.wallet.concurrent_remaining}` : "-- / --"}</b></div></div><button class="generate-button" data-generate ${disabled ? "disabled" : ""}>${buttonText}<small>${variant ? `${variant.duration_seconds}s` : ""}</small></button></div>${recommendations ? `<div class="subsection"><div class="subsection-head"><h2>${esc(effect.recommendation_label || "推荐效果")}</h2><span>继续探索</span></div><div class="recommend-grid">${recommendations}</div></div>` : ""}<div style="padding:0 16px 28px">${nav("")}</div></section>`)
   }
 
@@ -327,19 +330,31 @@
   }
 
   async function createTask() {
+    if (state.isSubmitting) return
     const current = route()
     const effect = effectBySlug(current.params.get("video")) || allEffects()[0]
     const variant = selectedVariant(effect)
     if (!effect || !variant) return
     document.getElementById("overlayRoot").innerHTML = ""
     const uploadIds = state.uploads.slice(0, effect.input_image_count).map((item) => item?.id).filter(Boolean)
+    const body = JSON.stringify({ effect_id: effect.id, variant_id: variant.id, upload_ids: uploadIds })
+    const fingerprint = `${state.appUser?.id}:${body}`
+    // A lost response can hide a successful debit. Retry the same intent with
+    // the same key; new photos, variant, or user establish a different intent.
+    if (state.generationAttempt?.fingerprint !== fingerprint) {
+      state.generationAttempt = { fingerprint, key: crypto.randomUUID() }
+    }
+    const attempt = state.generationAttempt
+    state.isSubmitting = true
+    render()
     try {
       const response = await authFetch("/api/v1/app/video-tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ effect_id: effect.id, variant_id: variant.id, upload_ids: uploadIds }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
+        body,
       })
       const task = await parseResponse(response)
+      if (state.generationAttempt === attempt) state.generationAttempt = null
       state.currentTask = task
       state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
       state.uploads = []
@@ -350,6 +365,9 @@
       const message = errorDetail(error)
       if (/insufficient coin/i.test(message)) navigate("wallet")
       toast(`提交失败：${message}`, true)
+    } finally {
+      state.isSubmitting = false
+      if (route().name === "generate") render()
     }
   }
 
@@ -363,9 +381,9 @@
         const index = state.tasks.findIndex((item) => item.id === task.id)
         if (index >= 0) state.tasks[index] = task
         else state.tasks.unshift(task)
+        if (terminalStatuses.has(task.status)) await loadWallet(false)
         render()
         if (!terminalStatuses.has(task.status)) state.polling = setTimeout(poll, POLL_MS)
-        else await loadWallet(false)
       } catch (error) { toast(errorDetail(error), true) }
     }
     void poll()
