@@ -1,6 +1,7 @@
 import json
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -9,6 +10,7 @@ from app.models import (
     AppAdminOperationLog,
     AppEffect,
     AppEffectCategory,
+    AppEffectVariant,
     AppManagedMediaAsset,
 )
 from tests.utils.app_user import app_authentication_headers
@@ -160,6 +162,86 @@ def test_admin_category_defaults_publish_validation_and_public_etag(
         headers={"If-None-Match": etag},
     )
     assert not_modified.status_code == 304
+
+
+def test_duration_release_gate_filters_catalog_and_detail_without_deleting_config(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    category = client.post(
+        f"{settings.API_V1_STR}/admin/app/effect-categories",
+        headers=superuser_token_headers,
+        json=_category_payload(f"duration-gate-{uuid.uuid4().hex[:8]}"),
+    ).json()
+    effects = client.get(
+        f"{settings.API_V1_STR}/admin/app/effects",
+        params={"category_id": category["id"]},
+        headers=superuser_token_headers,
+    ).json()["data"]
+    effect, longer_only = effects[:2]
+    longer_ids = []
+    for target, durations in ((effect, [5, 10, 15]), (longer_only, [15])):
+        updated = client.put(
+            f"{settings.API_V1_STR}/admin/app/effects/{target['id']}",
+            headers=superuser_token_headers,
+            json=_effect_payload(category["id"], target["slug"]),
+        )
+        assert updated.status_code == 200
+        for duration in durations:
+            model = {
+                5: "minimax/video-01",
+                10: "wan-video/wan-2.7-r2v",
+                15: "bytedance/seedance-2.0",
+            }[duration]
+            variant = client.post(
+                f"{settings.API_V1_STR}/admin/app/effects/{target['id']}/variants",
+                headers=superuser_token_headers,
+                json=_variant_payload(
+                    duration=duration, model=model, negative_prompt=None
+                ),
+            )
+            assert variant.status_code == 200
+            if duration == 15:
+                longer_ids.append(uuid.UUID(variant.json()["id"]))
+        assert (
+            client.post(
+                f"{settings.API_V1_STR}/admin/app/effects/{target['id']}/publish",
+                headers=superuser_token_headers,
+            ).status_code
+            == 200
+        )
+
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 15)
+    unrestricted = client.get(f"{settings.API_V1_STR}/app/effect-catalog")
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 10)
+    restricted = client.get(
+        f"{settings.API_V1_STR}/app/effect-catalog",
+        headers={"If-None-Match": unrestricted.headers["etag"]},
+    )
+    assert restricted.status_code == 200
+    assert restricted.headers["etag"] != unrestricted.headers["etag"]
+    public = next(
+        c for c in restricted.json()["categories"] if c["id"] == category["id"]
+    )
+    assert [e["id"] for e in public["effects"]] == [effect["id"]]
+    assert [v["duration_seconds"] for v in public["effects"][0]["variants"]] == [5, 10]
+    detail = client.get(f"{settings.API_V1_STR}/app/effects/{effect['slug']}")
+    assert [v["duration_seconds"] for v in detail.json()["variants"]] == [5, 10]
+    assert (
+        client.get(
+            f"{settings.API_V1_STR}/app/effects/{longer_only['slug']}"
+        ).status_code
+        == 404
+    )
+    for variant_id in longer_ids:
+        variant_config = db.get(AppEffectVariant, variant_id)
+        assert variant_config is not None and variant_config.is_enabled
+        assert variant_config.duration_seconds == 15
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 15)
+    restored = client.get(f"{settings.API_V1_STR}/app/effects/{effect['slug']}")
+    assert [v["duration_seconds"] for v in restored.json()["variants"]] == [5, 10, 15]
 
 
 def test_admin_coin_adjustment_is_idempotent_and_wallet_is_server_owned(

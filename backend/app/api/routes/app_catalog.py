@@ -71,7 +71,11 @@ def _asset_url(session: SessionDep, asset_id: uuid.UUID | None) -> str | None:
 def _variants_by_effect(session: SessionDep) -> dict[uuid.UUID, list[AppEffectVariant]]:
     variants = session.exec(
         select(AppEffectVariant)
-        .where(col(AppEffectVariant.is_enabled).is_(True))
+        .where(
+            col(AppEffectVariant.is_enabled).is_(True),
+            AppEffectVariant.duration_seconds
+            <= settings.APP_EFFECT_MAX_DURATION_SECONDS,
+        )
         .order_by(col(AppEffectVariant.duration_seconds))
     ).all()
     result: dict[uuid.UUID, list[AppEffectVariant]] = {}
