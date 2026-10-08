@@ -28,6 +28,13 @@ or contacting the provider. Administrator configuration and historical tasks
 remain intact. After separate 15-second acceptance, set the value to `15` and
 redeploy; no database migration or recreation of variants is needed.
 
+Set `APP_LEGACY_VIDEO_TASKS_ENABLED=False` for the paid v1.2 release. The legacy
+request has no priced catalog variant, so permitting it with real generation
+enabled would bypass the coin charge. This gate rejects only new legacy tasks;
+historical reads and idempotent retries of accepted tasks remain supported. For
+an old-H5 rollback, first disable real generation and enable local demo mode
+before reopening legacy submissions; do not downgrade the database.
+
 ## Domain registration and hostnames
 
 Keep the registered `usevireal.com` domain on Cloudflare DNS and Registrar.

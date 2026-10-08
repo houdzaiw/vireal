@@ -241,6 +241,49 @@ def _grant_coins(
     assert response.status_code == 200
 
 
+def test_paid_release_closes_unpriced_legacy_submission_but_preserves_history(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider()
+    _enable_mock_replicate(monkeypatch, provider)
+    monkeypatch.setattr(settings, "LOCAL_DEMO_ENABLED", False)
+    headers, _login = app_authentication_headers(client=client)
+    upload = _upload_image(client, headers)
+    body = {"template_id": "dance", "upload_ids": [upload["id"]], "duration": 5}
+    task_headers = {**headers, "Idempotency-Key": "legacy-accepted-before-release"}
+    monkeypatch.setattr(settings, "APP_LEGACY_VIDEO_TASKS_ENABLED", True)
+    accepted = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers=task_headers,
+        json=body,
+    )
+    assert accepted.status_code == 202
+    monkeypatch.setattr(settings, "APP_LEGACY_VIDEO_TASKS_ENABLED", False)
+    duplicate = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers=task_headers,
+        json=body,
+    )
+    assert duplicate.status_code == 202
+    assert duplicate.json()["id"] == accepted.json()["id"]
+    rejected = client.post(
+        f"{settings.API_V1_STR}/app/video-tasks",
+        headers={**headers, "Idempotency-Key": "unpriced-legacy-after-release"},
+        json=body,
+    )
+    assert rejected.status_code == 409
+    assert "Legacy generation" in rejected.json()["detail"]
+    assert len(provider.calls) == 1
+    assert (
+        client.get(
+            f"{settings.API_V1_STR}/app/video-tasks/{accepted.json()['id']}",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+
+
 def test_duration_gate_rejects_new_long_tasks_but_preserves_existing_tasks(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
