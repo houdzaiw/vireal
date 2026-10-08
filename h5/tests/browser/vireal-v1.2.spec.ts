@@ -130,13 +130,16 @@ test("signed-out Clerk notifications preserve the in-progress login form", async
           session: null,
           user: null,
           addListener(listener) { listeners.push(listener); listener() },
-          mountSignIn(root) {
+          mountSignIn(root, options) {
+            if (options.routing !== 'hash') throw new Error('Unsupported embedded routing')
             root.innerHTML = '<input aria-label="QA email"><button>Continue QA login</button>'
             const notify = () => listeners.forEach(listener => listener())
             root.querySelector('input').addEventListener('input', notify)
             root.querySelector('button').addEventListener('click', () => {
               root.innerHTML = '<input aria-label="QA verification code">'
+              root.querySelector('input').addEventListener('input', notify)
               notify()
+              location.hash = '/factor-one'
             })
           },
         }
@@ -152,6 +155,36 @@ test("signed-out Clerk notifications preserve the in-progress login form", async
   await page.getByRole("textbox", { name: "QA email" }).fill("qa@example.com")
   await expect(page.getByRole("textbox", { name: "QA email" })).toHaveValue("qa@example.com")
   await page.getByRole("button", { name: "Continue QA login" }).click()
+  await expect(page).toHaveURL(/#\/factor-one$/)
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await expect(page.getByRole("textbox", { name: "QA verification code" })).toBeVisible()
+  await page.getByRole("textbox", { name: "QA verification code" }).fill("123456")
+  await expect(page.getByRole("textbox", { name: "QA verification code" })).toHaveValue("123456")
   await expect(page.getByRole("textbox", { name: "QA email" })).toHaveCount(0)
+  await page.locator('[data-route="home"]').click()
+  await expect(page.locator(".effect-card")).toHaveCount(4)
+  await page.getByRole("button", { name: "账户", exact: true }).click()
+  await expect(page.getByRole("textbox", { name: "QA email" })).toHaveValue("")
+})
+
+test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.addEventListener('qa-clerk-load', () => {
+        window.VirealClerk = {
+          session: null, user: null,
+          addListener(listener) { listener() },
+          mountSignIn(root) { root.innerHTML = '<input aria-label="Late QA email">' },
+        }
+        window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))
+      }, {once: true})`,
+    })
+  })
+  await page.goto("/#login")
+  await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+  await page.evaluate(() => window.dispatchEvent(new Event("qa-clerk-load")))
+  await expect(page.getByRole("textbox", { name: "Late QA email" })).toBeVisible()
+  await expect(page.locator("#clerkStatus")).toContainText("仅限受邀请用户登录")
 })

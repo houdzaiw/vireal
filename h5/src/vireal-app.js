@@ -40,6 +40,9 @@
 
   function route() {
     const raw = location.hash.slice(1) || "home"
+    // Clerk's supported hash router owns slash-prefixed paths such as
+    // #/factor-one. They must stay inside the mounted login component.
+    if (raw.startsWith("/")) return { name: "login", params: new URLSearchParams() }
     const [name, query = ""] = raw.split("?")
     return { name: name === "create" ? "generate" : name, params: new URLSearchParams(query) }
   }
@@ -259,6 +262,10 @@
 
   function render() {
     const current = route()
+    const loginRoot = document.getElementById("clerkSignIn")
+    const showsLogin = current.name === "login" || (!state.appUser && ["works", "wallet", "account"].includes(current.name))
+    if (loginRoot && showsLogin) { mountSignIn(); return }
+    if (loginRoot) window.VirealClerk?.unmountSignIn?.(loginRoot)
     const pages = {
       home: homePage,
       generate: () => generatePage(current.params),
@@ -275,9 +282,13 @@
   function mountSignIn() {
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
-    if (!root || !clerk || clerk.session) return
+    if (!root || !clerk || clerk.session || root.dataset.clerkMounted) return
     try {
-      clerk.mountSignIn(root, { routing: "virtual", appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
+      clerk.mountSignIn(root, { routing: "hash", forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      root.dataset.clerkMounted = "true"
+      const status = document.getElementById("clerkStatus")
+      if (status) status.textContent = "仅限受邀请用户登录"
     } catch (_) {}
   }
 
