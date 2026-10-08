@@ -92,6 +92,29 @@ async function mockSignedInApi(page: Page) {
   })
 }
 
+test("photo uploads prevent another file picker from being replaced mid-selection", async ({ page }) => {
+  await mockSignedInApi(page)
+  let releaseUpload!: () => void
+  const uploadFinished = new Promise<void>((resolve) => { releaseUpload = resolve })
+  await page.route("https://api.example.com/api/v1/app/uploads/images", async (route) => {
+    await uploadFinished
+    await route.fulfill({ json: { id: "upload-1" } })
+  })
+  await page.goto("/#generate?category=kiss&video=kiss-1")
+  await expect(page.locator(".energy-pill")).toContainText("500")
+  await page.locator("[data-upload-index='0']").setInputFiles({ name: "qa.png", mimeType: "image/png", buffer: Buffer.from("qa-image") })
+  try {
+    await expect(page.locator("[data-upload-index='1']")).toBeDisabled()
+    await expect(page.locator("[data-remove-upload='0']")).toBeDisabled()
+    await expect(page.locator("[data-generate]")).toContainText("正在上传照片")
+  } finally {
+    releaseUpload()
+  }
+  await expect(page.locator("[data-upload-index='1']")).toBeEnabled()
+  await expect(page.locator("[data-remove-upload='0']")).toBeEnabled()
+  await expect(page.locator("[data-generate]")).toContainText("还需上传 1 张照片")
+})
+
 test("generation retries reuse the same idempotency key after a lost response", async ({ page }) => {
   await mockSignedInApi(page)
   await page.route("https://api.example.com/api/v1/app/uploads/images", async (route) => {

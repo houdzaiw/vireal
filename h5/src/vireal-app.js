@@ -214,9 +214,10 @@
     const variant = selectedVariant(effect)
     const enough = state.wallet && variant && state.wallet.balance >= variant.coin_cost
     const uploaded = state.uploads.filter((entry) => entry?.id).length
+    const uploading = state.uploads.some((entry) => entry?.pending)
     const uploadTiles = Array.from({ length: effect.input_image_count }, (_, index) => {
       const entry = state.uploads[index]
-      return `<label class="upload-tile" aria-pressed="${Boolean(entry)}"><input type="file" accept="image/jpeg,image/png,image/webp" data-upload-index="${index}">${entry ? `<img src="${esc(entry.preview)}" alt="已上传照片 ${index + 1}"><button class="remove-upload" type="button" data-remove-upload="${index}">×</button>` : `<span class="upload-center"><span class="plus-ring">${icons.plus}</span><span class="upload-title">上传照片 ${index + 1}</span><span class="upload-hint">JPG / PNG / WebP</span></span>`}</label>`
+      return `<label class="upload-tile" aria-pressed="${Boolean(entry)}" aria-busy="${Boolean(entry?.pending)}"><input type="file" accept="image/jpeg,image/png,image/webp" data-upload-index="${index}" ${uploading ? "disabled" : ""}>${entry ? `<img src="${esc(entry.preview)}" alt="${entry.pending ? "正在上传照片" : "已上传照片"} ${index + 1}"><button class="remove-upload" type="button" data-remove-upload="${index}" ${uploading ? "disabled" : ""}>×</button>` : `<span class="upload-center"><span class="plus-ring">${icons.plus}</span><span class="upload-title">上传照片 ${index + 1}</span><span class="upload-hint">JPG / PNG / WebP</span></span>`}</label>`
     }).join("")
     const variants = effect.variants.map((item) => `<button class="duration-button" data-variant="${item.id}" aria-pressed="${item.id === variant?.id}"><b>${item.duration_seconds} 秒</b><small>${item.coin_cost} ✦</small></button>`).join("")
     const recommendations = (effect.recommendations || []).map((slug) => effectBySlug(slug)).filter(Boolean).slice(0, 4).map((item, index) => `<button class="recommend-card" data-effect="${esc(item.slug)}">${surface(item, categoryFor(item), index)}<strong>${esc(item.title_zh)}</strong></button>`).join("")
@@ -226,6 +227,7 @@
       buttonText = uploaded < effect.input_image_count ? `还需上传 ${effect.input_image_count - uploaded} 张照片` : !enough ? "金币余额不足" : "确认并生成"
       disabled = uploaded < effect.input_image_count
     }
+    if (uploading) { buttonText = "正在上传照片"; disabled = true }
     if (state.isSubmitting) { buttonText = "正在提交"; disabled = true }
     return shell(`<section class="page page-enter"><div class="detail-hero">${surface(effect, category)}<div class="detail-shade"></div><div class="detail-bar"><button class="icon-button" data-route="home">${icons.back}</button><button class="energy-pill" data-route="wallet">✦ ${state.wallet ? state.wallet.balance : "--"}</button></div><div class="hero-copy"><div class="eyeline">${esc(effect.title_en)}</div><h1>${esc(effect.title_zh)}</h1><p>${esc(effect.description || "上传照片，由 AI 生成自然流畅的动态时刻。")}</p></div></div><div class="generator-panel"><div class="panel-head"><div><h2>上传${effect.input_image_count}张照片</h2><p>图片仅用于本次生成，并按当前素材保留策略处理。</p></div><span class="data-badge">服务端配置</span></div><div class="upload-grid${effect.input_image_count === 2 ? " two" : ""}">${uploadTiles}</div><div class="duration-wrap"><div class="field-label">选择时长 <span>实际金币价格</span></div><div class="duration-group">${variants}</div></div><div class="balance-line"><div><span>本次消耗</span><b>${variant?.coin_cost ?? "--"} ✦</b></div><div><span>剩余余额</span><b class="${state.appUser && !enough ? "insufficient" : ""}">${state.wallet ? state.wallet.balance : "登录后查看"} ${state.wallet ? "✦" : ""}</b></div><div><span>今日 / 并发可用</span><b>${state.wallet ? `${state.wallet.daily_remaining} / ${state.wallet.concurrent_remaining}` : "-- / --"}</b></div></div><button class="generate-button" data-generate ${disabled ? "disabled" : ""}>${buttonText}<small>${variant ? `${variant.duration_seconds}s` : ""}</small></button></div>${recommendations ? `<div class="subsection"><div class="subsection-head"><h2>${esc(effect.recommendation_label || "推荐效果")}</h2><span>继续探索</span></div><div class="recommend-grid">${recommendations}</div></div>` : ""}<div style="padding:0 16px 28px">${nav("")}</div></section>`)
   }
@@ -306,6 +308,7 @@
 
   async function uploadImage(index, file) {
     if (!requireAuth(location.hash)) return
+    if (state.uploads.some((entry) => entry?.pending)) return
     if (!file?.type.startsWith("image/")) return toast("请选择 JPG、PNG 或 WebP 图片", true)
     const preview = URL.createObjectURL(file)
     state.uploads[index] = { preview, pending: true }
