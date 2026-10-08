@@ -120,6 +120,12 @@
       const authChanged = !state.authReady || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
       state.appUser = null
       state.wallet = null
+      state.tasks = []
+      state.currentTask = null
+      state.generationAttempt = null
+      state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
+      state.uploads = []
+      clearTimeout(state.polling)
       state.authSyncedSessionId = ""
       state.authReady = true
       if (authChanged) render()
@@ -277,7 +283,7 @@
   function render() {
     const current = route()
     const loginRoot = document.getElementById("clerkSignIn")
-    const showsLogin = current.name === "login" || (!state.appUser && ["works", "wallet", "account"].includes(current.name))
+    const showsLogin = current.name === "login" || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
     if (loginRoot && showsLogin) { mountSignIn(); return }
     if (loginRoot) window.VirealClerk?.unmountSignIn?.(loginRoot)
     const pages = {
@@ -464,7 +470,7 @@
       void (async () => {
         try { await authFetch("/api/v1/app/auth/logout", { method: "POST" }) } catch (_) {}
         await window.VirealClerk?.signOut()
-        state.appUser = null; state.wallet = null; state.tasks = []; state.authSyncedSessionId = ""
+      state.appUser = null; state.wallet = null; state.tasks = []; state.currentTask = null; state.authSyncedSessionId = ""
         navigate("home")
       })()
     }

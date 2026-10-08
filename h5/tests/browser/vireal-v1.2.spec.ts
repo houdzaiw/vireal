@@ -92,6 +92,50 @@ async function mockSignedInApi(page: Page) {
   })
 }
 
+test("signing out clears the previous account's cached generation details", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("**/assets/vireal-auth.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.VirealClerk = {
+        session: {id: 'session-a', getToken: async () => 'qa-token-a'},
+        user: {id: 'user-a'},
+        addListener(listener) { window.qaClerkNotify = listener },
+      }`,
+    })
+  })
+  let account = "a"
+  const task = { id: "private-a", status: "succeeded", duration: 5, coin_cost: 12, effect_title: "QA-A private work" }
+  await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
+    await route.fulfill({ json: { app_user: { id: `qa-user-${account}`, nickname: `QA-${account}` } } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+    await route.fulfill({ json: { data: account === "a" ? [task] : [] } })
+  })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/private-a", async (route) => {
+    await route.fulfill(account === "a" ? { json: task } : { status: 404, json: { detail: "Video task not found" } })
+  })
+  await page.goto("/#works")
+  await page.getByRole("button", { name: "已完成", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "QA-A private work" })).toBeVisible()
+  await page.evaluate(() => {
+    const runtime = window as any
+    runtime.VirealClerk.session = null
+    runtime.VirealClerk.user = null
+    runtime.qaClerkNotify()
+  })
+  await expect(page.getByRole("heading", { name: "登录后继续创作" })).toBeVisible()
+  account = "b"
+  await page.evaluate(() => {
+    const runtime = window as any
+    runtime.VirealClerk.session = { id: "session-b", getToken: async () => "qa-token-b" }
+    runtime.VirealClerk.user = { id: "user-b" }
+    runtime.qaClerkNotify()
+  })
+  await expect(page.getByRole("heading", { name: "生成任务", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "QA-A private work" })).toHaveCount(0)
+})
+
 test("photo uploads prevent another file picker from being replaced mid-selection", async ({ page }) => {
   await mockSignedInApi(page)
   let releaseUpload!: () => void
@@ -215,7 +259,8 @@ test("desktop keeps the approved phone composition centered", async ({ page }) =
   await page.screenshot({ path: "../.impeccable/review/desktop.png", fullPage: true, animations: "disabled" })
 })
 
-test("signed-out Clerk notifications preserve the in-progress login form", async ({ page }) => {
+for (const entry of ["account navigation", "generation deep link"]) {
+test(`${entry}: signed-out Clerk notifications preserve the in-progress login form`, async ({ page }) => {
   await mockPublicApi(page)
   await page.route("**/assets/vireal-auth.js", async (route) => {
     await route.fulfill({
@@ -245,10 +290,16 @@ test("signed-out Clerk notifications preserve the in-progress login form", async
       })()`,
     })
   })
-  await page.goto("/#home")
-  await expect(page.locator(".effect-card")).toHaveCount(4)
-  await page.getByRole("button", { name: "账户", exact: true }).click()
+  if (entry === "account navigation") {
+    await page.goto("/#home")
+    await expect(page.locator(".effect-card")).toHaveCount(4)
+    await page.getByRole("button", { name: "账户", exact: true }).click()
+  } else {
+    await page.goto("/#generation?id=qa-deep-link")
+  }
   await page.getByRole("textbox", { name: "QA email" }).fill("qa@example.com")
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await expect(page.getByRole("textbox", { name: "QA email" })).toHaveValue("qa@example.com")
   await page.getByRole("button", { name: "Continue QA login" }).click()
   await expect(page).toHaveURL(/#\/factor-one$/)
@@ -262,6 +313,7 @@ test("signed-out Clerk notifications preserve the in-progress login form", async
   await page.getByRole("button", { name: "账户", exact: true }).click()
   await expect(page.getByRole("textbox", { name: "QA email" })).toHaveValue("")
 })
+}
 
 test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }) => {
   await mockPublicApi(page)
