@@ -89,10 +89,14 @@ fi
 
 docs_status="$(curl --silent --show-error --output /dev/null \
   --write-out '%{http_code}' "$api_url/docs")"
-if [[ "$docs_status" != "404" ]]; then
-  echo "Public API docs must return HTTP 404; received $docs_status" >&2
-  exit 1
-fi
+# Cloudflare blocks non-/api/ paths before FastAPI's disabled docs return 404.
+case "$docs_status" in
+  403|404) ;;
+  *)
+    echo "Public API docs must be blocked (HTTP 403 or 404); received $docs_status" >&2
+    exit 1
+    ;;
+esac
 
 echo "Checking Replicate webhook reachability and redirect policy"
 webhook_result="$(curl --silent --show-error --output /dev/null \
@@ -118,8 +122,9 @@ esac
 if [[ -n "$private_object_url" ]]; then
   echo "Checking that the unsigned R2 object is private"
   private_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$private_object_url")"
+  # R2's S3 endpoint may reject a missing signature with HTTP 400 InvalidArgument.
   case "$private_status" in
-    401|403|404) ;;
+    400|401|403|404) ;;
     *)
       echo "Unsigned R2 object must not be readable; received HTTP $private_status" >&2
       exit 1
