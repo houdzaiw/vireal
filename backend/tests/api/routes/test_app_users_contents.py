@@ -311,9 +311,17 @@ def test_admin_list_and_soft_delete_app_user(
         f"{settings.API_V1_STR}/admin/app/users?account_type=legacy_test",
         headers=superuser_token_headers,
     )
+    unfiltered_list_response = client.get(
+        f"{settings.API_V1_STR}/admin/app/users",
+        headers=superuser_token_headers,
+    )
 
     assert list_response.status_code == 200
     assert any(item["id"] == app_user["id"] for item in list_response.json()["data"])
+    assert unfiltered_list_response.status_code == 200
+    assert any(
+        item["id"] == app_user["id"] for item in unfiltered_list_response.json()["data"]
+    )
 
     delete_response = client.delete(
         f"{settings.API_V1_STR}/admin/app/users/{app_user['id']}",

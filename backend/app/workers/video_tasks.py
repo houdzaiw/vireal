@@ -15,6 +15,7 @@ from sqlmodel import Session, col, select
 from app.core.config import settings
 from app.core.db import engine
 from app.models import AppUpload, AppVideoTask
+from app.services.coin_wallet import refund_video_task
 from app.services.storage import ImageStorage, ImageStorageError, get_image_storage
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,9 @@ def _run_ffmpeg(command: list[str], *, operation: str) -> None:
             timeout=settings.LOCAL_DEMO_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
-        raise VideoOutputError("FFmpeg is not installed for local video rendering") from exc
+        raise VideoOutputError(
+            "FFmpeg is not installed for local video rendering"
+        ) from exc
     except subprocess.TimeoutExpired as exc:
         raise VideoOutputError(f"FFmpeg timed out while {operation}") from exc
     except subprocess.CalledProcessError as exc:
@@ -217,6 +220,7 @@ def _record_worker_failure(
         task.error = f"Unable to persist generated video: {exc}"
         task.completed_at = now
         task.next_attempt_at = None
+        refund_video_task(session=session, task=task)
     else:
         delay_seconds = min(15 * (2 ** (task.worker_attempts - 1)), 300)
         task.next_attempt_at = now + timedelta(seconds=delay_seconds)
@@ -253,7 +257,12 @@ def process_next_video_task(
                     try:
                         upload_ids = json.loads(task.upload_ids_json)
                         upload_id = uuid.UUID(upload_ids[0])
-                    except (IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    except (
+                        IndexError,
+                        TypeError,
+                        ValueError,
+                        json.JSONDecodeError,
+                    ) as exc:
                         raise VideoOutputError(
                             "Local demo task has an invalid source upload"
                         ) from exc
@@ -268,7 +277,9 @@ def process_next_video_task(
                             "Local demo source upload is unavailable"
                         )
                     source_image = media_storage.read_app_image(upload.url)
-                    suffix = ".png" if source_image.content_type == "image/png" else ".jpg"
+                    suffix = (
+                        ".png" if source_image.content_type == "image/png" else ".jpg"
+                    )
                     with tempfile.NamedTemporaryFile(
                         suffix=suffix,
                         delete=False,
@@ -301,7 +312,9 @@ def process_next_video_task(
                         http_client=client,
                     )
                     video_path = downloaded_path
-                    if task.mode == "standard":
+                    # v1.2 uses mode="effect" for every catalog variant. Keep
+                    # MiniMax's five-second normalization model-driven too.
+                    if task.mode == "standard" or task.execution_type == "minimax":
                         with tempfile.NamedTemporaryFile(
                             suffix=".mp4",
                             delete=False,

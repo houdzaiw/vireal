@@ -163,7 +163,7 @@ def read_app_users(
     skip: int = 0,
     limit: int = 100,
     status: Literal["active", "disabled", "deleted"] | None = None,
-    account_type: Literal["clerk", "legacy_test"] | None = "clerk",
+    account_type: Literal["clerk", "legacy_test"] | None = None,
     q: str | None = None,
 ) -> Any:
     """

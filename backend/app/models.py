@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import EmailStr
+from pydantic import EmailStr, model_validator
 from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -294,6 +294,17 @@ class AppVideoTask(SQLModel, table=True):
     )
     idempotency_key: str = Field(max_length=255)
     template_id: str = Field(max_length=50)
+    effect_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_effect.id", ondelete="SET NULL", index=True
+    )
+    variant_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="app_effect_variant.id",
+        ondelete="SET NULL",
+        index=True,
+    )
+    coin_cost_snapshot: int | None = Field(default=None, ge=0)
+    prompt_version_snapshot: str | None = Field(default=None, max_length=40)
     upload_ids_json: str = Field(sa_type=Text)
     mode: str = Field(default="advanced", max_length=20, index=True)
     provider: str = Field(default="replicate", max_length=30)
@@ -316,24 +327,24 @@ class AppVideoTask(SQLModel, table=True):
     metrics_json: str | None = Field(default=None, sa_type=Text)
     submission_attempted_at: datetime | None = Field(
         default=None,
-        sa_type=DateTime(timezone=True),
-        index=True,  # type: ignore
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
     real_submission_counted_at: datetime | None = Field(
         default=None,
-        sa_type=DateTime(timezone=True),
-        index=True,  # type: ignore
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
     worker_attempts: int = Field(default=0)
     worker_locked_at: datetime | None = Field(
         default=None,
-        sa_type=DateTime(timezone=True),
-        index=True,  # type: ignore
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
     next_attempt_at: datetime | None = Field(
         default=None,
-        sa_type=DateTime(timezone=True),
-        index=True,  # type: ignore
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
@@ -346,6 +357,15 @@ class AppVideoTask(SQLModel, table=True):
     completed_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    coin_refunded_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
     )
     expires_at: datetime = Field(sa_type=DateTime(timezone=True), index=True)  # type: ignore
     app_user: AppUser | None = Relationship(back_populates="video_tasks")
@@ -376,12 +396,27 @@ class AppVideoTaskWebhookEvent(SQLModel, table=True):
 
 
 class AppVideoTaskCreate(SQLModel):
-    template_id: Literal["dance"]
-    upload_ids: list[uuid.UUID] = Field(min_length=1, max_length=1)
+    template_id: Literal["dance"] | None = None
+    effect_id: uuid.UUID | None = None
+    variant_id: uuid.UUID | None = None
+    upload_ids: list[uuid.UUID] = Field(min_length=1, max_length=2)
     # Advanced preserves compatibility while v1.0 H5 and v1.1 API overlap.
     # The v1.1 client always sends this field explicitly and defaults to standard.
     mode: Literal["standard", "advanced"] = "advanced"
-    duration: Literal[5, 10]
+    duration: Literal[5, 10] | None = None
+
+    @model_validator(mode="after")
+    def validate_task_shape(self) -> AppVideoTaskCreate:
+        uses_effect = self.effect_id is not None or self.variant_id is not None
+        if uses_effect:
+            if self.effect_id is None or self.variant_id is None:
+                raise ValueError("effect_id and variant_id must be provided together")
+            return self
+        if self.template_id != "dance" or self.duration is None:
+            raise ValueError("legacy tasks require template_id and duration")
+        if len(self.upload_ids) != 1:
+            raise ValueError("legacy dance tasks require exactly one upload")
+        return self
 
 
 class AppVideoTaskQuotaPublic(SQLModel):
@@ -390,6 +425,8 @@ class AppVideoTaskQuotaPublic(SQLModel):
     wan_global_limit: int
     wan_global_remaining: int
     resets_at: datetime
+    concurrent_limit: int = 1
+    concurrent_remaining: int = 0
 
 
 class AppVideoTaskPublic(SQLModel):
@@ -407,11 +444,17 @@ class AppVideoTaskPublic(SQLModel):
         "submission_unknown",
         "expired",
     ]
-    mode: Literal["standard", "advanced"]
-    execution_type: Literal["minimax", "wan", "local_demo"]
+    mode: Literal["standard", "advanced", "effect"]
+    execution_type: Literal["minimax", "wan", "seedance", "local_demo"]
     is_demo: bool
     fallback_reason: str | None = None
     duration: int
+    effect_id: uuid.UUID | None = None
+    variant_id: uuid.UUID | None = None
+    effect_slug: str | None = None
+    effect_title: str | None = None
+    coin_cost: int | None = None
+    balance: int | None = None
     resolution: str
     aspect_ratio: str
     error: str | None = None
@@ -420,6 +463,211 @@ class AppVideoTaskPublic(SQLModel):
     completed_at: datetime | None = None
     expires_at: datetime
     quota: AppVideoTaskQuotaPublic | None = None
+
+
+class AppVideoTasksPublic(SQLModel):
+    data: list[AppVideoTaskPublic]
+    count: int
+
+
+class AppManagedMediaAsset(SQLModel, table=True):
+    __tablename__ = "app_managed_media_asset"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    kind: str = Field(max_length=30, index=True)
+    object_key: str = Field(unique=True, max_length=2048)
+    content_type: str = Field(max_length=100)
+    size_bytes: int = Field(ge=0)
+    checksum_sha256: str = Field(max_length=64)
+    status: str = Field(default="active", max_length=20, index=True)
+    uploaded_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    deleted_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+
+
+class AppEffectCategory(SQLModel, table=True):
+    __tablename__ = "app_effect_category"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    slug: str = Field(unique=True, index=True, min_length=1, max_length=80)
+    name_zh: str = Field(max_length=120)
+    name_en: str = Field(max_length=120)
+    tones_json: str = Field(default='["#476b70","#18262c","#98d9de"]', sa_type=Text)
+    sort_order: int = Field(default=0, index=True)
+    is_enabled: bool = Field(default=True, index=True)
+    created_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    updated_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AppEffect(SQLModel, table=True):
+    __tablename__ = "app_effect"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    category_id: uuid.UUID = Field(
+        foreign_key="app_effect_category.id", ondelete="RESTRICT", index=True
+    )
+    slug: str = Field(unique=True, index=True, min_length=1, max_length=120)
+    title_zh: str = Field(max_length=160)
+    title_en: str = Field(max_length=160)
+    description: str | None = Field(default=None, sa_type=Text)
+    input_image_count: int = Field(default=1, ge=1, le=2)
+    poster_asset_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_managed_media_asset.id", ondelete="SET NULL"
+    )
+    preview_asset_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_managed_media_asset.id", ondelete="SET NULL"
+    )
+    sort_order: int = Field(default=0, index=True)
+    publish_status: str = Field(default="draft", max_length=20, index=True)
+    is_enabled: bool = Field(default=True, index=True)
+    recommendation_label: str | None = Field(default=None, max_length=80)
+    created_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    updated_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    published_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AppEffectVariant(SQLModel, table=True):
+    __tablename__ = "app_effect_variant"
+    __table_args__ = (
+        UniqueConstraint(
+            "effect_id", "duration_seconds", name="uq_app_effect_variant_duration"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    effect_id: uuid.UUID = Field(
+        foreign_key="app_effect.id", ondelete="CASCADE", index=True
+    )
+    duration_seconds: int = Field(ge=1, le=60)
+    coin_cost: int = Field(ge=0)
+    provider: str = Field(default="replicate", max_length=30)
+    model: str = Field(max_length=255)
+    model_type: str = Field(max_length=80)
+    prompt: str = Field(sa_type=Text)
+    negative_prompt: str | None = Field(default=None, sa_type=Text)
+    prompt_version: str = Field(default="v1", max_length=40)
+    is_default: bool = False
+    is_enabled: bool = True
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AppEffectRecommendation(SQLModel, table=True):
+    __tablename__ = "app_effect_recommendation"
+
+    effect_id: uuid.UUID = Field(
+        foreign_key="app_effect.id", ondelete="CASCADE", primary_key=True
+    )
+    recommended_effect_id: uuid.UUID = Field(
+        foreign_key="app_effect.id", ondelete="CASCADE", primary_key=True
+    )
+    sort_order: int = 0
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AppCoinAccount(SQLModel, table=True):
+    __tablename__ = "app_coin_account"
+
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", ondelete="CASCADE", primary_key=True
+    )
+    balance: int = Field(default=0, ge=0)
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class AppCoinLedger(SQLModel, table=True):
+    __tablename__ = "app_coin_ledger"
+    __table_args__ = (
+        UniqueConstraint(
+            "app_user_id",
+            "idempotency_key",
+            name="uq_app_coin_ledger_user_idempotency_key",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", ondelete="CASCADE", index=True
+    )
+    delta: int
+    balance_after: int = Field(ge=0)
+    entry_type: str = Field(max_length=40, index=True)
+    idempotency_key: str = Field(max_length=255)
+    task_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_video_task.id", ondelete="SET NULL", index=True
+    )
+    admin_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    reason: str = Field(max_length=500)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        index=True,
+    )
+
+
+class AppCoinLedgerPublic(SQLModel):
+    id: uuid.UUID
+    delta: int
+    balance_after: int
+    entry_type: str
+    reason: str
+    task_id: uuid.UUID | None = None
+    created_at: datetime | None = None
+
+
+class AppWalletPublic(SQLModel):
+    balance: int
+    daily_remaining: int
+    concurrent_remaining: int
+    resets_at: datetime
+    ledger: list[AppCoinLedgerPublic] = Field(default_factory=list)
 
 
 class AppContent(SQLModel, table=True):

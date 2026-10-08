@@ -23,6 +23,9 @@ import { Route as LayoutAppGenerationsRouteImport } from './routes/_layout/app-g
 import { Route as LayoutAppOperationLogsRouteImport } from './routes/_layout/app-operation-logs'
 import { Route as LayoutAppOrdersRouteImport } from './routes/_layout/app-orders'
 import { Route as LayoutAppUsersRouteImport } from './routes/_layout/app-users'
+import { Route as LayoutCoinWalletRouteImport } from './routes/_layout/coin-wallet'
+import { Route as LayoutEffectCategoriesRouteImport } from './routes/_layout/effect-categories'
+import { Route as LayoutEffectsRouteImport } from './routes/_layout/effects'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 
@@ -95,6 +98,21 @@ const LayoutAppUsersRoute = LayoutAppUsersRouteImport.update({
   path: '/app-users',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutCoinWalletRoute = LayoutCoinWalletRouteImport.update({
+  id: '/coin-wallet',
+  path: '/coin-wallet',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEffectCategoriesRoute = LayoutEffectCategoriesRouteImport.update({
+  id: '/effect-categories',
+  path: '/effect-categories',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEffectsRoute = LayoutEffectsRouteImport.update({
+  id: '/effects',
+  path: '/effects',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutItemsRoute = LayoutItemsRouteImport.update({
   id: '/items',
   path: '/items',
@@ -120,6 +138,9 @@ export interface FileRoutesByFullPath {
   '/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/app-orders': typeof LayoutAppOrdersRoute
   '/app-users': typeof LayoutAppUsersRoute
+  '/coin-wallet': typeof LayoutCoinWalletRoute
+  '/effect-categories': typeof LayoutEffectCategoriesRoute
+  '/effects': typeof LayoutEffectsRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
 }
@@ -136,6 +157,9 @@ export interface FileRoutesByTo {
   '/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/app-orders': typeof LayoutAppOrdersRoute
   '/app-users': typeof LayoutAppUsersRoute
+  '/coin-wallet': typeof LayoutCoinWalletRoute
+  '/effect-categories': typeof LayoutEffectCategoriesRoute
+  '/effects': typeof LayoutEffectsRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
@@ -155,6 +179,9 @@ export interface FileRoutesById {
   '/_layout/app-operation-logs': typeof LayoutAppOperationLogsRoute
   '/_layout/app-orders': typeof LayoutAppOrdersRoute
   '/_layout/app-users': typeof LayoutAppUsersRoute
+  '/_layout/coin-wallet': typeof LayoutCoinWalletRoute
+  '/_layout/effect-categories': typeof LayoutEffectCategoriesRoute
+  '/_layout/effects': typeof LayoutEffectsRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
@@ -175,6 +202,9 @@ export interface FileRouteTypes {
     | '/app-operation-logs'
     | '/app-orders'
     | '/app-users'
+    | '/coin-wallet'
+    | '/effect-categories'
+    | '/effects'
     | '/items'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
@@ -191,6 +221,9 @@ export interface FileRouteTypes {
     | '/app-operation-logs'
     | '/app-orders'
     | '/app-users'
+    | '/coin-wallet'
+    | '/effect-categories'
+    | '/effects'
     | '/items'
     | '/settings'
     | '/'
@@ -209,6 +242,9 @@ export interface FileRouteTypes {
     | '/_layout/app-operation-logs'
     | '/_layout/app-orders'
     | '/_layout/app-users'
+    | '/_layout/coin-wallet'
+    | '/_layout/effect-categories'
+    | '/_layout/effects'
     | '/_layout/items'
     | '/_layout/settings'
     | '/_layout/'
@@ -323,6 +359,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAppUsersRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/coin-wallet': {
+      id: '/_layout/coin-wallet'
+      path: '/coin-wallet'
+      fullPath: '/coin-wallet'
+      preLoaderRoute: typeof LayoutCoinWalletRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/effect-categories': {
+      id: '/_layout/effect-categories'
+      path: '/effect-categories'
+      fullPath: '/effect-categories'
+      preLoaderRoute: typeof LayoutEffectCategoriesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/effects': {
+      id: '/_layout/effects'
+      path: '/effects'
+      fullPath: '/effects'
+      preLoaderRoute: typeof LayoutEffectsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/items': {
       id: '/_layout/items'
       path: '/items'
@@ -348,6 +405,9 @@ interface LayoutRouteChildren {
   LayoutAppOperationLogsRoute: typeof LayoutAppOperationLogsRoute
   LayoutAppOrdersRoute: typeof LayoutAppOrdersRoute
   LayoutAppUsersRoute: typeof LayoutAppUsersRoute
+  LayoutCoinWalletRoute: typeof LayoutCoinWalletRoute
+  LayoutEffectCategoriesRoute: typeof LayoutEffectCategoriesRoute
+  LayoutEffectsRoute: typeof LayoutEffectsRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -361,6 +421,9 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAppOperationLogsRoute: LayoutAppOperationLogsRoute,
   LayoutAppOrdersRoute: LayoutAppOrdersRoute,
   LayoutAppUsersRoute: LayoutAppUsersRoute,
+  LayoutCoinWalletRoute: LayoutCoinWalletRoute,
+  LayoutEffectCategoriesRoute: LayoutEffectCategoriesRoute,
+  LayoutEffectsRoute: LayoutEffectsRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,

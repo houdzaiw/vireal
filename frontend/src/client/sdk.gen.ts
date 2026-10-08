@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthInitializeClerkSessionData, appAuthInitializeClerkSessionResponses, appAuthLogoutClerkSessionData, appAuthLogoutClerkSessionResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, appVideoTasksCreateVideoTaskData, appVideoTasksCreateVideoTaskErrors, appVideoTasksCreateVideoTaskResponses, appVideoTasksReadVideoTaskData, appVideoTasksReadVideoTaskErrors, appVideoTasksReadVideoTaskResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginAdminLoginAccessTokenData, loginAdminLoginAccessTokenErrors, loginAdminLoginAccessTokenResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, replicateWebhooksReceiveReplicateWebhookData, replicateWebhooksReceiveReplicateWebhookErrors, replicateWebhooksReceiveReplicateWebhookResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, adminEffectCatalogAdjustUserCoinsData, adminEffectCatalogAdjustUserCoinsErrors, adminEffectCatalogAdjustUserCoinsResponses, adminEffectCatalogCreateCategoryData, adminEffectCatalogCreateCategoryErrors, adminEffectCatalogCreateCategoryResponses, adminEffectCatalogCreateEffectData, adminEffectCatalogCreateEffectErrors, adminEffectCatalogCreateEffectResponses, adminEffectCatalogCreateVariantData, adminEffectCatalogCreateVariantErrors, adminEffectCatalogCreateVariantResponses, adminEffectCatalogDeleteCategoryData, adminEffectCatalogDeleteCategoryErrors, adminEffectCatalogDeleteCategoryResponses, adminEffectCatalogDeleteEffectData, adminEffectCatalogDeleteEffectErrors, adminEffectCatalogDeleteEffectResponses, adminEffectCatalogDeleteMediaAssetData, adminEffectCatalogDeleteMediaAssetErrors, adminEffectCatalogDeleteMediaAssetResponses, adminEffectCatalogDeleteVariantData, adminEffectCatalogDeleteVariantErrors, adminEffectCatalogDeleteVariantResponses, adminEffectCatalogListCategoriesData, adminEffectCatalogListCategoriesResponses, adminEffectCatalogListEffectsData, adminEffectCatalogListEffectsErrors, adminEffectCatalogListEffectsResponses, adminEffectCatalogPublishEffectData, adminEffectCatalogPublishEffectErrors, adminEffectCatalogPublishEffectResponses, adminEffectCatalogReadEffectData, adminEffectCatalogReadEffectErrors, adminEffectCatalogReadEffectResponses, adminEffectCatalogUpdateCategoryData, adminEffectCatalogUpdateCategoryErrors, adminEffectCatalogUpdateCategoryResponses, adminEffectCatalogUpdateEffectData, adminEffectCatalogUpdateEffectErrors, adminEffectCatalogUpdateEffectResponses, adminEffectCatalogUpdateVariantData, adminEffectCatalogUpdateVariantErrors, adminEffectCatalogUpdateVariantResponses, adminEffectCatalogUploadMediaAssetData, adminEffectCatalogUploadMediaAssetErrors, adminEffectCatalogUploadMediaAssetResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthInitializeClerkSessionData, appAuthInitializeClerkSessionResponses, appAuthLogoutClerkSessionData, appAuthLogoutClerkSessionResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appEffectCatalogReadEffectCatalogData, appEffectCatalogReadEffectCatalogResponses, appEffectCatalogReadEffectData, appEffectCatalogReadEffectErrors, appEffectCatalogReadEffectResponses, appEffectCatalogReadMediaAssetData, appEffectCatalogReadMediaAssetErrors, appEffectCatalogReadMediaAssetResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, appVideoTasksCreateVideoTaskData, appVideoTasksCreateVideoTaskErrors, appVideoTasksCreateVideoTaskResponses, appVideoTasksDeleteVideoTaskData, appVideoTasksDeleteVideoTaskErrors, appVideoTasksDeleteVideoTaskResponses, appVideoTasksReadVideoTaskData, appVideoTasksReadVideoTaskErrors, appVideoTasksReadVideoTaskResponses, appVideoTasksReadVideoTasksData, appVideoTasksReadVideoTasksErrors, appVideoTasksReadVideoTasksResponses, appWalletReadWalletData, appWalletReadWalletResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginAdminLoginAccessTokenData, loginAdminLoginAccessTokenErrors, loginAdminLoginAccessTokenResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, replicateWebhooksReceiveReplicateWebhookData, replicateWebhooksReceiveReplicateWebhookErrors, replicateWebhooksReceiveReplicateWebhookResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -443,6 +443,41 @@ export class AppAuthService {
     }
 }
 
+export class AppEffectCatalogService {
+    /**
+     * Read Effect Catalog
+     */
+    public static readEffectCatalog<ThrowOnError extends boolean = true>(options?: Options<appEffectCatalogReadEffectCatalogData, ThrowOnError>) {
+        return (options?.client ?? client).get<appEffectCatalogReadEffectCatalogResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            url: '/api/v1/app/effect-catalog',
+            ...options
+        });
+    }
+
+    /**
+     * Read Media Asset
+     */
+    public static readMediaAsset<ThrowOnError extends boolean = true>(options: Options<appEffectCatalogReadMediaAssetData, ThrowOnError>) {
+        return (options.client ?? client).get<appEffectCatalogReadMediaAssetResponses, appEffectCatalogReadMediaAssetErrors, ThrowOnError>({
+            responseType: 'json',
+            url: '/api/v1/app/media-assets/{asset_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Read Effect
+     */
+    public static readEffect<ThrowOnError extends boolean = true>(options: Options<appEffectCatalogReadEffectData, ThrowOnError>) {
+        return (options.client ?? client).get<appEffectCatalogReadEffectResponses, appEffectCatalogReadEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            url: '/api/v1/app/effects/{slug}',
+            ...options
+        });
+    }
+}
+
 export class AppUsersService {
     /**
      * Read App User Me
@@ -692,6 +727,18 @@ export class AppOrdersService {
 
 export class AppVideoTasksService {
     /**
+     * Read Video Tasks
+     */
+    public static readVideoTasks<ThrowOnError extends boolean = true>(options?: Options<appVideoTasksReadVideoTasksData, ThrowOnError>) {
+        return (options?.client ?? client).get<appVideoTasksReadVideoTasksResponses, appVideoTasksReadVideoTasksErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/video-tasks',
+            ...options
+        });
+    }
+
+    /**
      * Create Video Task
      */
     public static createVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksCreateVideoTaskData, ThrowOnError>) {
@@ -708,6 +755,18 @@ export class AppVideoTasksService {
     }
 
     /**
+     * Delete Video Task
+     */
+    public static deleteVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksDeleteVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).delete<appVideoTasksDeleteVideoTaskResponses, appVideoTasksDeleteVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/video-tasks/{task_id}',
+            ...options
+        });
+    }
+
+    /**
      * Read Video Task
      */
     public static readVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksReadVideoTaskData, ThrowOnError>) {
@@ -715,6 +774,20 @@ export class AppVideoTasksService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/app/video-tasks/{task_id}',
+            ...options
+        });
+    }
+}
+
+export class AppWalletService {
+    /**
+     * Read Wallet
+     */
+    public static readWallet<ThrowOnError extends boolean = true>(options?: Options<appWalletReadWalletData, ThrowOnError>) {
+        return (options?.client ?? client).get<appWalletReadWalletResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/wallet',
             ...options
         });
     }
@@ -949,6 +1022,233 @@ export class AdminAppService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/admin/app/configs/{config_id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+}
+
+export class AdminEffectCatalogService {
+    /**
+     * List Categories
+     */
+    public static listCategories<ThrowOnError extends boolean = true>(options?: Options<adminEffectCatalogListCategoriesData, ThrowOnError>) {
+        return (options?.client ?? client).get<adminEffectCatalogListCategoriesResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effect-categories',
+            ...options
+        });
+    }
+
+    /**
+     * Create Category
+     */
+    public static createCategory<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogCreateCategoryData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogCreateCategoryResponses, adminEffectCatalogCreateCategoryErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effect-categories',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Delete Category
+     */
+    public static deleteCategory<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogDeleteCategoryData, ThrowOnError>) {
+        return (options.client ?? client).delete<adminEffectCatalogDeleteCategoryResponses, adminEffectCatalogDeleteCategoryErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effect-categories/{category_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Update Category
+     */
+    public static updateCategory<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogUpdateCategoryData, ThrowOnError>) {
+        return (options.client ?? client).put<adminEffectCatalogUpdateCategoryResponses, adminEffectCatalogUpdateCategoryErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effect-categories/{category_id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * List Effects
+     */
+    public static listEffects<ThrowOnError extends boolean = true>(options?: Options<adminEffectCatalogListEffectsData, ThrowOnError>) {
+        return (options?.client ?? client).get<adminEffectCatalogListEffectsResponses, adminEffectCatalogListEffectsErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects',
+            ...options
+        });
+    }
+
+    /**
+     * Create Effect
+     */
+    public static createEffect<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogCreateEffectData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogCreateEffectResponses, adminEffectCatalogCreateEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Delete Effect
+     */
+    public static deleteEffect<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogDeleteEffectData, ThrowOnError>) {
+        return (options.client ?? client).delete<adminEffectCatalogDeleteEffectResponses, adminEffectCatalogDeleteEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Read Effect
+     */
+    public static readEffect<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogReadEffectData, ThrowOnError>) {
+        return (options.client ?? client).get<adminEffectCatalogReadEffectResponses, adminEffectCatalogReadEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Update Effect
+     */
+    public static updateEffect<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogUpdateEffectData, ThrowOnError>) {
+        return (options.client ?? client).put<adminEffectCatalogUpdateEffectResponses, adminEffectCatalogUpdateEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Create Variant
+     */
+    public static createVariant<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogCreateVariantData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogCreateVariantResponses, adminEffectCatalogCreateVariantErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}/variants',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Delete Variant
+     */
+    public static deleteVariant<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogDeleteVariantData, ThrowOnError>) {
+        return (options.client ?? client).delete<adminEffectCatalogDeleteVariantResponses, adminEffectCatalogDeleteVariantErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}/variants/{variant_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Update Variant
+     */
+    public static updateVariant<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogUpdateVariantData, ThrowOnError>) {
+        return (options.client ?? client).put<adminEffectCatalogUpdateVariantResponses, adminEffectCatalogUpdateVariantErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}/variants/{variant_id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Publish Effect
+     */
+    public static publishEffect<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogPublishEffectData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogPublishEffectResponses, adminEffectCatalogPublishEffectErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/effects/{effect_id}/publish',
+            ...options
+        });
+    }
+
+    /**
+     * Upload Media Asset
+     */
+    public static uploadMediaAsset<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogUploadMediaAssetData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogUploadMediaAssetResponses, adminEffectCatalogUploadMediaAssetErrors, ThrowOnError>({
+            ...formDataBodySerializer,
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/media-assets',
+            ...options,
+            headers: {
+                'Content-Type': null,
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Delete Media Asset
+     */
+    public static deleteMediaAsset<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogDeleteMediaAssetData, ThrowOnError>) {
+        return (options.client ?? client).delete<adminEffectCatalogDeleteMediaAssetResponses, adminEffectCatalogDeleteMediaAssetErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/media-assets/{asset_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Adjust User Coins
+     */
+    public static adjustUserCoins<ThrowOnError extends boolean = true>(options: Options<adminEffectCatalogAdjustUserCoinsData, ThrowOnError>) {
+        return (options.client ?? client).post<adminEffectCatalogAdjustUserCoinsResponses, adminEffectCatalogAdjustUserCoinsErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/coin-adjustments',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

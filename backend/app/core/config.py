@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     APP_IMAGE_STORAGE_BACKEND: Literal["local", "r2"] = "local"
     LOCAL_UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_IMAGE_BYTES: int = 5 * 1024 * 1024
+    MAX_CATALOG_IMAGE_BYTES: int = 10 * 1024 * 1024
+    MAX_CATALOG_VIDEO_BYTES: int = 100 * 1024 * 1024
     APP_GENERATION_PROVIDER: Literal["local", "ark"] = "local"
     APP_GENERATION_LOCAL_DELAY_SECONDS: float = 1.5
     APP_PUBLIC_BASE_URL: str | None = None
@@ -78,7 +80,13 @@ class Settings(BaseSettings):
     REPLICATE_WEBHOOK_TOLERANCE_SECONDS: int = 5 * 60
     REPLICATE_POC_MAX_SUBMISSIONS: int = 0
     APP_USER_DAILY_REAL_SUBMISSIONS: int = 5
+    APP_USER_MAX_CONCURRENT_VIDEO_TASKS: int = 1
     APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 3
+    # Release gate only: retain longer variants and historical task snapshots.
+    APP_EFFECT_MAX_DURATION_SECONDS: Literal[5, 10, 15] = 10
+    # Preserve compatibility in development; disable the unpriced legacy
+    # submission path when releasing the paid effect catalog.
+    APP_LEGACY_VIDEO_TASKS_ENABLED: bool = True
     LOCAL_DEMO_ENABLED: bool = True
     LOCAL_DEMO_FFMPEG_PATH: str = "/usr/bin/ffmpeg"
     LOCAL_DEMO_TIMEOUT_SECONDS: int = 180
@@ -91,6 +99,11 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     DATABASE_URL: PostgresDsn
+
+    @field_validator("APP_EFFECT_MAX_DURATION_SECONDS", mode="before")
+    @classmethod
+    def _parse_effect_duration_release_gate(cls, value: int | str) -> int:
+        return int(value)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -215,8 +228,14 @@ class Settings(BaseSettings):
             raise ValueError("VIDEO_CLEANUP_INTERVAL_SECONDS must be positive")
         if self.APP_USER_DAILY_REAL_SUBMISSIONS < 1:
             raise ValueError("APP_USER_DAILY_REAL_SUBMISSIONS must be positive")
+        if self.APP_USER_MAX_CONCURRENT_VIDEO_TASKS < 1:
+            raise ValueError("APP_USER_MAX_CONCURRENT_VIDEO_TASKS must be positive")
         if self.APP_WAN_DAILY_GLOBAL_SUBMISSIONS < 1:
             raise ValueError("APP_WAN_DAILY_GLOBAL_SUBMISSIONS must be positive")
+        if self.MAX_CATALOG_IMAGE_BYTES < 1:
+            raise ValueError("MAX_CATALOG_IMAGE_BYTES must be positive")
+        if self.MAX_CATALOG_VIDEO_BYTES < 1:
+            raise ValueError("MAX_CATALOG_VIDEO_BYTES must be positive")
         if not self.LOCAL_DEMO_FFMPEG_PATH.strip():
             raise ValueError("LOCAL_DEMO_FFMPEG_PATH must not be empty")
         if self.LOCAL_DEMO_TIMEOUT_SECONDS < 1:

@@ -8,4 +8,5 @@ FASTAPI_ENV=development uv run python -c "import app.main; import json; print(js
 cd ..
 mv openapi.json frontend/
 bun run --filter frontend generate-client
+perl -pi -e 's/[ \t]+$//' frontend/src/client/*.ts
 bun run lint

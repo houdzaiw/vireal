@@ -29,12 +29,19 @@ test("Log In button is visible", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Log In" })).toBeVisible()
 })
 
-test("Forgot Password link is visible", async ({ page }) => {
+test("Administrator login has no public password recovery or signup links", async ({
+  page,
+}) => {
   await page.goto("/login")
 
   await expect(
-    page.getByRole("link", { name: "Forgot your password?" }),
+    page.getByRole("heading", { name: "Vireal Admin" }),
   ).toBeVisible()
+  await expect(page.getByText("Authorized administrators only")).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Forgot your password?" }),
+  ).not.toBeVisible()
+  await expect(page.getByRole("link", { name: "Sign Up" })).not.toBeVisible()
 })
 
 test("Log in with valid email and password ", async ({ page }) => {
