@@ -44,7 +44,7 @@ function formatAmount(order: AppOrderPublic) {
   if (order.amount == null) {
     return "N/A"
   }
-  return `${order.amount} ${order.currency ?? ""}`.trim()
+  return `${order.provider === "paypal" ? (order.amount / 100).toFixed(2) : order.amount} ${order.currency ?? ""}`.trim()
 }
 
 const columns: ColumnDef<AppOrderPublic>[] = [
@@ -92,6 +92,24 @@ const columns: ColumnDef<AppOrderPublic>[] = [
     accessorKey: "paid_at",
     header: "Paid",
     cell: ({ row }) => <DateTime value={row.original.paid_at} />,
+  },
+  {
+    accessorKey: "fulfilled_at",
+    header: "Credits issued",
+    cell: ({ row }) => (
+      <span>
+        {row.original.coin_quantity ?? "—"} ·{" "}
+        {row.original.fulfilled_at ? "Issued" : "Not issued"}
+        <DateTime value={row.original.fulfilled_at} />
+      </span>
+    ),
+  },
+  {
+    accessorKey: "payment_environment",
+    header: "Environment",
+    cell: ({ row }) => (
+      <span>{row.original.payment_environment ?? "Legacy"}</span>
+    ),
   },
   {
     id: "events",

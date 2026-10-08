@@ -150,10 +150,13 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn("variant.coin_cost", self.app)
         self.assertNotIn("state.balance -=", self.app)
 
-    def test_wallet_is_real_and_has_no_payment_packages(self) -> None:
+    def test_wallet_uses_real_server_priced_paypal_orders(self) -> None:
         self.assertIn("/api/v1/app/wallet", self.app)
         self.assertIn("wallet?.ledger", self.app)
-        self.assertIn("本期不开放 H5 充值", self.app)
+        self.assertIn("/api/v1/app/paypal/orders", self.app)
+        self.assertIn("/api/v1/app/paypal/config", self.app)
+        self.assertIn("coin_quantity", self.app)
+        self.assertIn("order.fulfilled_at", self.app)
         self.assertNotIn("data-pack", self.app)
         self.assertNotIn("确认充值", self.app)
 

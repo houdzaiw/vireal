@@ -18,6 +18,7 @@ def _validate_idempotent_adjustment(
     entry_type: str,
     reason: str,
     task_id: uuid.UUID | None,
+    order_id: uuid.UUID | None,
     admin_user_id: uuid.UUID | None,
 ) -> None:
     if (
@@ -25,6 +26,7 @@ def _validate_idempotent_adjustment(
         or existing.entry_type != entry_type
         or existing.reason != reason
         or existing.task_id != task_id
+        or existing.order_id != order_id
         or existing.admin_user_id != admin_user_id
     ):
         raise CoinBalanceError(
@@ -46,6 +48,7 @@ def adjust_coin_balance(
     idempotency_key: str,
     reason: str,
     task_id: uuid.UUID | None = None,
+    order_id: uuid.UUID | None = None,
     admin_user_id: uuid.UUID | None = None,
 ) -> tuple[AppCoinAccount, AppCoinLedger, bool]:
     """Apply one idempotent wallet change inside the caller's transaction."""
@@ -64,6 +67,7 @@ def adjust_coin_balance(
             entry_type=entry_type,
             reason=reason,
             task_id=task_id,
+            order_id=order_id,
             admin_user_id=admin_user_id,
         )
         account = session.get(AppCoinAccount, app_user_id)
@@ -103,6 +107,7 @@ def adjust_coin_balance(
             entry_type=entry_type,
             reason=reason,
             task_id=task_id,
+            order_id=order_id,
             admin_user_id=admin_user_id,
         )
         return account, existing, False
@@ -119,6 +124,7 @@ def adjust_coin_balance(
         entry_type=entry_type,
         idempotency_key=idempotency_key,
         task_id=task_id,
+        order_id=order_id,
         admin_user_id=admin_user_id,
         reason=reason,
     )

@@ -733,6 +733,9 @@ def process_payment_callback(
         return order, existing_event, True
 
     order = session.get(AppOrder, callback.order_id)
+    # Legacy callbacks must never alter another provider's financial state.
+    if order is not None and order.provider != provider:
+        order = None
     now = datetime.now(UTC)
     raw_payload = json.dumps(callback.model_dump(mode="json"), ensure_ascii=False)
     event = AppOrderEvent(

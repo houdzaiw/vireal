@@ -31,6 +31,13 @@
     isSubmitting: false,
     currentTask: null,
     polling: null,
+    commerce: null,
+    commerceError: "",
+    authView: "login",
+    rechargeOrders: [],
+    rechargeProduct: "coins_100",
+    paymentPolling: null,
+    checkoutActive: false,
   }
   const observedClerks = new WeakSet()
 
@@ -53,7 +60,7 @@
     const raw = location.hash.slice(1) || "home"
     // Clerk's supported hash router owns slash-prefixed paths such as
     // #/factor-one. They must stay inside the mounted login component.
-    if (raw.startsWith("/")) return { name: "login", params: new URLSearchParams() }
+    if (raw.startsWith("/")) return { name: state.authView, params: new URLSearchParams() }
     const [name, query = ""] = raw.split("?")
     return { name: name === "create" ? "generate" : name, params: new URLSearchParams(query) }
   }
@@ -112,6 +119,118 @@
     render()
   }
 
+  const paymentText = (zh, en) => /^zh\b/i.test(navigator.language) ? zh : en
+  const paymentStatus = (order) => order.fulfilled_at && order.status === "paid"
+    ? paymentText("已到账", "Credits received")
+    : ({ created: paymentText("等待支付", "Awaiting payment"), approved: paymentText("正在确认", "Confirming payment"), capture_pending: paymentText("支付待确认", "Payment pending"), payment_review: paymentText("人工审核中", "Under review"), refunded: paymentText("已退款，待核对金币", "Refunded; credits under review"), reversed: paymentText("付款已撤销", "Payment reversed"), canceled: paymentText("已取消", "Cancelled"), failed: paymentText("支付失败", "Payment failed") })[order.status] || paymentText("待确认", "Pending confirmation")
+
+  async function loadCommerce(redraw = true) {
+    try {
+      state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store" }))
+      state.commerceError = ""
+    } catch (_) {
+      state.commerce = null
+      state.commerceError = paymentText("暂时无法确认服务地区和充值状态", "Service availability could not be confirmed")
+    }
+    if (redraw) render()
+  }
+
+  async function loadRechargeOrders() {
+    if (!state.appUser) return
+    try {
+      const result = await parseResponse(await authFetch("/api/v1/app/orders?limit=20"))
+      state.rechargeOrders = result.data.filter(order => order.provider === "paypal")
+    } catch (_) {}
+  }
+
+  async function refreshPayments() {
+    await Promise.all([loadCommerce(false), loadWallet(false), loadRechargeOrders()])
+    if (route().name === "wallet" && !state.checkoutActive) render()
+    clearTimeout(state.paymentPolling)
+    if (route().name === "wallet" && state.rechargeOrders.some(order => !order.fulfilled_at && ["created", "approved", "capture_pending", "payment_review"].includes(order.status))) {
+      state.paymentPolling = setTimeout(refreshPayments, 10000)
+    }
+  }
+
+  let paypalSdkPromise
+  async function paypalSdk(config) {
+    if (window.paypal?.createInstance) return window.paypal
+    if (!paypalSdkPromise) paypalSdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script")
+      script.src = config.environment === "live" ? "https://www.paypal.com/web-sdk/v6/core" : "https://www.sandbox.paypal.com/web-sdk/v6/core"
+      script.async = true
+      script.onload = () => window.paypal?.createInstance ? resolve(window.paypal) : reject(new Error("PayPal SDK unavailable"))
+      script.onerror = () => { paypalSdkPromise = null; script.remove(); reject(new Error("PayPal SDK unavailable")) }
+      document.head.append(script)
+    })
+    return paypalSdkPromise
+  }
+
+  async function mountPayPal() {
+    const root = document.getElementById("paypalCheckout")
+    const config = state.commerce
+    const userId = state.appUser?.id
+    const product = state.rechargeProduct
+    if (!root || root.dataset.mounted || !userId || !config?.recharge_enabled || state.wallet?.payment_hold) return
+    root.dataset.mounted = "true"
+    const message = text => { if (root.isConnected) root.querySelector("[data-payment-message]").textContent = text }
+    const key = `vireal-payment:${userId}`
+    let activeOrder
+    try {
+      const sdk = await paypalSdk(config)
+      const instance = await sdk.createInstance({ clientId: config.client_id, components: ["paypal-payments"] })
+      const eligible = await instance.findEligibleMethods({ currencyCode: "USD" })
+      if (!root.isConnected) return
+      if (!eligible.isEligible("paypal")) { message(paymentText("PayPal 当前不可用，请联系客服", "PayPal is not available; please contact support")); return }
+      const checkout = await instance.createPayPalOneTimePaymentSession({
+        async onApprove(data) {
+          state.checkoutActive = false
+          if (!activeOrder || data.orderId !== activeOrder.provider_order_id || state.appUser?.id !== userId) {
+            message(paymentText("订单需要重新确认，请刷新记录", "Please refresh to verify the order")); return
+          }
+          try {
+            const order = await parseResponse(await authFetch(`/api/v1/app/paypal/orders/${activeOrder.id}/capture`, { method: "POST" }))
+            if (order.fulfilled_at && order.status === "paid") {
+              sessionStorage.removeItem(key)
+              toast(paymentText("充值已到账", "Credits received"))
+            } else toast(paymentText("支付正在确认，请勿重复付款", "Payment is being confirmed; do not pay again"))
+          } catch (_) { toast(paymentText("支付结果待确认，请查看充值记录，不要重复付款", "Payment confirmation is pending; check your orders before paying again"), true) }
+          await refreshPayments()
+        },
+        onCancel() { state.checkoutActive = false; toast(paymentText("支付已取消，请以订单状态为准", "Checkout cancelled; check your order status")); void refreshPayments() },
+        onError() { state.checkoutActive = false; toast(paymentText("支付暂未确认，请查看记录后再操作", "Payment has not been confirmed; please check order history"), true); void refreshPayments() },
+      })
+      if (!root.isConnected) return
+      const button = document.createElement("paypal-button")
+      root.prepend(button)
+      let starting = false
+      button.addEventListener("click", async () => {
+        if (starting || state.appUser?.id !== userId) return
+        starting = true
+        state.checkoutActive = true
+        message(paymentText("正在创建安全支付订单…", "Creating a secure payment order…"))
+        // Start immediately within the click's user activation; do not await creation first.
+        const orderPromise = (async () => {
+          let attempt
+          try { attempt = JSON.parse(sessionStorage.getItem(key) || "null") } catch (_) {}
+          if (!attempt || attempt.product_id !== product) attempt = { product_id: product, idempotency_key: crypto.randomUUID() }
+          sessionStorage.setItem(key, JSON.stringify(attempt))
+          activeOrder = await parseResponse(await authFetch("/api/v1/app/paypal/orders", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.idempotency_key }, body: JSON.stringify({ product_id: product }) }))
+          if (activeOrder.fulfilled_at || ["failed", "canceled", "refunded", "reversed"].includes(activeOrder.status) || !activeOrder.provider_order_id) {
+            sessionStorage.removeItem(key)
+            throw new Error("Please refresh your payment records")
+          }
+          sessionStorage.setItem(key, JSON.stringify({ ...attempt, order_id: activeOrder.id }))
+          return { orderId: activeOrder.provider_order_id }
+        })()
+        try { await checkout.start({ presentationMode: "auto" }, orderPromise) }
+        catch (_) { state.checkoutActive = false; message(paymentText("订单暂未确认，请刷新充值记录", "Order confirmation unavailable; refresh your payment records")); void refreshPayments() }
+        finally { starting = false }
+      })
+      message(paymentText("由 PayPal 安全收款，后端确认后到账", "Secure PayPal checkout; credits are issued after server verification"))
+    } catch (_) { message(paymentText("支付组件加载失败，请稍后刷新", "Checkout could not load; please refresh later")); root.dataset.mounted = "" }
+  }
+
   async function syncSession() {
     const clerk = window.VirealClerk
     if (!clerk?.session || !clerk.user) {
@@ -121,6 +240,9 @@
       state.appUser = null
       state.wallet = null
       state.tasks = []
+      state.rechargeOrders = []
+      clearTimeout(state.paymentPolling)
+      state.checkoutActive = false
       state.currentTask = null
       state.generationAttempt = null
       state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
@@ -135,10 +257,21 @@
     try {
       const response = await authFetch("/api/v1/app/auth/session", { method: "POST", headers: { "Content-Type": "application/json" } })
       const payload = await parseResponse(response)
+      if (state.appUser?.id !== payload.app_user.id) {
+        state.rechargeOrders = []
+        clearTimeout(state.paymentPolling)
+        state.checkoutActive = false
+        state.currentTask = null
+        state.tasks = []
+        state.generationAttempt = null
+        state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
+        state.uploads = []
+        clearTimeout(state.polling)
+      }
       state.appUser = payload.app_user
       state.authSyncedSessionId = clerk.session.id
       state.authReady = true
-      await Promise.all([loadWallet(false), loadTasks(false)])
+      await Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders()])
       const afterLogin = sessionStorage.getItem("vireal-after-login")
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
@@ -147,6 +280,7 @@
       // Clerk may already have redirected to this hash. In that case no
       // hashchange event fires, so render the newly authenticated state here.
       render()
+      if (route().name === "wallet") void refreshPayments()
     } catch (error) {
       state.authReady = true
       toast(`登录同步失败：${errorDetail(error)}`, true)
@@ -267,7 +401,13 @@
     if (!state.appUser) return loginPage()
     const wallet = state.wallet
     const ledger = (wallet?.ledger || []).map((item) => `<div class="ledger-row"><div><strong>${esc(item.reason)}</strong><small>${formatDate(item.created_at)} · ${esc(item.entry_type)}</small></div><b class="${item.delta > 0 ? "positive" : ""}">${item.delta > 0 ? "+" : ""}${item.delta} ✦</b></div>`).join("")
-    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">金币与额度</h1><p class="screen-copy">本期不开放 H5 充值；金币由管理员发放，所有变动都有不可变流水。</p><div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${wallet?.balance ?? "--"} ✦</strong><p>今日剩余 ${wallet?.daily_remaining ?? "--"} 次 · 当前可并发 ${wallet?.concurrent_remaining ?? "--"} 个任务</p></div><div class="subsection-head" style="margin-top:24px"><h2>余额流水</h2><span>最近 50 条</span></div><div class="profile-card">${ledger || '<p class="screen-copy" style="margin:0">暂无金币流水</p>'}</div>${nav("")}</section>`)
+    const config = state.commerce
+    const available = config?.recharge_enabled && !wallet?.payment_hold
+    const notice = wallet?.payment_hold ? paymentText("支付账户正在人工审核，请联系客服。", "Your payment account is under review. Please contact support.") : config?.region_allowed === false ? paymentText("当前地区暂未开放充值。", "Recharge is unavailable in this region.") : config?.global_real_remaining === 0 ? paymentText("今日全站额度已用完，暂停新充值和生成。", "Daily generation capacity is exhausted. New recharge and generation are paused.") : state.commerceError || (!available ? paymentText("充值尚未开放；等待收款验收完成。", "Recharge will open after payment verification is complete.") : paymentText("注册不赠币；充值不会解除生成额度限制。", "No signup credits. Recharge does not bypass generation limits."))
+    const products = (config?.products || []).map(product => `<button class="recharge-product ${product.product_id === state.rechargeProduct ? "selected" : ""}" data-recharge-product="${esc(product.product_id)}" ${available ? "" : "disabled"}><b>${product.coins} ✦</b><span>$${(product.amount / 100).toFixed(2)} USD</span></button>`).join("")
+    const orders = state.rechargeOrders.map(order => `<div class="ledger-row"><div><strong>${esc(paymentStatus(order))} · ${order.coin_quantity || 0} ✦</strong><small>${formatDate(order.created_at)} · ${esc(order.id)}</small></div><b>$${((order.amount || 0) / 100).toFixed(2)}</b></div>`).join("")
+    if (available) setTimeout(mountPayPal, 0)
+    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${paymentText("金币与充值", "Credits & recharge")}</h1><p class="screen-copy">${esc(notice)}</p><div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${wallet?.balance ?? "--"} ✦</strong><p>今日剩余 ${wallet?.daily_remaining ?? "--"} 次 · 当前可并发 ${wallet?.concurrent_remaining ?? "--"} 个任务</p><p>${paymentText("全站今日剩余", "Site daily capacity remaining")}: ${wallet?.global_real_remaining ?? config?.global_real_remaining ?? "--"} / ${config?.global_real_limit ?? 30}</p>${config?.resets_at ? `<p>${paymentText("额度恢复时间", "Capacity resets")}: ${esc(new Date(config.resets_at).toLocaleString())}</p>` : ""}</div><div class="recharge-products">${products}</div>${available ? '<div id="paypalCheckout" class="profile-card"><p data-payment-message class="screen-copy">Loading PayPal…</p></div>' : ""}<p class="screen-copy">${paymentText("点击支付即确认服务条款与充值说明。", "By paying, you accept the terms and recharge information.")} <a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私", "Privacy")}</a> · <a href="#refunds">${paymentText("充值与退款帮助", "Recharge & refunds")}</a></p><button class="secondary-button" data-refresh-payments>${paymentText("刷新余额与充值记录", "Refresh balance & orders")}</button><div class="subsection-head"><h2>${paymentText("充值记录", "Recharge orders")}</h2></div><div class="profile-card">${orders || paymentText("暂无充值订单", "No recharge orders")}</div><div class="subsection-head" style="margin-top:24px"><h2>余额流水</h2><span>最近 50 条</span></div><div class="profile-card">${ledger || '<p class="screen-copy" style="margin:0">暂无金币流水</p>'}</div>${nav("")}</section>`)
   }
 
   function accountPage() {
@@ -275,10 +415,24 @@
     return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">账户与偏好</h1><div class="profile-card"><div class="profile-row"><div class="profile-avatar">${esc((state.appUser.nickname || "VI").slice(0, 2).toUpperCase())}</div><div><strong>${esc(state.appUser.nickname || "Vireal User")}</strong><span style="display:block;margin-top:5px;color:#84979e;font-size:10px">${esc(state.appUser.id)}</span></div></div><div class="settings-list"><button data-route="wallet"><span><b>金币与额度</b><small>查看真实余额和流水</small></span>${icons.arrow}</button><button data-route="works"><span><b>作品记录</b><small>查看生成状态与结果</small></span>${icons.arrow}</button><button data-toast="素材和生成结果按当前服务端保留策略处理"><span><b>隐私与数据</b><small>私有素材与短期签名访问</small></span>${icons.arrow}</button></div></div><button class="danger-button" style="width:100%;margin-top:14px" data-logout>退出登录</button>${nav("account")}</section>`)
   }
 
+  function legalPage(kind) {
+    const texts = {
+      terms: [paymentText("服务条款", "Terms of service"), paymentText("Vireal 提供 AI 视频生成服务，仅限已开放地区使用。请仅上传你拥有使用权、获得必要授权且符合平台和服务商规则的成年人物素材，禁止侵权、色情及违法内容。生成可能失败或被安全规则拒绝；失败退回金币不代表现金退款。金币仅用于本站生成服务，不可转让、提现或作为通用支付工具。时长、价格、额度和结果保留时间以服务端说明为准。正式收款前，经营主体及适用条款须完成确认。", "Vireal provides AI video generation in supported regions. Upload only adult-person images that you have rights and necessary consent to use. Illegal, infringing and sexually explicit content is prohibited. Generation may fail or be rejected by safety checks; returned generation credits are not cash refunds. Credits are non-transferable, cannot be withdrawn, and are only usable for this service. Server-side pricing, limits and retention rules apply. Merchant identity and applicable terms must be confirmed before live payments.")],
+      privacy: [paymentText("隐私与数据", "Privacy & data"), paymentText("邮箱与身份验证由 Clerk 提供，支付由 PayPal 处理，生成由模型服务商处理，文件存于私有 Cloudflare R2。本站不接收银行卡密码或支付密码。图片和视频按服务端保留策略处理，当前默认24小时；播放链接短期有效。订单、账本和审计记录与媒体分别保留，以支持到账、退款和争议处理。请勿上传未经授权的个人信息。联系下方客服申请数据相关处理。", "Clerk handles identity verification, PayPal processes payments, model providers process generation, and private Cloudflare R2 stores media. We do not collect card or payment passwords. Media follows server retention rules, currently 24 hours by default, with short-lived playback links. Orders, ledgers and audit records are retained separately for payment, refund and dispute handling. Do not upload unauthorized personal data. Contact support for data requests.")],
+      refunds: [paymentText("充值与退款帮助", "Recharge & refund help"), paymentText("美元套餐为100金币/$5.99、220金币/$11.99、500金币/$24.99，注册不赠币。只有后端确认真实收款后才到账；显示待确认时请不要重复付款。每人每天最多5次、同时1个任务，全站每天最多30次真实生成，按UTC日界恢复。充值不保证即时生成名额。退款请提供订单号联系人工客服，按照订单消费情况和适用规则审核，不影响适用法律赋予的权利。退款、拒付和撤销可能暂停新充值和生成，记录仍可查看。", "USD packages: 100 credits/$5.99, 220/$11.99, 500/$24.99. No signup credits. Credits are issued only after server-side payment verification; do not repay a pending order. Limits: 5 submissions per user/day, 1 concurrent task, 30 site-wide submissions/day, resetting at UTC midnight. Recharge does not reserve generation capacity. Contact support with your order ID for manual refund review under applicable rules and legal rights. Refunds, disputes and reversals may suspend new purchases and generation while records remain available.")],
+    }
+    const [title, copy] = texts[kind]
+    const support = state.commerce?.support_email || "li522903183@gmail.com"
+    return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${esc(title)}</h1><div class="profile-card"><p class="screen-copy">${esc(copy)}</p><p class="screen-copy">${paymentText("客服", "Support")}: <a href="mailto:${esc(support)}">${esc(support)}</a></p><p class="screen-copy">2026-10-08</p></div><button class="secondary-button" data-route="home">${paymentText("返回首页", "Back to home")}</button></section>`)
+  }
+
   function loginPage() {
+    const signup = route().name === "register"
+    if (state.commerce?.region_allowed === false) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
+    if (signup && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
-    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">登录后继续创作</h1><p class="screen-copy">登录用于同步金币、额度、任务状态和作品记录。</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? "仅限受邀请用户登录" : "正在载入安全登录…"}</p></section>`)
+    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
 
   function shell(content) { return `<main class="phone-shell">${content}</main>` }
@@ -286,9 +440,13 @@
   function render() {
     const current = route()
     const loginRoot = document.getElementById("clerkSignIn")
-    const showsLogin = current.name === "login" || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
-    if (loginRoot && showsLogin) { mountSignIn(); return }
-    if (loginRoot) window.VirealClerk?.unmountSignIn?.(loginRoot)
+    const showsLogin = ["login", "register"].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
+    if (loginRoot && (state.commerce?.region_allowed === false || loginRoot.dataset.clerkKind !== (current.name === "register" ? "register" : "login"))) {
+      window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
+      loginRoot.remove()
+    }
+    if (loginRoot?.isConnected && showsLogin) { mountSignIn(); return }
+    if (loginRoot?.isConnected) window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
     const pages = {
       home: homePage,
       generate: () => generatePage(current.params),
@@ -297,6 +455,10 @@
       wallet: walletPage,
       account: accountPage,
       login: loginPage,
+      register: loginPage,
+      terms: () => legalPage("terms"),
+      privacy: () => legalPage("privacy"),
+      refunds: () => legalPage("refunds"),
     }
     app().innerHTML = (pages[current.name] || homePage)()
     document.querySelectorAll("video[autoplay], .effect-card video").forEach((video) => video.play?.().catch(() => {}))
@@ -305,13 +467,17 @@
   function mountSignIn() {
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
-    if (!root || !clerk || clerk.session || root.dataset.clerkMounted) return
+    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !state.commerce || state.commerce.region_allowed === false) return
+    const signup = route().name === "register"
+    if (signup && !state.commerce?.registration_enabled) return
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
-      clerk.mountSignIn(root, { routing: "hash", forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      state.authView = signup ? "register" : "login"
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/#login`, signUpUrl: `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
       const status = document.getElementById("clerkStatus")
-      if (status) status.textContent = "仅限受邀请用户登录"
+      if (status) status.textContent = paymentText("安全邮箱验证", "Secure email verification")
     } catch (_) {}
   }
 
@@ -411,6 +577,14 @@
   }
 
   document.addEventListener("click", (event) => {
+    const product = event.target.closest("[data-recharge-product]")
+    if (product) {
+      if (state.checkoutActive) return
+      state.rechargeProduct = product.dataset.rechargeProduct
+      render()
+      return
+    }
+    if (event.target.closest("[data-refresh-payments]")) { void refreshPayments(); return }
     const routeButton = event.target.closest("[data-route]")
     if (routeButton) {
       const target = routeButton.dataset.route
@@ -487,8 +661,10 @@
   window.addEventListener("hashchange", () => {
     clearTimeout(state.polling)
     const current = route()
+    if (["login", "register"].includes(current.name)) state.authView = current.name
+    if (current.name !== "wallet") clearTimeout(state.paymentPolling)
     if (current.name === "works") void loadTasks(false).then(render)
-    else if (current.name === "wallet") void loadWallet(false).then(render)
+    else if (current.name === "wallet") void refreshPayments()
     else if (current.name === "generation" && current.params.get("id")) startPolling(current.params.get("id"))
     render()
   })
@@ -501,5 +677,6 @@
 
   render()
   void loadCatalog()
+  void loadCommerce()
   if (window.VirealClerk) observeClerk(window.VirealClerk)
 })()

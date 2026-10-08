@@ -1,9 +1,10 @@
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 
 from app.api import deps as deps_module
 from app.api.routes import admin_app as admin_app_module
@@ -63,6 +64,56 @@ def clerk_mode(monkeypatch: pytest.MonkeyPatch) -> FakeClerkService:
         lambda: service,
     )
     return service
+
+
+def test_new_business_identity_requires_open_registration_and_signed_region(
+    client: TestClient,
+    db: Session,
+    clerk_mode: FakeClerkService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.api.routes.test_paypal_commerce import signed_headers
+
+    clerk_mode.claims = replace(
+        clerk_mode.claims,
+        subject="commerce-" + str(uuid.uuid4()),
+        session_id="commerce-session-" + str(uuid.uuid4()),
+    )
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "APP_PUBLIC_REGISTRATION_ENABLED", False)
+    monkeypatch.setattr(settings, "APP_REGION_ENFORCEMENT_ENABLED", True)
+    monkeypatch.setattr(
+        settings,
+        "APP_EDGE_SIGNING_SECRET",
+        "unit-edge-secret-with-at-least-32-characters",
+    )
+    path = "/api/v1/app/auth/session"
+    headers = {"Authorization": "Bearer clerk-token"}
+    for proof in (
+        {"CF-IPCountry": "US"},
+        signed_headers(path, "POST", "CN"),
+        signed_headers(path, "POST", "US"),
+    ):
+        assert client.post(path, headers={**headers, **proof}).status_code == 403
+    assert (
+        db.exec(
+            select(AppUserIdentity).where(
+                AppUserIdentity.subject == clerk_mode.claims.subject
+            )
+        ).first()
+        is None
+    )
+    monkeypatch.setattr(settings, "APP_PUBLIC_REGISTRATION_ENABLED", True)
+    allowed = {**headers, **signed_headers(path, "POST", "US")}
+    response = client.post(path, headers=allowed)
+    assert response.status_code == 200 and response.json()["is_new_user"]
+    assert client.get("/api/v1/app/wallet", headers=headers).json()["balance"] == 0
+    db.execute(
+        delete(AppUser).where(
+            AppUser.id == uuid.UUID(response.json()["app_user"]["id"])
+        )
+    )
+    db.commit()
 
 
 def test_clerk_session_creates_one_app_user_and_updates_login_summary(

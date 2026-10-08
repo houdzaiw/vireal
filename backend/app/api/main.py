@@ -9,6 +9,7 @@ from app.api.routes import (
     app_contents,
     app_generations,
     app_orders,
+    app_paypal,
     app_uploads,
     app_users,
     app_video_tasks,
@@ -16,6 +17,7 @@ from app.api.routes import (
     items,
     login,
     payment_webhooks,
+    paypal_webhooks,
     private,
     replicate_webhooks,
     users,
@@ -36,11 +38,13 @@ api_router.include_router(app_contents.router)
 api_router.include_router(app_generations.router)
 api_router.include_router(app_configs.router)
 api_router.include_router(app_orders.router)
+api_router.include_router(app_paypal.router)
 api_router.include_router(app_video_tasks.router)
 api_router.include_router(app_wallet.router)
 api_router.include_router(admin_app.router)
 api_router.include_router(admin_catalog.router)
 api_router.include_router(payment_webhooks.router)
+api_router.include_router(paypal_webhooks.router)
 api_router.include_router(replicate_webhooks.router)
 
 

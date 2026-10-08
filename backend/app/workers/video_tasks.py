@@ -5,6 +5,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -433,9 +434,29 @@ def cleanup_expired_media(*, storage: ImageStorage | None = None) -> int:
 def run_worker() -> None:
     logger.info("Video task worker started")
     next_cleanup_at = 0.0
+    next_payment_reconcile_at = 0.0
+    payment_executor = ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="paypal-reconcile"
+    )
+    payment_future = None
     while True:
         processed = process_next_video_task()
         monotonic_now = time.monotonic()
+        if monotonic_now >= next_payment_reconcile_at and (
+            payment_future is None or payment_future.done()
+        ):
+            from app.services.paypal_orders import reconcile_paypal_orders
+
+            try:
+                if payment_future is not None:
+                    payment_future.result()
+            except Exception:
+                # Never leak payment payloads/secrets or stop video persistence.
+                logger.error("Payment reconciliation failed; will retry")
+            payment_future = payment_executor.submit(reconcile_paypal_orders)
+            next_payment_reconcile_at = (
+                monotonic_now + settings.PAYPAL_RECONCILE_INTERVAL_SECONDS
+            )
         if monotonic_now >= next_cleanup_at:
             cleanup_expired_media()
             next_cleanup_at = monotonic_now + settings.VIDEO_CLEANUP_INTERVAL_SECONDS

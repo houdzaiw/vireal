@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from sqlmodel import Session
 
 from app import crud
@@ -17,6 +17,7 @@ from app.models import (
     Message,
 )
 from app.services import ai_generation
+from app.services.commercial_access import lock_commercial_user, require_region
 from app.services.storage import is_supported_uploaded_image_url
 
 router = APIRouter(prefix="/app/generations", tags=["app generations"])
@@ -119,6 +120,7 @@ def read_generation_quota(
 @router.post("/", response_model=AppGenerationPublic)
 def create_generation(
     *,
+    request: Request,
     session: SessionDep,
     current_app_user: CurrentAppUser,
     generation_in: AppGenerationCreate,
@@ -130,6 +132,10 @@ def create_generation(
     worker marks it succeeded. A real provider adapter can replace the local
     worker without changing the public API contract.
     """
+    require_region(request)
+    lock_commercial_user(session, current_app_user)
+    if settings.APP_PUBLIC_REGISTRATION_ENABLED:
+        raise HTTPException(410, "Use the priced effect video-task endpoint")
     normalized_generation = _normalize_generation_input(generation_in)
     used_count = crud.count_app_generations_by_kind(
         session=session,

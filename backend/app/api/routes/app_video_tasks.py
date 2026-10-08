@@ -6,7 +6,7 @@ from typing import Annotated, Literal, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Request, status
 from sqlalchemy import func, or_, text
 from sqlmodel import col, select
 
@@ -29,6 +29,7 @@ from app.services.coin_wallet import (
     get_coin_balance,
     refund_video_task,
 )
+from app.services.commercial_access import lock_commercial_user, require_region
 from app.services.effect_validation import (
     execution_type_for_model,
     validate_effect_variant,
@@ -40,7 +41,7 @@ from app.services.replicate_video import (
 )
 from app.services.storage import ImageStorageError, get_image_storage
 from app.services.video_generation import VideoTaskStatus
-from app.services.video_quota import build_video_quota, quota_counts
+from app.services.video_quota import build_video_quota, global_real_count, quota_counts
 
 router = APIRouter(prefix="/app/video-tasks", tags=["app video tasks"])
 
@@ -244,11 +245,13 @@ def _route_to_local_demo(
 )
 async def create_video_task(
     *,
+    request: Request,
     session: SessionDep,
     current_app_user: CurrentAppUser,
     body: AppVideoTaskCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> AppVideoTaskPublic:
+    require_region(request)
     if not settings.REPLICATE_ENABLED and not settings.LOCAL_DEMO_ENABLED:
         raise HTTPException(status_code=503, detail="Replicate integration is disabled")
     idempotency_key = idempotency_key.strip()
@@ -358,6 +361,7 @@ async def create_video_task(
         return _serialize_idempotent_task(session, existing, body)
 
     now = datetime.now(UTC)
+    lock_commercial_user(session, current_app_user)
     user_count, wan_count, active_count, _resets_at = quota_counts(
         session=session,
         app_user_id=current_app_user.id,
@@ -381,6 +385,11 @@ async def create_video_task(
         fallback_reason = "replicate_disabled"
     elif user_count >= settings.APP_USER_DAILY_REAL_SUBMISSIONS:
         fallback_reason = "user_daily_quota"
+    elif (
+        global_real_count(session=session, now=now)
+        >= settings.APP_GLOBAL_DAILY_REAL_SUBMISSIONS
+    ):
+        fallback_reason = "global_daily_quota"
     elif (
         settings.REPLICATE_POC_MAX_SUBMISSIONS > 0
         and attempted_count >= settings.REPLICATE_POC_MAX_SUBMISSIONS

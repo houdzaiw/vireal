@@ -10,6 +10,10 @@ fallback_file="$prototype_dir/prototype_v1.1.html"
 output_dir="$workspace_dir/dist/vireal-pages"
 api_base_url="${VIREAL_API_BASE_URL:-}"
 clerk_publishable_key="${VITE_CLERK_PUBLISHABLE_KEY:-}"
+# Optional explicit installed compiler for hosts where the local binary cannot run.
+# CI and deployment continue to use the lockfile's compiler by default.
+esbuild_bin="${VIREAL_ESBUILD_BIN:-$workspace_dir/node_modules/.bin/esbuild}"
+tailwind_bin="${VIREAL_TAILWIND_BIN:-$workspace_dir/node_modules/.bin/tailwindcss}"
 
 if [[ -z "$api_base_url" ]]; then
   echo "VIREAL_API_BASE_URL is required, for example https://api.example.com" >&2
@@ -54,14 +58,14 @@ sed \
   -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
   "$fallback_file" > "$output_dir/fallback/v1.1/index.html"
 
-bunx esbuild "$prototype_dir/vireal-auth.js" \
+"$esbuild_bin" "$prototype_dir/vireal-auth.js" \
   --bundle \
   --format=iife \
   --platform=browser \
   --minify \
   --outfile="$output_dir/assets/vireal-auth.js"
 
-bunx esbuild "$source_dir/vireal-app.js" \
+"$esbuild_bin" "$source_dir/vireal-app.js" \
   --bundle \
   --format=iife \
   --platform=browser \
@@ -71,11 +75,11 @@ bunx esbuild "$source_dir/vireal-app.js" \
 awk '/<style>/{capture=1;next}/<\/style>/{capture=0}capture' \
   "$prototype_dir/prototype_v1.2.html" > "$output_dir/assets/vireal-v1.2.css"
 
-bunx esbuild "$source_dir/vireal-production.css" \
+"$esbuild_bin" "$source_dir/vireal-production.css" \
   --minify \
   --outfile="$output_dir/assets/vireal-production.css"
 
-bunx tailwindcss \
+"$tailwind_bin" \
   --input "$workspace_dir/styles/vireal.css" \
   --output "$output_dir/assets/vireal.css" \
   --minify

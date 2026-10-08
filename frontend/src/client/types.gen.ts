@@ -512,6 +512,10 @@ export type AppCoinLedgerPublic = {
      */
     task_id?: string | null;
     /**
+     * Order Id
+     */
+    order_id?: string | null;
+    /**
      * Created At
      */
     created_at?: string | null;
@@ -1188,6 +1192,26 @@ export type AppOrderPublic = {
      * Paid At
      */
     paid_at?: string | null;
+    /**
+     * Payment Environment
+     */
+    payment_environment?: string | null;
+    /**
+     * Provider Order Id
+     */
+    provider_order_id?: string | null;
+    /**
+     * Capture Id
+     */
+    capture_id?: string | null;
+    /**
+     * Coin Quantity
+     */
+    coin_quantity?: number | null;
+    /**
+     * Fulfilled At
+     */
+    fulfilled_at?: string | null;
 };
 
 /**
@@ -1202,6 +1226,80 @@ export type AppOrdersPublic = {
      * Count
      */
     count: number;
+};
+
+/**
+ * AppPayPalOrderCreate
+ */
+export type AppPayPalOrderCreate = {
+    /**
+     * Product Id
+     */
+    product_id: string;
+};
+
+/**
+ * AppPaymentCasePublic
+ */
+export type AppPaymentCasePublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Order Id
+     */
+    order_id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * External Id
+     */
+    external_id: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Required Coins
+     */
+    required_coins: number;
+    /**
+     * Recovered Coins
+     */
+    recovered_coins: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Resolution
+     */
+    resolution?: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Resolved At
+     */
+    resolved_at?: string | null;
+};
+
+/**
+ * AppPaymentCaseResolve
+ */
+export type AppPaymentCaseResolve = {
+    /**
+     * Resolution
+     */
+    resolution: 'recover' | 'dismiss';
+    /**
+     * Reason
+     */
+    reason: string;
 };
 
 /**
@@ -1566,6 +1664,14 @@ export type AppVideoTaskQuotaPublic = {
      * Concurrent Remaining
      */
     concurrent_remaining?: number;
+    /**
+     * Global Real Limit
+     */
+    global_real_limit?: number;
+    /**
+     * Global Real Remaining
+     */
+    global_real_remaining?: number;
 };
 
 /**
@@ -1606,6 +1712,18 @@ export type AppWalletPublic = {
      * Ledger
      */
     ledger?: Array<AppCoinLedgerPublic>;
+    /**
+     * Payment Hold
+     */
+    payment_hold?: boolean;
+    /**
+     * Global Real Limit
+     */
+    global_real_limit?: number;
+    /**
+     * Global Real Remaining
+     */
+    global_real_remaining?: number;
 };
 
 /**
@@ -3326,6 +3444,87 @@ export type appOrdersReadOrderResponses = {
 
 export type appOrdersReadOrderResponse = appOrdersReadOrderResponses[keyof appOrdersReadOrderResponses];
 
+export type appPaypalPaymentConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/paypal/config';
+};
+
+export type appPaypalPaymentConfigResponses = {
+    /**
+     * Response App Paypal-Payment Config
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type appPaypalPaymentConfigResponse = appPaypalPaymentConfigResponses[keyof appPaypalPaymentConfigResponses];
+
+export type appPaypalCreatePaypalOrderData = {
+    body: AppPayPalOrderCreate;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'idempotency-key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/paypal/orders';
+};
+
+export type appPaypalCreatePaypalOrderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalCreatePaypalOrderError = appPaypalCreatePaypalOrderErrors[keyof appPaypalCreatePaypalOrderErrors];
+
+export type appPaypalCreatePaypalOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalCreatePaypalOrderResponse = appPaypalCreatePaypalOrderResponses[keyof appPaypalCreatePaypalOrderResponses];
+
+export type appPaypalCapturePaypalOrderData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/paypal/orders/{order_id}/capture';
+};
+
+export type appPaypalCapturePaypalOrderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalCapturePaypalOrderError = appPaypalCapturePaypalOrderErrors[keyof appPaypalCapturePaypalOrderErrors];
+
+export type appPaypalCapturePaypalOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalCapturePaypalOrderResponse = appPaypalCapturePaypalOrderResponses[keyof appPaypalCapturePaypalOrderResponses];
+
 export type appVideoTasksReadVideoTasksData = {
     body?: never;
     path?: never;
@@ -3762,11 +3961,11 @@ export type adminAppReadAppOrdersData = {
         /**
          * Status
          */
-        status?: 'created' | 'paid' | 'failed' | 'refunded' | 'canceled' | null;
+        status?: 'created' | 'approved' | 'capture_pending' | 'payment_review' | 'paid' | 'failed' | 'refunded' | 'reversed' | 'canceled' | null;
         /**
          * Provider
          */
-        provider?: 'apple' | 'google' | null;
+        provider?: 'apple' | 'google' | 'paypal' | null;
     };
     url: '/api/v1/admin/app/orders';
 };
@@ -3848,6 +4047,68 @@ export type adminAppReadAppOrderEventsResponses = {
 };
 
 export type adminAppReadAppOrderEventsResponse = adminAppReadAppOrderEventsResponses[keyof adminAppReadAppOrderEventsResponses];
+
+export type adminAppReadPaymentCasesData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/orders/{order_id}/payment-cases';
+};
+
+export type adminAppReadPaymentCasesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppReadPaymentCasesError = adminAppReadPaymentCasesErrors[keyof adminAppReadPaymentCasesErrors];
+
+export type adminAppReadPaymentCasesResponses = {
+    /**
+     * Response Admin App-Read Payment Cases
+     *
+     * Successful Response
+     */
+    200: Array<AppPaymentCasePublic>;
+};
+
+export type adminAppReadPaymentCasesResponse = adminAppReadPaymentCasesResponses[keyof adminAppReadPaymentCasesResponses];
+
+export type adminAppResolvePaymentCaseData = {
+    body: AppPaymentCaseResolve;
+    path: {
+        /**
+         * Case Id
+         */
+        case_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/payment-cases/{case_id}/resolve';
+};
+
+export type adminAppResolvePaymentCaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppResolvePaymentCaseError = adminAppResolvePaymentCaseErrors[keyof adminAppResolvePaymentCaseErrors];
+
+export type adminAppResolvePaymentCaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppPaymentCasePublic;
+};
+
+export type adminAppResolvePaymentCaseResponse = adminAppResolvePaymentCaseResponses[keyof adminAppResolvePaymentCaseResponses];
 
 export type adminAppReadAppAdminOperationLogsData = {
     body?: never;
@@ -4517,6 +4778,22 @@ export type paymentWebhooksReceiveGooglePlayCallbackResponses = {
 };
 
 export type paymentWebhooksReceiveGooglePlayCallbackResponse = paymentWebhooksReceiveGooglePlayCallbackResponses[keyof paymentWebhooksReceiveGooglePlayCallbackResponses];
+
+export type paypalWebhooksPaypalWebhookData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/webhooks/payments/paypal';
+};
+
+export type paypalWebhooksPaypalWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type paypalWebhooksPaypalWebhookResponse = paypalWebhooksPaypalWebhookResponses[keyof paypalWebhooksPaypalWebhookResponses];
 
 export type replicateWebhooksReceiveReplicateWebhookData = {
     body?: never;

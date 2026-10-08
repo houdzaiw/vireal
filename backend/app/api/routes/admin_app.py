@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
@@ -31,6 +31,9 @@ from app.models import (
     AppOrderEventsPublic,
     AppOrderPublic,
     AppOrdersPublic,
+    AppPaymentCase,
+    AppPaymentCasePublic,
+    AppPaymentCaseResolve,
     AppUser,
     AppUserAdminPublic,
     AppUserIdentity,
@@ -408,8 +411,19 @@ def read_app_orders(
     session: SessionDep,
     skip: int = 0,
     limit: int = 100,
-    status: Literal["created", "paid", "failed", "refunded", "canceled"] | None = None,
-    provider: Literal["apple", "google"] | None = None,
+    status: Literal[
+        "created",
+        "approved",
+        "capture_pending",
+        "payment_review",
+        "paid",
+        "failed",
+        "refunded",
+        "reversed",
+        "canceled",
+    ]
+    | None = None,
+    provider: Literal["apple", "google", "paypal"] | None = None,
 ) -> Any:
     """
     Retrieve App payment orders for admin management.
@@ -451,6 +465,74 @@ def read_app_order_events(session: SessionDep, order_id: uuid.UUID) -> Any:
         data=[AppOrderEventPublic.model_validate(event) for event in events],
         count=len(events),
     )
+
+
+@router.get(
+    "/orders/{order_id}/payment-cases", response_model=list[AppPaymentCasePublic]
+)
+def read_payment_cases(
+    order_id: uuid.UUID, session: SessionDep
+) -> list[AppPaymentCasePublic]:
+    return [
+        AppPaymentCasePublic.model_validate(case)
+        for case in session.exec(
+            select(AppPaymentCase).where(AppPaymentCase.order_id == order_id)
+        ).all()
+    ]
+
+
+@router.post("/payment-cases/{case_id}/resolve", response_model=AppPaymentCasePublic)
+def resolve_payment_case(
+    case_id: uuid.UUID,
+    body: AppPaymentCaseResolve,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_superuser)],
+) -> AppPaymentCasePublic:
+    from app.services.coin_wallet import CoinBalanceError
+    from app.services.paypal_client import PayPalError, get_paypal_client
+    from app.services.paypal_orders import resolve_case
+
+    client = None
+    try:
+        client = get_paypal_client()
+        case = resolve_case(
+            session,
+            case_id,
+            resolution=body.resolution,
+            reason=body.reason,
+            admin_id=current_admin.id,
+            client=client,
+        )
+        session.add(
+            AppAdminOperationLog(
+                admin_user_id=current_admin.id,
+                admin_email=current_admin.email,
+                action="app_payment_case.resolve",
+                target_type="app_payment_case",
+                target_id=case.id,
+                summary=body.reason,
+                details_json=json.dumps(
+                    {
+                        "resolution": body.resolution,
+                        "recovered_coins": case.recovered_coins,
+                    }
+                ),
+            )
+        )
+        session.commit()
+        session.refresh(case)
+        return AppPaymentCasePublic.model_validate(case)
+    except CoinBalanceError as exc:
+        session.rollback()
+        raise HTTPException(
+            409, "Insufficient coin balance; account remains under review"
+        ) from exc
+    except PayPalError as exc:
+        session.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    finally:
+        if client:
+            client.close()
 
 
 @router.get("/operation-logs", response_model=AppAdminOperationLogsPublic)

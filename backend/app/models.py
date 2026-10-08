@@ -2,9 +2,10 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import EmailStr, model_validator
-from sqlalchemy import DateTime, Text, UniqueConstraint
+from pydantic import EmailStr, field_validator, model_validator
+from sqlalchemy import CheckConstraint, Column, DateTime, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel.main import SQLModelConfig
 
 
 def get_datetime_utc() -> datetime:
@@ -82,6 +83,7 @@ class AppUser(AppUserBase, table=True):
     __tablename__ = "app_user"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    payment_hold: bool = Field(default=False)
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -427,6 +429,8 @@ class AppVideoTaskQuotaPublic(SQLModel):
     resets_at: datetime
     concurrent_limit: int = 1
     concurrent_remaining: int = 0
+    global_real_limit: int = 30
+    global_real_remaining: int = 0
 
 
 class AppVideoTaskPublic(SQLModel):
@@ -641,6 +645,9 @@ class AppCoinLedger(SQLModel, table=True):
     task_id: uuid.UUID | None = Field(
         default=None, foreign_key="app_video_task.id", ondelete="SET NULL", index=True
     )
+    order_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_order.id", ondelete="SET NULL", index=True
+    )
     admin_user_id: uuid.UUID | None = Field(
         default=None, foreign_key="user.id", ondelete="SET NULL"
     )
@@ -659,6 +666,7 @@ class AppCoinLedgerPublic(SQLModel):
     entry_type: str
     reason: str
     task_id: uuid.UUID | None = None
+    order_id: uuid.UUID | None = None
     created_at: datetime | None = None
 
 
@@ -668,6 +676,9 @@ class AppWalletPublic(SQLModel):
     concurrent_remaining: int
     resets_at: datetime
     ledger: list[AppCoinLedgerPublic] = Field(default_factory=list)
+    payment_hold: bool = False
+    global_real_limit: int = 30
+    global_real_remaining: int = 0
 
 
 class AppContent(SQLModel, table=True):
@@ -914,6 +925,32 @@ class AppConfigValuesPublic(SQLModel):
 
 class AppOrder(SQLModel, table=True):
     __tablename__ = "app_order"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "payment_environment",
+            "provider_order_id",
+            name="uq_app_order_paypal_provider_order",
+        ),
+        UniqueConstraint(
+            "provider",
+            "payment_environment",
+            "capture_id",
+            name="uq_app_order_paypal_capture",
+        ),
+        UniqueConstraint(
+            "app_user_id",
+            "payment_idempotency_key",
+            name="uq_app_order_paypal_idempotency",
+        ),
+        CheckConstraint(
+            "provider <> 'paypal' OR (amount IS NOT NULL AND amount > 0 AND "
+            "currency IS NOT NULL AND currency = 'USD' AND coin_quantity IS NOT NULL "
+            "AND coin_quantity > 0 AND payment_environment IS NOT NULL AND "
+            "payment_environment IN ('sandbox','live') AND payment_idempotency_key IS NOT NULL)",
+            name="ck_app_order_paypal_snapshot",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     app_user_id: uuid.UUID = Field(
@@ -925,6 +962,18 @@ class AppOrder(SQLModel, table=True):
     amount: int | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, max_length=3)
     transaction_id: str | None = Field(default=None, max_length=255, index=True)
+    payment_environment: str | None = Field(default=None, max_length=10)
+    payment_idempotency_key: str | None = Field(default=None, max_length=120)
+    provider_order_id: str | None = Field(default=None, max_length=255, index=True)
+    capture_id: str | None = Field(default=None, max_length=255)
+    coin_quantity: int | None = Field(default=None, ge=1)
+    fulfilled_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    next_reconcile_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -990,6 +1039,75 @@ class AppOrderPublic(SQLModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     paid_at: datetime | None = None
+    payment_environment: str | None = None
+    provider_order_id: str | None = None
+    capture_id: str | None = None
+    coin_quantity: int | None = None
+    fulfilled_at: datetime | None = None
+
+
+class AppPayPalOrderCreate(SQLModel):
+    model_config = SQLModelConfig(extra="forbid")
+    product_id: str = Field(min_length=1, max_length=100)
+
+
+class AppPaymentCase(SQLModel, table=True):
+    __tablename__ = "app_payment_case"
+    __table_args__ = (
+        UniqueConstraint("order_id", "kind", "external_id"),
+        CheckConstraint("required_coins >= 0 AND recovered_coins >= 0"),
+    )
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    order_id: uuid.UUID = Field(
+        foreign_key="app_order.id", ondelete="CASCADE", index=True
+    )
+    app_user_id: uuid.UUID = Field(
+        foreign_key="app_user.id", ondelete="CASCADE", index=True
+    )
+    kind: str = Field(max_length=40)
+    external_id: str = Field(max_length=255)
+    status: str = Field(default="open", max_length=20, index=True)
+    required_coins: int = Field(default=0, ge=0)
+    recovered_coins: int = Field(default=0, ge=0)
+    reason: str = Field(default="", max_length=500)
+    resolution: str | None = Field(default=None, max_length=20)
+    resolved_by: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    resolved_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+
+
+class AppPaymentCasePublic(SQLModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    kind: str
+    external_id: str
+    status: str
+    required_coins: int
+    recovered_coins: int
+    reason: str
+    resolution: str | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+
+class AppPaymentCaseResolve(SQLModel):
+    resolution: Literal["recover", "dismiss"]
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def substantive_reason(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("A substantive review reason is required")
+        return value
 
 
 class AppOrdersPublic(SQLModel):
