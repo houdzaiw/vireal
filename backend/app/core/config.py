@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 3
     # Release gate only: retain longer variants and historical task snapshots.
     APP_EFFECT_MAX_DURATION_SECONDS: Literal[5, 10, 15] = 10
+    # Preserve compatibility in development; disable the unpriced legacy
+    # submission path when releasing the paid effect catalog.
+    APP_LEGACY_VIDEO_TASKS_ENABLED: bool = True
     LOCAL_DEMO_ENABLED: bool = True
     LOCAL_DEMO_FFMPEG_PATH: str = "/usr/bin/ffmpeg"
     LOCAL_DEMO_TIMEOUT_SECONDS: int = 180

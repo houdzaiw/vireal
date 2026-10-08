@@ -312,6 +312,11 @@ async def create_video_task(
         resolved_negative_prompt = variant.negative_prompt
         configured_coin_cost = variant.coin_cost
     else:
+        if not settings.APP_LEGACY_VIDEO_TASKS_ENABLED:
+            raise HTTPException(
+                status_code=409,
+                detail="Legacy generation is unavailable; select a catalog effect",
+            )
         if body.mode == "standard" and body.duration != 5:
             raise HTTPException(
                 status_code=422,
