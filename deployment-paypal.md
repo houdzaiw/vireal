@@ -11,7 +11,12 @@ before any live release. Do not reactivate the previously disabled QA accounts.
 Read-only release check on 2026-10-08: neither Railway API environment has the four
 PayPal credentials configured. The production API health endpoint is healthy and
 the new PayPal config endpoint is still 404, confirming this feature is not deployed.
-Chrome account inspection was blocked by the Mac lock screen. Pending gates are
+After the owner unlocked Chrome, PayPal Developer showed an existing Sandbox
+`Default Application` and explicitly required upgrading the account to Business
+to view Live credentials. Opening the Sandbox application details redirected to
+PayPal sign-in, so merchant identity, application capabilities and webhooks remain
+unverified. The owner must complete reauthentication; any financial account upgrade,
+identity verification or binding agreement remains owner-only. Pending gates are
 owner account readiness, secret provisioning, actual sandbox acceptance, fresh
 production backup/deployment and owner-operated live acceptance.
 
