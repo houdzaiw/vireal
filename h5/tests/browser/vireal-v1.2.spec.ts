@@ -169,6 +169,49 @@ test(`PayPal wallet: ${outcome} never grants unverified credits`, async ({ page 
 })
 }
 
+for (const locale of ["en-US", "zh-CN"]) {
+  test.describe(`refund status (${locale})`, () => {
+    test.use({ locale })
+    for (const held of [true, false]) {
+      test(`refund record stays accurate when payment hold is ${held}`, async ({ page }) => {
+        await mockSignedInApi(page)
+        await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+        await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({ json: { data: [{
+          id: "qa-refunded-order", status: "refunded", provider: "paypal", coin_quantity: 100,
+          amount: 599, currency: "USD", created_at: "2026-10-08T10:00:00Z", fulfilled_at: "2026-10-08T10:01:00Z",
+        }] } }))
+        await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: {
+          balance: held ? 820 : 720, payment_hold: held, daily_remaining: 5, concurrent_remaining: 1,
+          global_real_remaining: 30, ledger: held ? [] : [{
+            entry_type: "recharge_recovery", delta: -100, balance_after: 720,
+            reason: "Payment recovery: QA-REFUND", created_at: "2026-10-08T10:02:00Z",
+          }],
+        } }))
+        await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+          contentType: "application/javascript",
+          body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement { connectedCallback() { this.textContent='PayPal checkout (UI mock)'; } }); window.paypal = { createInstance: async () => ({ findEligibleMethods: async () => ({isEligible: () => true}), createPayPalOneTimePaymentSession: () => ({ start() {throw new Error('Refund UI contract must not start a payment')} }) }) }`,
+        }))
+        await page.goto("/#wallet")
+        const zh = locale === "zh-CN"
+        await expect(page.locator(".wallet-card strong")).toHaveText(`${held ? 820 : 720} ✦`)
+        await expect(page.getByText(`${zh ? "已退款" : "Refunded"} · 100 ✦`, { exact: true })).toBeVisible()
+        const reviewNotice = page.getByText(zh ? "支付账户正在人工审核，请联系客服。" : "Your payment account is under review. Please contact support.", { exact: true })
+        if (held) {
+          await expect(reviewNotice).toBeVisible()
+          await expect(page.locator("paypal-button")).toHaveCount(0)
+          for (const product of await page.locator(".recharge-product").all()) await expect(product).toBeDisabled()
+        } else {
+          await expect(reviewNotice).toHaveCount(0)
+          await expect(page.locator("paypal-button")).toBeVisible()
+          for (const product of await page.locator(".recharge-product").all()) await expect(product).toBeEnabled()
+          await expect(page.getByText(zh ? "已退款，待核对金币" : "Refunded; credits under review", { exact: false })).toHaveCount(0)
+          await expect(page.getByText("Payment recovery: QA-REFUND", { exact: true })).toBeVisible()
+        }
+      })
+    }
+  })
+}
+
 test("region denied does not mount Clerk signup while public browsing works", async ({ page }) => {
   await mockPublicApi(page)
   await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: { ...paymentConfig, region_allowed: false, registration_enabled: false, recharge_enabled: false } }))

@@ -123,9 +123,11 @@
   }
 
   const paymentText = (zh, en) => /^zh\b/i.test(navigator.language) ? zh : en
+  // Refunded describes the payment, not an unresolved case. Review availability
+  // is shown separately using the wallet's current payment_hold flag.
   const paymentStatus = (order) => order.fulfilled_at && order.status === "paid"
     ? paymentText("已到账", "Credits received")
-    : ({ created: paymentText("等待支付", "Awaiting payment"), approved: paymentText("正在确认", "Confirming payment"), capture_pending: paymentText("支付待确认", "Payment pending"), payment_review: paymentText("人工审核中", "Under review"), refunded: paymentText("已退款，待核对金币", "Refunded; credits under review"), reversed: paymentText("付款已撤销", "Payment reversed"), canceled: paymentText("已取消", "Cancelled"), failed: paymentText("支付失败", "Payment failed") })[order.status] || paymentText("待确认", "Pending confirmation")
+    : ({ created: paymentText("等待支付", "Awaiting payment"), approved: paymentText("正在确认", "Confirming payment"), capture_pending: paymentText("支付待确认", "Payment pending"), payment_review: paymentText("人工审核中", "Under review"), refunded: paymentText("已退款", "Refunded"), reversed: paymentText("付款已撤销", "Payment reversed"), canceled: paymentText("已取消", "Cancelled"), failed: paymentText("支付失败", "Payment failed") })[order.status] || paymentText("待确认", "Pending confirmation")
 
   async function loadCommerce(redraw = true) {
     try {
