@@ -39,8 +39,9 @@ sandbox acceptance, owner Live readiness, fresh production backup/deployment and
 owner-operated live acceptance. Old QA users remain disabled. The owner was asked
 for a new test email/alias; controlled acceptance activation must not be mistaken
 for a public or Live release. Any financial account upgrade, identity verification
-or binding agreement remains owner-only. The Mac locked during the final H5
-screenshot check; further Chrome verification requires the owner to unlock it.
+or binding agreement remains owner-only. The owner has now unlocked the Mac and
+provided a new test email/alias. Clerk Dashboard administrator login is pending;
+the new identifier has not been registered or given access yet.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -139,6 +140,33 @@ screenshot check; further Chrome verification requires the owner to unlock it.
   `d35d95e5-67db-4267-843b-4ee184483376`. Production Pages remains deployment
   `6e4f185e-30c2-4247-985a-06c631acbd4c` in **vireal-h5-houdzaiw**.
   No production schema, service, route, Pages release or Clerk access policy changed.
+
+## H5 auth-link regression checkpoint — 2026-10-09
+
+- Native Chrome verification found that Clerk's real `Sign up` link targets
+  `/#register/`. The H5 router previously treated that trailing-slash route as
+  unknown and rendered the home page. Commit `0b02d19` normalizes trailing slashes
+  on app routes without changing Clerk's slash-prefixed internal verification routes.
+- Added browser regressions for the closed-registration link, login/signup
+  switching, query strings and preservation of the in-progress email verification
+  form. Full H5 browser suite: **20 passed**; H5 contract suite: **29 passed**.
+  These use explicit UI mocks and do not constitute real payment acceptance.
+- Rebuilt against the actual staging API origin and staging Clerk publishable key.
+  Published only **vireal-h5-staging**, deployment
+  `d1ef24e0-90c1-4d0e-957a-429ef5eb112f`, source `0b02d19`, preserving branch
+  `codex/vireal-v1-2-h5`. No Git push, API/worker redeploy or production change.
+  The custom-domain JavaScript SHA-256 matched the local release artifact.
+- Retested the actual Clerk login-to-signup link in Chrome: it now displays the
+  closed-registration gate, not home. Public recharge/refund help displays the
+  three correct USD packages, zero signup credits, UTC limits and support contact.
+- Read-only Clerk checks verified this is a development instance matching the
+  staging issuer; the new test identifier has no user or allowlist entry. The
+  instance response does not expose the signup/restriction policy, so its mode
+  must not be inferred from the empty allowlist. Dashboard administrator login is
+  required to finish that check before controlled test activation. No Clerk
+  access changes, invitations, business users, orders or payments were created.
+  Registration/recharge remain off and region enforcement remains on; mainland
+  config reports `region_allowed=false`. Production PayPal config is still 404.
 
 ## Locked business rules
 
