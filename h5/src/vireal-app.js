@@ -61,7 +61,10 @@
     // Clerk's supported hash router owns slash-prefixed paths such as
     // #/factor-one. They must stay inside the mounted login component.
     if (raw.startsWith("/")) return { name: state.authView, params: new URLSearchParams() }
-    const [name, query = ""] = raw.split("?")
+    const [path, query = ""] = raw.split("?")
+    // Clerk appends a slash to its sign-in/sign-up links; keep those links
+    // on the app's auth pages without changing Clerk's internal hash routes.
+    const name = path.replace(/\/+$/, "")
     return { name: name === "create" ? "generate" : name, params: new URLSearchParams(query) }
   }
 

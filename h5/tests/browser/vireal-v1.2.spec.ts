@@ -180,6 +180,56 @@ test("region denied does not mount Clerk signup while public browsing works", as
   await expect(page.locator(".effect-card")).toHaveCount(4)
 })
 
+test("Clerk's slash-suffixed signup link respects the closed registration gate", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {
+      session:null, user:null, addListener() {},
+      mountSignIn(root) { root.innerHTML='<a href="#register/">Sign up</a>' },
+      unmountSignIn() {}, mountSignUp() {throw new Error('Closed signup must not mount')},
+    }`,
+  }))
+  await page.goto("/#login")
+  await page.getByRole("link", { name: "Sign up", exact: true }).click()
+  await expect(page).toHaveURL(/#register\/$/)
+  await expect(page.getByText("Registration is not yet open", { exact: true })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+})
+
+test("slash-suffixed auth routes switch Clerk components and preserve verification", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {
+      session:null, user:null, addListener() {},
+      mountSignIn(root) { root.innerHTML='<a href="#register/">Sign up</a>' },
+      unmountSignIn() {}, unmountSignUp() {},
+      mountSignUp(root) {
+        root.innerHTML='<input aria-label="Signup email"><button>Verify QA email</button><a href="#login/">Sign in</a>';
+        root.querySelector('button').onclick=()=>{
+          root.innerHTML='<input aria-label="Signup OTP"><a href="#login/">Sign in</a>';
+          location.hash='/verify-email-address';
+        };
+      },
+    }`,
+  }))
+  await page.goto("/#login/")
+  await page.getByRole("link", { name: "Sign up", exact: true }).click()
+  await page.getByRole("textbox", { name: "Signup email" }).fill("verified@example.com")
+  await page.getByRole("button", { name: "Verify QA email" }).click()
+  await expect(page).toHaveURL(/#\/verify-email-address$/)
+  await page.getByRole("textbox", { name: "Signup OTP" }).fill("123456")
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+  await expect(page.getByRole("textbox", { name: "Signup OTP" })).toHaveValue("123456")
+  await page.getByRole("link", { name: "Sign in", exact: true }).click()
+  await expect(page).toHaveURL(/#login\/$/)
+  await expect(page.getByRole("link", { name: "Sign up", exact: true })).toBeVisible()
+  await page.goto("/#register/?redirect_url=%23wallet")
+  await expect(page.getByRole("textbox", { name: "Signup email" })).toBeVisible()
+})
+
 test("open signup preserves verification state and returns to a zero-credit wallet", async ({ page }) => {
   await mockSignedInApi(page)
   await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
