@@ -6,7 +6,8 @@ Implementation is on `codex/paypal-public-registration`. Production registration
 recharge and region enforcement have **not** been switched on by this change.
 Controlled **staging-only** registration and Sandbox recharge are now enabled;
 the Development Clerk allowlist admits only the owner-approved new test email.
-Actual sandbox purchase/refund acceptance remains pending verified user signup.
+The new test user has completed verified signup and reached a zero-balance wallet;
+actual sandbox purchase/refund acceptance remains pending payment testing.
 Unit/UI mocks are not PayPal sandbox acceptance or evidence of live merchant eligibility.
 The owner must confirm eligibility, merchant identity, permitted products and terms
 before any live release. Do not reactivate the previously disabled QA accounts.
@@ -38,8 +39,8 @@ config endpoint is 200 and reports the three USD packages, Sandbox mode and a
 30-submission global daily limit. Production remains unchanged; its health endpoint
 is 200 and PayPal config remains 404.
 
-Pending gates are a new verified, region-eligible staging test user and actual
-sandbox acceptance, owner Live readiness, fresh production backup/deployment and
+Pending gates are actual sandbox payment/refund acceptance, owner Live readiness,
+fresh production backup/deployment and
 owner-operated live acceptance. Old QA users remain disabled. The owner was asked
 for a new test email/alias; controlled acceptance activation must not be mistaken
 for a public or Live release. Any financial account upgrade, identity verification
@@ -47,9 +48,10 @@ or binding agreement remains owner-only. The owner has now unlocked the Mac and
 provided a new test email/alias and logged into Clerk Dashboard. Following the
 owner's explicit staging-only confirmation, the Development instance remains Open
 with its allowlist enabled for exactly that one identifier, and the staging
-registration/Sandbox recharge flags are active. The real H5 signup form is ready;
-the owner must enter the new password, submit and complete email verification.
-No new Clerk/business user or payment order has been created yet.
+registration/Sandbox recharge flags are active. The owner completed password entry
+and email verification. Refreshing the existing Chrome H5 tab synchronized the
+verified Clerk session to a new active business account and a zero-balance wallet.
+No payment order has been created yet.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -239,6 +241,37 @@ No new Clerk/business user or payment order has been created yet.
   above. Production PayPal config remains 404; no production configuration,
   schema, account policy, route or Pages change was made. Sandbox purchase/capture,
   transaction-webhook, refund and real generation acceptance remain **pending**.
+
+## Verified staging signup/zero-wallet checkpoint — 2026-10-09
+
+- Owner reported completed signup/login. Official Clerk read-only checks confirm
+  the approved email is verified, its user is neither banned nor locked, and it has
+  one active session. The Development instance still has exactly one allowlist
+  entry, three users total (the two old QA users and this new test user), and no
+  unexpected user. No credential/session was fabricated or manually provisioned.
+- The existing Chrome H5 tab initially displayed the sign-in form while the
+  backend had no business identity for the new user. One ordinary page refresh
+  restored the signed-in account view and synchronized through the real auth API.
+  No code/configuration change or deployment was needed. This observed refresh
+  recovery is not proof that all signup redirect/error cases have passed.
+- Chrome `/#wallet` now shows **0 credits**, all three server-owned USD packages,
+  the real Sandbox PayPal button, user capacity 5/day and 1 concurrent, global
+  capacity 30/30, and no recharge order or coin ledger entry.
+- Read-only database verification confirms the new account is active, Clerk-based,
+  email-verified, has one synchronized login and no payment hold. Total users: 3;
+  both old QA users remain **disabled**, and all their user/wallet/ledger columns
+  still match the restored backup. New-user ledger count and total order count
+  are zero. A wallet row is created only on the first financial adjustment;
+  `get_coin_balance()` correctly returns zero before that, without granting coins.
+- Direct mainland checks, including forged region headers, still deny signup and
+  recharge with signed CN proof and retain the 30/day global limit. Production API
+  remains at the same successful deployment and its PayPal config remains 404.
+- The payment UI says clicking PayPal confirms its service terms/recharge notice.
+  Requested action-time confirmation for **only Sandbox** notice confirmation and
+  three virtual purchases (combined $42.97), followed by sandbox refund acceptance.
+  This does not approve production legal notices, merchant readiness or Live
+  funds. No payment button, buyer approval, capture, refund or paid generation has
+  been executed while this confirmation is pending.
 
 ## Locked business rules
 
