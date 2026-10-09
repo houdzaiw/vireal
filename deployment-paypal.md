@@ -6,8 +6,12 @@ Implementation is on `codex/paypal-public-registration`. Production registration
 recharge and region enforcement have **not** been switched on by this change.
 Controlled **staging-only** registration and Sandbox recharge are now enabled;
 the Development Clerk allowlist admits only the owner-approved new test email.
-The new test user has completed verified signup and reached a zero-balance wallet;
-actual sandbox purchase/refund acceptance remains pending payment testing.
+The new test user completed verified signup with zero initial credits. All three
+actual Sandbox purchases/captures have passed, with exactly 820 credits across
+three recharge ledger entries. A completed $5.99 Sandbox refund triggered the
+verified refund event, one open manual-review case and the expected account hold.
+Audited administrator recovery/closure remains pending staging administrator login;
+the held wallet still has 820 credits, not an automatically reduced balance.
 Unit/UI mocks are not PayPal sandbox acceptance or evidence of live merchant eligibility.
 The owner must confirm eligibility, merchant identity, permitted products and terms
 before any live release. Do not reactivate the previously disabled QA accounts.
@@ -39,7 +43,7 @@ config endpoint is 200 and reports the three USD packages, Sandbox mode and a
 30-submission global daily limit. Production remains unchanged; its health endpoint
 is 200 and PayPal config remains 404.
 
-Pending gates are actual sandbox payment/refund acceptance, owner Live readiness,
+Pending gates are completion of Sandbox manual refund-case closure, owner Live readiness,
 fresh production backup/deployment and
 owner-operated live acceptance. Old QA users remain disabled. The owner was asked
 for a new test email/alias; controlled acceptance activation must not be mistaken
@@ -51,7 +55,8 @@ with its allowlist enabled for exactly that one identifier, and the staging
 registration/Sandbox recharge flags are active. The owner completed password entry
 and email verification. Refreshing the existing Chrome H5 tab synchronized the
 verified Clerk session to a new active business account and a zero-balance wallet.
-No payment order has been created yet.
+The subsequent Sandbox transaction checkpoint below records the three real test
+orders and first refund; it supersedes the earlier zero-order checkpoint.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -272,6 +277,76 @@ No payment order has been created yet.
   This does not approve production legal notices, merchant readiness or Live
   funds. No payment button, buyer approval, capture, refund or paid generation has
   been executed while this confirmation is pending.
+
+## Sandbox purchases and first refund checkpoint — 2026-10-09
+
+- The owner explicitly authorized Sandbox payment-notice confirmation, the three
+  virtual purchases (combined **$42.97**) and Sandbox refund acceptance. All
+  payments used the dedicated **virtual US Personal** buyer and its generated
+  test Visa, not a Live account/card or evidence of the owner's real residence.
+- Tested closing the first unpaid checkout, refreshing and reloading H5, and
+  retrying checkout. The same pending order was retained; before approval there
+  was one order, zero captures, zero credits and zero ledger rows. This covers
+  unpaid-window closure/recovery, not every provider/network failure condition.
+- Approved each checkout once. Official Sandbox Orders API reads verified the
+  dedicated merchant/buyer, local custom/invoice references, exact USD snapshots,
+  `COMPLETED` order status and exactly one completed capture per purchase:
+
+  | Package | USD | Credits | Local order | PayPal order |
+  | --- | --- | --- | --- | --- |
+  | `coins_100` | 5.99 | 100 | `7a717439-07dc-42e5-b136-506172eb9d17` | `7V0331164U679591C` |
+  | `coins_220` | 11.99 | 220 | `e24f5606-8344-4b0b-ad59-acf021228b19` | `8PH67527LE334442R` |
+  | `coins_500` | 24.99 | 500 | `761d738b-8c93-4c10-bca9-ebed9368c38c` | `2KM45763H2158252B` |
+
+- H5 and read-only database verification showed balances **100 → 320 → 820**,
+  exactly three `recharge_credit` rows (`+100`, `+220`, `+500`) and no payment
+  holds before refund. Actual `CHECKOUT.ORDER.APPROVED` and
+  `PAYMENT.CAPTURE.COMPLETED` webhooks were recorded for every order. These are
+  genuine Sandbox transaction events, not simulator events or mocked signatures.
+- PayPal accepted resending the first order's existing capture-completed event to
+  only the registered staging webhook. The additional receiver request returned
+  **204**; subsequent verification still showed three orders, three credit rows,
+  six unique approval/capture events and 820 credits, with no duplicate credit.
+- Submitted one full **virtual $5.99 USD** refund for the first verified capture
+  through PayPal's official Sandbox Payments API, with a fixed idempotency key
+  and strict staging/merchant/buyer/order/amount guards. Refund
+  `8DP38818WN780541H` is **COMPLETED**. No public cash-refund endpoint was added.
+- The independently verified `PAYMENT.CAPTURE.REFUNDED` event marked the first
+  order `refunded`, created one **open refund case**
+  `241a3781-ae47-4c79-b811-db7ac69eb0e1` requiring recovery of **100 credits**, and
+  set `payment_hold=true`. No coins were automatically recovered or made negative:
+  the wallet remains **820**, with three original credit ledger rows. H5 refresh
+  showed the manual-review notice, disabled package selection, removed the PayPal
+  checkout button and retained readable records/help.
+- Resent the same authentic capture-completed event **after** refund as a late
+  delivery test. The receiver returned 204 again; the first order stayed
+  `refunded`, its one case stayed open, the payment hold remained set, and the
+  wallet/three credit ledger rows were unchanged. There are seven unique provider
+  events, not an extra credit or a restored paid-order status.
+- **Remaining controlled acceptance step:** sign in at the staging admin, open
+  the first order's payment case, enter a substantive Sandbox-refund review reason,
+  and use **Recover credits & resolve**. Verify one audited `recharge_recovery -100`
+  ledger row, wallet **720**, resolved case/reviewer/reason and cleared hold.
+  Do not mark this step passed before those observations, and do not manipulate
+  the database or use the production admin to bypass staging authentication.
+- The staging admin's expired Cloudflare Access session recovered through the
+  already-authorized provider login; its own admin login now requires the owner.
+  Chrome is left at `https://staging-admin.usevireal.com/login` for that handoff.
+- Applied axiom-security credential handling: the Sandbox buyer's masked password
+  was copied through the official UI only into its matching Sandbox login, the
+  clipboard was replaced with a public URL, temporary credential variables were
+  cleared, and Chrome's password-save prompt was declined. No plaintext password,
+  bearer token, raw buyer payload or screenshot of a revealed password was saved.
+- Evidence screenshots (outside Git):
+  `/tmp/vireal-sandbox-config-ukwVtF/staging-three-packages-paid.png` and
+  `/tmp/vireal-sandbox-config-ukwVtF/staging-refund-account-frozen.png`.
+  Read-only probes still match both disabled QA users' original user/wallet/ledger
+  data to the isolated backup. No new generation was submitted: global capacity
+  remains 30/30, user capacity 5/day and 1 concurrent. Production health is 200,
+  and its PayPal config endpoint remains 404. No source/runtime release, production
+  configuration/database/Clerk/Cloudflare change or Git push occurred in this test.
+- This checkpoint does not claim Live merchant eligibility, Live payment/refund
+  acceptance, every dispute/partial-refund scenario or a newly paid video test.
 
 ## Locked business rules
 
