@@ -19,16 +19,56 @@ The agent registered and verified the ten specific webhook events listed below a
 verification only, not actual transaction or webhook-signature acceptance. Live
 credentials still require the owner to upgrade the account to Business.
 
-Railway staging currently has three pre-existing, unrelated drafts: changed
-`CLERK_SECRET_KEY` values on the API and worker, and an API Healthcheck Path change
-whose displayed old/new paths are identical. None was applied or discarded. Resolve
-these with the owner before a deployment that could include them. No PayPal secrets
-have been provisioned to Railway yet; staging health is 200 and PayPal config is
-still 404. Production remains unchanged and closed to public signup/recharge.
-Pending gates are draft resolution, secret provisioning, actual sandbox acceptance,
+On 2026-10-09 the owner explicitly approved discarding all three unrelated staging
+drafts. The two `CLERK_SECRET_KEY` drafts were discarded; the identical old/new API
+Healthcheck Path draft then disappeared automatically. The staging UI showed no
+remaining drafts, and clearing them did not trigger a runtime deployment. No old
+Clerk key draft was applied.
+
+The compatible API and existing worker have now been deployed to **staging only**
+from commit `e6c51fe`, with public registration, recharge and region enforcement
+still disabled. The staging PayPal config endpoint is 200 and reports the three
+USD packages, Sandbox mode and a 30-submission global daily limit. Production
+remains unchanged; its health endpoint is 200 and PayPal config remains 404.
+
+Pending gates are PayPal Sandbox secret/merchant provisioning, Cloudflare CLI
+authorization and signed region Worker/H5 deployment, actual sandbox acceptance,
 owner Live readiness, fresh production backup/deployment and owner-operated live
-acceptance. Any financial account upgrade, identity verification or binding agreement
-remains owner-only.
+acceptance. The PayPal browser session expired before reading the merchant ID or
+Client Secret; reauthentication was requested. Cloudflare CLI is not authenticated;
+authorization with macOS Keychain credential storage was requested but has not yet
+been granted. No PayPal or edge signing secrets have been provisioned. Any financial
+account upgrade, identity verification or binding agreement remains owner-only.
+
+## Staging operational checkpoint — 2026-10-09
+
+- Before migration, created a mode-0600 custom-format staging database backup:
+  `/Users/huili/Documents/vireal-backups/staging-20261009-pre-paypal-1791512329800.dump`.
+  Size: 85,258 bytes; SHA-256:
+  `e4d0045a1b108ba151239a06e5ae94fec3f6f318f99d8bd7856442b69f17902c`.
+  Restoration was verified in an isolated local database; staging and production
+  database identities were checked to differ. The companion `.verification.json`
+  records the backup/restoration result without connection credentials.
+- Rehearsed `f2a3b4c5d6e7` → `a3b4c5d6e7f8` against a second isolated restored copy.
+  API deployment then applied the compatible migration using its existing
+  `bash scripts/prestart.sh` predeploy command. Remote schema head was verified.
+- Post-deployment read-only comparison with the restored backup, using **UTC in
+  both database sessions**, confirmed all existing user, coin account and ledger
+  columns unchanged. The initial timestamp-serialization fingerprint mismatch
+  disappeared after normalizing session timezones; it was not a row mutation.
+  There are 2 users, 2 wallets, 12 ledger rows, 0 orders and 0 payment holds.
+- Staging API deployment `36e0e0f9-0500-4b04-a90b-ef0ed512e67e`: **SUCCESS**.
+  Existing worker deployment `f5be7c24-d8d1-4a9d-9a76-14c065da5326`: **SUCCESS**.
+  Start commands remain unchanged; no new Railway service was created.
+- Both staging services use `ENVIRONMENT=staging`, `PAYPAL_ENVIRONMENT=sandbox`,
+  `PAYPAL_ENABLED=false`, `APP_PUBLIC_REGISTRATION_ENABLED=false`,
+  `APP_REGION_ENFORCEMENT_ENABLED=false`, `ADMIN_PUBLIC_SIGNUP_ENABLED=false`,
+  and global/Wan daily limits of 30. Support email is
+  `li522903183@gmail.com`. Credentials remain unconfigured; payment acceptance
+  cannot be claimed from a successful deployment or config response.
+- No Cloudflare route, region enforcement, Pages release, Clerk access policy or
+  production service/database was changed in this checkpoint. Do not deploy the
+  existing mock H5 test output as a release artifact.
 
 ## Locked business rules
 
