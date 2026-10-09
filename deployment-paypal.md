@@ -10,8 +10,9 @@ The new test user completed verified signup with zero initial credits. All three
 actual Sandbox purchases/captures have passed, with exactly 820 credits across
 three recharge ledger entries. A completed $5.99 Sandbox refund triggered the
 verified refund event, one open manual-review case and the expected account hold.
-Audited administrator recovery/closure remains pending staging administrator login;
-the held wallet still has 820 credits, not an automatically reduced balance.
+Audited administrator recovery/closure has also passed: exactly one 100-credit
+recovery, the correlated reconciliation review closed without a second debit,
+wallet balance **720**, and the account hold cleared. The actual H5 wallet agrees.
 Unit/UI mocks are not PayPal sandbox acceptance or evidence of live merchant eligibility.
 The owner must confirm eligibility, merchant identity, permitted products and terms
 before any live release. Do not reactivate the previously disabled QA accounts.
@@ -43,7 +44,7 @@ config endpoint is 200 and reports the three USD packages, Sandbox mode and a
 30-submission global daily limit. Production remains unchanged; its health endpoint
 is 200 and PayPal config remains 404.
 
-Pending gates are completion of Sandbox manual refund-case closure, owner Live readiness,
+Pending gates are owner Live readiness,
 fresh production backup/deployment and
 owner-operated live acceptance. Old QA users remain disabled. The owner was asked
 for a new test email/alias; controlled acceptance activation must not be mistaken
@@ -347,6 +348,75 @@ orders and first refund; it supersedes the earlier zero-order checkpoint.
   configuration/database/Clerk/Cloudflare change or Git push occurred in this test.
 - This checkpoint does not claim Live merchant eligibility, Live payment/refund
   acceptance, every dispute/partial-refund scenario or a newly paid video test.
+
+## Sandbox audited recovery and H5 correction checkpoint — 2026-10-09
+
+- After the owner completed **staging** administrator login, selected only the
+  first refunded Sandbox order. Its verified refund case still required 100
+  credits. The existing Worker had also created a `refund_reconcile` case for the
+  same capture; this was associated review evidence, not another refund/payment.
+- Submitted **Recover credits & resolve** once for verified refund case
+  `241a3781-ae47-4c79-b811-db7ac69eb0e1`, with a substantive review reason referencing
+  its full USD 5.99 Sandbox refund/capture and explicitly excluding Live funds.
+  The case became `resolved`, recovered 100 credits and retained its reviewer,
+  reason and resolution time. Correlated case
+  `525eb3ad-df8c-463c-8f55-8f6845086bc2` became resolved with **0** recovered credits.
+  No generic wallet adjustment or manual database write was used.
+- Two successive **read-only** database transactions verified the approved test
+  identity, active account, `payment_hold=false`, balance **720**, three original
+  recharge entries and exactly one `recharge_recovery -100` entry. The recovery
+  references the first order, the administrator and idempotency key
+  `paypal-case:241a3781-ae47-4c79-b811-db7ac69eb0e1`. There is exactly one
+  `app_payment_case.resolve` admin audit record for the submitted case, recording
+  `recover` and 100 recovered credits. Both cases are resolved and total recovered
+  credits are 100. The first order remains `refunded`, the other two remain paid,
+  and seven unique provider events remain recorded. Old QA accounts stay disabled;
+  schema remains `a3b4c5d6e7f8`.
+- Actual authenticated Chrome H5 displayed **720 credits**, the recovery ledger
+  row, all three original recharge rows and a restored PayPal button. User capacity
+  remains 5/day and 1 concurrent, global capacity 30/30. No fourth payment, further
+  cash refund or new real video generation was submitted.
+- Acceptance exposed one inaccurate status label: refunded orders always said
+  "credits under review", even after case closure. Changed only the bilingual
+  refund status to **已退款 / Refunded**; the separate wallet `payment_hold` notice
+  still controls review messaging and recharge availability. This does not add a
+  public API or change financial/account-freeze behavior.
+- Added four UI regressions covering English/Chinese and held/cleared accounts:
+  held accounts retain their review notice and disabled recharge; cleared accounts
+  show the recovery row and available PayPal checkout without stale review wording.
+  Full H5 browser suite: **24 passed**; Python page contracts: **29 passed**.
+  These local mocked tests remain distinct from the actual Sandbox transaction
+  and authenticated administrator acceptance above.
+- The existing local esbuild binary was killed and a Tailwind native dependency
+  was missing. Rebuilt successfully using isolated official-registry esbuild
+  **0.28.2** and Tailwind **4.3.3** through the build script's explicit overrides,
+  then reran the complete browser suite against the complete artifact. No project
+  dependency/lockfile or system security setting was changed.
+- Source commit **635523e** was rebuilt with the actual staging `pk_test_…` key,
+  matching its Development Clerk issuer, and only `https://staging-api.usevireal.com`.
+  Guarded publication rejected mock/incomplete artifacts and kept the staging
+  Pages project's branch `codex/vireal-v1-2-h5`. Deployment
+  **da642a18-4bf8-42c3-aa28-6705de472302** in **vireal-h5-staging** succeeded.
+  The public custom-domain app bundle SHA-256 matches the real release artifact;
+  Chrome refresh verified the corrected refund label and unchanged balance/ledger.
+- Production Pages remains **6e4f185e-30c2-4247-985a-06c631acbd4c** before and after
+  the staging publication. Production API health is 200 and its PayPal config is
+  still 404. No Railway service/configuration, database schema, Clerk policy,
+  region Worker/route or production release was changed, and no Git push occurred.
+- Applied axiom-security guidance to the read-only verifier: Railway/database
+  credentials stayed in subprocess memory, sensitive provider diagnostics were
+  suppressed and nothing secret was saved to source/evidence. Wrangler retained
+  encrypted configuration backed by macOS Keychain; its suggested unrelated
+  additional OAuth scopes were not granted.
+- Durable screenshots outside Git:
+  `/Users/huili/Documents/vireal-acceptance/2026-10-09-sandbox/refund-case-resolved.png`,
+  `/Users/huili/Documents/vireal-acceptance/2026-10-09-sandbox/wallet-720-restored.png`,
+  `/Users/huili/Documents/vireal-acceptance/2026-10-09-sandbox/refund-history-and-recovery.png`.
+- The controlled three-package purchase and **lowest-package full-refund/manual
+  credit recovery** flow is complete. Live merchant qualification, production
+  backup/rollout, owner-operated eligible-buyer payment and separately authorized
+  paid video acceptance remain release gates. This is not acceptance of every
+  partial-refund/dispute case or a Live launch.
 
 ## Locked business rules
 
