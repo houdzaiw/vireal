@@ -4,6 +4,9 @@
 
 Implementation is on `codex/paypal-public-registration`. Production registration,
 recharge and region enforcement have **not** been switched on by this change.
+Controlled **staging-only** registration and Sandbox recharge are now enabled;
+the Development Clerk allowlist admits only the owner-approved new test email.
+Actual sandbox purchase/refund acceptance remains pending verified user signup.
 Unit/UI mocks are not PayPal sandbox acceptance or evidence of live merchant eligibility.
 The owner must confirm eligibility, merchant identity, permitted products and terms
 before any live release. Do not reactivate the previously disabled QA accounts.
@@ -29,7 +32,8 @@ The compatible API and existing worker have now been deployed to **staging only*
 from commit `e6c51fe`. After the owner reauthenticated PayPal and explicitly approved
 Cloudflare CLI authorization, sandbox credentials and a separate staging edge secret
 were provisioned, the region Worker/H5 were deployed, and staging region enforcement
-was enabled. Public registration and recharge remain disabled. The staging PayPal
+was enabled. Public registration and recharge were kept disabled at that checkpoint.
+The staging PayPal
 config endpoint is 200 and reports the three USD packages, Sandbox mode and a
 30-submission global daily limit. Production remains unchanged; its health endpoint
 is 200 and PayPal config remains 404.
@@ -40,11 +44,12 @@ owner-operated live acceptance. Old QA users remain disabled. The owner was aske
 for a new test email/alias; controlled acceptance activation must not be mistaken
 for a public or Live release. Any financial account upgrade, identity verification
 or binding agreement remains owner-only. The owner has now unlocked the Mac and
-provided a new test email/alias and logged into Clerk Dashboard. The Development
-instance's access mode is Open with its allowlist off. Controlled acceptance
-activation is awaiting owner confirmation to enable a single-email allowlist and
-the staging registration/Sandbox recharge flags. The new identifier has not been
-registered or given access yet.
+provided a new test email/alias and logged into Clerk Dashboard. Following the
+owner's explicit staging-only confirmation, the Development instance remains Open
+with its allowlist enabled for exactly that one identifier, and the staging
+registration/Sandbox recharge flags are active. The real H5 signup form is ready;
+the owner must enter the new password, submit and complete email verification.
+No new Clerk/business user or payment order has been created yet.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -198,6 +203,42 @@ registered or given access yet.
   stayed in process memory; CLI/provider diagnostics suppress sensitive outputs.
   No payment approval/capture, actual transaction webhook, refund or generation
   acceptance has been performed. Production remains unchanged.
+
+## Controlled staging activation checkpoint — 2026-10-09
+
+- Owner explicitly authorized **only controlled staging acceptance**. Enabled the
+  Allowlist on the Development Clerk instance, added only the approved new email,
+  then refreshed the Dashboard to verify the saved restriction. Read-only API
+  checks confirmed one allowlist entry, no user for that identifier, and only the
+  two known old QA Clerk users. No production Clerk access setting changed.
+- Set `APP_PUBLIC_REGISTRATION_ENABLED=true` and `PAYPAL_ENABLED=true` on **only**
+  the staging API and existing staging worker. Retained Sandbox credentials,
+  signed region enforcement, closed admin registration and all existing limits.
+  Read-back checks confirmed matching nonempty secrets across both services;
+  official Sandbox OAuth/webhook configuration verification passed again.
+- Staging API deployment `4b317fc5-c0bf-4969-9ba7-14a72bea7d10`: **SUCCESS**;
+  worker `d5e293fb-c558-4417-9653-fbd17df81293`: **SUCCESS**. API build logs
+  confirmed its health check succeeded, and the public health endpoint is 200.
+  No source upload, new Railway service, Cloudflare release or Git push occurred.
+- Actual signed US-edge configuration reports Sandbox, registration/recharge
+  enabled, the three correct USD products and 30/30 global submissions remaining.
+  This request used the pre-existing proxy and does **not** establish residence
+  or qualify as genuine overseas/Live buyer acceptance. Direct mainland requests,
+  including forged region headers, still report signed CN and deny both actions.
+  No network/system proxy setting or region-proof validation was changed.
+- After the API rollout and before signup, repeated the read-only UTC comparison
+  against the restored backup: schema `a3b4c5d6e7f8`, all existing user/wallet/ledger
+  columns unchanged, 2 users, 2 wallets, 12 ledger rows, 0 orders and 0 payment holds.
+  Worker diagnostics found no payment-reconciliation failure markers.
+- Refreshed `https://staging-app.usevireal.com/#register` in Chrome and verified
+  the real Clerk **Create your account** email/password form. Prefilled only the
+  authorized email and handed new-password entry, submission and email-code
+  verification to the owner. No password, code, session or verified identity was
+  fabricated, and no old QA account was reactivated or given coins.
+- Production API/worker remain **SUCCESS** at the same deployment IDs recorded
+  above. Production PayPal config remains 404; no production configuration,
+  schema, account policy, route or Pages change was made. Sandbox purchase/capture,
+  transaction-webhook, refund and real generation acceptance remain **pending**.
 
 ## Locked business rules
 
