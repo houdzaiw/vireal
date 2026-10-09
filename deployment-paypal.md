@@ -26,19 +26,21 @@ remaining drafts, and clearing them did not trigger a runtime deployment. No old
 Clerk key draft was applied.
 
 The compatible API and existing worker have now been deployed to **staging only**
-from commit `e6c51fe`, with public registration, recharge and region enforcement
-still disabled. The staging PayPal config endpoint is 200 and reports the three
-USD packages, Sandbox mode and a 30-submission global daily limit. Production
-remains unchanged; its health endpoint is 200 and PayPal config remains 404.
+from commit `e6c51fe`. After the owner reauthenticated PayPal and explicitly approved
+Cloudflare CLI authorization, sandbox credentials and a separate staging edge secret
+were provisioned, the region Worker/H5 were deployed, and staging region enforcement
+was enabled. Public registration and recharge remain disabled. The staging PayPal
+config endpoint is 200 and reports the three USD packages, Sandbox mode and a
+30-submission global daily limit. Production remains unchanged; its health endpoint
+is 200 and PayPal config remains 404.
 
-Pending gates are PayPal Sandbox secret/merchant provisioning, Cloudflare CLI
-authorization and signed region Worker/H5 deployment, actual sandbox acceptance,
-owner Live readiness, fresh production backup/deployment and owner-operated live
-acceptance. The PayPal browser session expired before reading the merchant ID or
-Client Secret; reauthentication was requested. Cloudflare CLI is not authenticated;
-authorization with macOS Keychain credential storage was requested but has not yet
-been granted. No PayPal or edge signing secrets have been provisioned. Any financial
-account upgrade, identity verification or binding agreement remains owner-only.
+Pending gates are a new verified, region-eligible staging test user and actual
+sandbox acceptance, owner Live readiness, fresh production backup/deployment and
+owner-operated live acceptance. Old QA users remain disabled. The owner was asked
+for a new test email/alias; controlled acceptance activation must not be mistaken
+for a public or Live release. Any financial account upgrade, identity verification
+or binding agreement remains owner-only. The Mac locked during the final H5
+screenshot check; further Chrome verification requires the owner to unlock it.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -69,6 +71,74 @@ account upgrade, identity verification or binding agreement remains owner-only.
 - No Cloudflare route, region enforcement, Pages release, Clerk access policy or
   production service/database was changed in this checkpoint. Do not deploy the
   existing mock H5 test output as a release artifact.
+
+## Staging sandbox/edge/H5 checkpoint — 2026-10-09
+
+- After owner reauthentication, read credentials only from the dedicated
+  **Vireal Staging Sandbox** app. Its linked sandbox seller is Business/Verified;
+  the UI still requires a Business upgrade for Live credentials. No Live merchant
+  eligibility or permitted-product approval has been established.
+- Provisioned `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MERCHANT_ID` and
+  `PAYPAL_WEBHOOK_ID` to staging API and the existing staging worker through CLI
+  standard input, with automatic deployments suppressed until configuration was
+  complete. Values were not printed, committed, or saved to a local plaintext file.
+  Read-back comparison confirmed both services use identical sandbox credentials.
+- Successfully obtained a sandbox OAuth token and read the registered webhook
+  through PayPal's official Sandbox API. Its receiver URL and all 10 specific
+  subscribed events matched. Tokens were retained in memory only. This is API
+  credential/configuration validation, **not** a buyer payment/capture, a verified
+  real transaction webhook, a refund acceptance, or Live acceptance.
+- Official Wrangler 4.149.0 was authorized on account
+  `03f299cf050fbb5da51340d76e8b24c3`, restricted to `account:read`, `user:read`,
+  `zone:read`, `workers_scripts:write`, `workers_routes:write`, `pages:write` and
+  the required `offline_access`. Ignored the CLI's suggestion to add unrelated
+  default permissions. Two localhost-callback attempts timed out; official device
+  authorization succeeded without changing scopes.
+- Applied the axiom-security credential-storage guidance by forcing
+  `CLOUDFLARE_AUTH_USE_KEYRING=true` with `--use-keyring`, preventing plaintext
+  fallback. CLI read-back confirmed persisted keyring mode: credentials reside in
+  encrypted `default.enc`, protected by a macOS Keychain key (`wrangler/default`).
+  No custom keychain implementation or browser password storage was added.
+- Generated an independent random 64-character staging `APP_EDGE_SIGNING_SECRET`
+  in memory, provisioned matching values to staging API/worker and Cloudflare's
+  Worker secret binding, then cleared temporary secret variables. Production
+  credentials were not read/copied/changed for this provisioning step.
+- Region Worker `vireal-api-region-staging` version
+  `b9e05b59-d178-4e01-8a2a-b3976cc4a0b4` deployed successfully to **only**
+  `staging-api.usevireal.com/api/*`. Backend first verified a non-null signed edge
+  country with enforcement off; forged `CF-IPCountry` and `x-vireal-edge-*` headers
+  were ignored. Only then enabled region enforcement and redeployed both services.
+- Final Railway staging API deployment
+  `e0f34ace-a21a-409a-a972-b7d03dc8a0ec`: **SUCCESS**; worker
+  `7531e42c-b70a-41f7-8d2e-92777c783af7`: **SUCCESS**.
+  Flags: `APP_REGION_ENFORCEMENT_ENABLED=true`, `PAYPAL_ENABLED=false`,
+  `APP_PUBLIC_REGISTRATION_ENABLED=false`, `ADMIN_PUBLIC_SIGNUP_ENABLED=false`.
+  Schema, existing user/wallet/ledger fingerprints, zero orders and zero payment
+  holds were verified again against the restored backup using UTC sessions.
+- Rebuilt H5 with `https://staging-api.usevireal.com` and the actual staging
+  `pk_test_…` Clerk key, whose issuer matches the backend. Published only Pages
+  project **vireal-h5-staging**: deployment
+  `355901a1-8a7e-40a6-9a76-259d3a280759`, source `5373bcb`, at
+  `https://staging-app.usevireal.com`. The project's existing production branch
+  `codex/vireal-v1-2-h5` was preserved for this direct upload; this is the staging
+  project's main release, not the production Vireal project. No Git push occurred.
+- Re-ran H5 contract tests: **29 passed**; edge signing tests: **3 passed**.
+  Browser AX check at `/#register` displayed “注册暂未开放” and the message that
+  signup/recharge await payment acceptance. No signup form was presented.
+- Direct mainland network checks returned signed `country=CN`,
+  `region_allowed=false`, registration/recharge false, including with forged
+  region headers. Mainland public effect catalog remained accessible: 6 categories,
+  18 effects, only 5/10-second variants; health returned 200. An unsigned PayPal
+  callback returned 403, not an Access login page, and did not create financial rows.
+  Requests via the pre-existing proxy returned a signed US edge country; this does
+  **not** establish overseas residence or count as genuine overseas buyer acceptance.
+  No system proxy was changed, no valid country proof was fabricated, and no real
+  generation or payment was submitted.
+- Production API/worker deployment IDs remain
+  `72e6587b-b6a6-4c92-bcd4-bb31165579da` /
+  `d35d95e5-67db-4267-843b-4ee184483376`. Production Pages remains deployment
+  `6e4f185e-30c2-4247-985a-06c631acbd4c` in **vireal-h5-houdzaiw**.
+  No production schema, service, route, Pages release or Clerk access policy changed.
 
 ## Locked business rules
 
