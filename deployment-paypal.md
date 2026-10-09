@@ -40,8 +40,11 @@ owner-operated live acceptance. Old QA users remain disabled. The owner was aske
 for a new test email/alias; controlled acceptance activation must not be mistaken
 for a public or Live release. Any financial account upgrade, identity verification
 or binding agreement remains owner-only. The owner has now unlocked the Mac and
-provided a new test email/alias. Clerk Dashboard administrator login is pending;
-the new identifier has not been registered or given access yet.
+provided a new test email/alias and logged into Clerk Dashboard. The Development
+instance's access mode is Open with its allowlist off. Controlled acceptance
+activation is awaiting owner confirmation to enable a single-email allowlist and
+the staging registration/Sandbox recharge flags. The new identifier has not been
+registered or given access yet.
 
 ## Staging operational checkpoint — 2026-10-09
 
@@ -167,6 +170,34 @@ the new identifier has not been registered or given access yet.
   access changes, invitations, business users, orders or payments were created.
   Registration/recharge remain off and region enforcement remains on; mainland
   config reports `region_allowed=false`. Production PayPal config is still 404.
+
+## Clerk/Sandbox buyer readiness checkpoint — 2026-10-09
+
+- Owner completed Clerk administrator login. Read-only Dashboard inspection
+  selected the **Development** instance `ins_3JhjJFXX0gfMy23mLRSqAEIWxtQ`, matching
+  the existing staging backend issuer/key. No production instance setting changed.
+- Email signup, required email and verification at signup are on, with email
+  verification codes selected. Email-code sign-in is on. Access mode is **Open**
+  and Allowlist is **off**, so do not enable backend registration until controlled
+  signup restrictions are explicitly approved and applied. Adding an identifier
+  without enabling the allowlist would not restrict who can sign up.
+- Requested action-time confirmation for a staging-only single-email allowlist
+  plus registration and Sandbox recharge activation. No toggle, identifier,
+  invitation or business-user write has occurred while confirmation is pending.
+  CLI read-only checks confirm the new identifier has no Clerk user or allowlist
+  entry. Both backend flags remain false; signed mainland region remains denied.
+- Restored the existing authorized PayPal Developer session with its existing
+  passkey; no credential was changed or saved. Both default Sandbox accounts were
+  C2. Created an additional **virtual US Personal Sandbox buyer** using PayPal's
+  automatic test-data/credential generation, distinct from the C2 Business seller.
+  New mock buyer account identifier: `4830785487038637637`. Dashboard confirmed
+  successful creation and lists three sandbox accounts. This does not create a
+  Live financial account or assert the owner's real country/residency.
+- Sandbox buyer password was not revealed, exported or committed. Following
+  axiom-security guidance, the staging Clerk secret used for read-only API checks
+  stayed in process memory; CLI/provider diagnostics suppress sensitive outputs.
+  No payment approval/capture, actual transaction webhook, refund or generation
+  acceptance has been performed. Production remains unchanged.
 
 ## Locked business rules
 
