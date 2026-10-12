@@ -417,12 +417,13 @@ test("terminal task refunds refresh the visible balance without leaving the page
   })
   await page.route("https://api.example.com/api/v1/app/video-tasks/qa-refund-task", async (route) => {
     balance = 500
-    await route.fulfill({ json: { ...task, status: "failed" } })
+    await route.fulfill({ json: { ...task, status: "failed", coin_refunded_at: new Date().toISOString() } })
   })
   await page.goto("/#works")
   await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("488")
   await page.getByRole("button", { name: "排队中", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "失败已退款" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "生成失败" })).toBeVisible()
+  await expect(page.getByText("金币已退回钱包", { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
 })
 
@@ -435,6 +436,110 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport)
   expect(dimensions.root).toBeLessThanOrEqual(dimensions.viewport)
 }
+
+function existingDeliveryTask(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "qa-delivery-task", status: "running", duration: 5, coin_cost: 12,
+    effect_title: "节拍律动", execution_type: "wan", resolution: "720p", aspect_ratio: "9:16",
+    expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
+    coin_refunded_at: null, playback_url: null, ...overrides,
+  }
+}
+
+async function mockExistingDelivery(page: Page, task = existingDeliveryTask()) {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", route => route.fulfill({ json: { data: [task] } }))
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill({ json: task }))
+}
+
+test("task polling retries transient failures and resumes online without creating a prediction", async ({ page }) => {
+  await mockExistingDelivery(page)
+  let queries = 0
+  let submissions = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks", async route => { submissions++; await route.fulfill({ status: 500, json: {} }) })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    await route.fulfill(queries === 1 ? { status: 503, json: { detail: "Temporary network failure" } } : { json: existingDeliveryTask() })
+  })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByText("状态更新暂时中断，正在重试；不会重新生成。", { exact: true })).toBeVisible()
+  await expect.poll(() => queries).toBeGreaterThanOrEqual(2)
+  await expect(page.getByText("状态更新暂时中断，正在重试；不会重新生成。", { exact: true })).toHaveCount(0)
+  const before = queries
+  await page.evaluate(() => window.dispatchEvent(new Event("online")))
+  await expect.poll(() => queries).toBeGreaterThan(before)
+  const beforeVisible = queries
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")))
+  await expect.poll(() => queries).toBeGreaterThan(beforeVisible)
+  expect(submissions).toBe(0)
+})
+
+test("manual task refresh recovers status and uses actual refund timestamp", async ({ page }) => {
+  await mockExistingDelivery(page)
+  let recovered = false
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill(recovered ? { json: existingDeliveryTask({ status: "failed", coin_refunded_at: new Date().toISOString() }) } : { status: 503, json: { detail: "Unavailable" } }))
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByRole("button", { name: "刷新任务状态" })).toBeVisible()
+  recovered = true
+  await page.getByRole("button", { name: "刷新任务状态" }).click()
+  await expect(page.getByText("金币已退回钱包", { exact: true })).toBeVisible()
+})
+
+for (const status of ["failed", "expired"] as const) {
+  test(`${status} without a server refund timestamp never promises a refund`, async ({ page }) => {
+    await mockExistingDelivery(page, existingDeliveryTask({ status, expires_at: new Date(Date.now() - 1000).toISOString() }))
+    await page.goto("/#generation?id=qa-delivery-task")
+    await expect(page.getByRole("heading", { name: status === "failed" ? "生成失败" : "作品已过期/删除" })).toBeVisible()
+    await expect(page.getByText("金币已退回钱包", { exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "下载 MP4" })).toHaveCount(0)
+  })
+}
+
+test("owned result download sends authentication and saves MP4 without a public object URL", async ({ page }) => {
+  const task = existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" })
+  await mockExistingDelivery(page, task)
+  const bytes = Buffer.from("00000018667479706d7034326d6f636b766964656f", "hex")
+  await page.route("https://api.example.com/mock-video.mp4", route => route.fulfill({ contentType: "video/mp4", body: bytes }))
+  let downloads = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task/download", async route => {
+    expect(route.request().headers().authorization).toBe("Bearer qa-session-token")
+    downloads++
+    await route.fulfill({ contentType: "video/mp4", headers: { "Content-Disposition": 'attachment; filename="vireal-qa-delivery-task.mp4"' }, body: bytes })
+  })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByText(/作品保留至/)).toBeVisible()
+  const saved = page.waitForEvent("download")
+  await page.getByRole("button", { name: "下载 MP4" }).click()
+  expect((await saved).suggestedFilename()).toBe("vireal-qa-delivery-task.mp4")
+  expect(downloads).toBe(1)
+  await expectNoHorizontalOverflow(page)
+})
+
+test("playback error refreshes its signed address once and cannot loop on a bad video", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/bad-video.mp4?token=old" }))
+  let queries = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    await route.fulfill({ json: existingDeliveryTask({ status: "succeeded", playback_url: `https://api.example.com/bad-video.mp4?token=${queries > 1 ? "fresh" : "old"}` }) })
+  })
+  await page.route("https://api.example.com/bad-video.mp4?**", route => route.fulfill({ status: 403, body: "Expired mock signature" }))
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=fresh/)
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("error")))
+  // Initial lookup plus one playback recovery; repeat errors must not spam APIs.
+  expect(queries).toBe(2)
+})
+
+test("expired download refreshes task state and removes stale download controls", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }))
+  let expired = false
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill({ json: expired ? existingDeliveryTask({ status: "expired", expires_at: new Date(Date.now() - 1000).toISOString() }) : existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }) }))
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task/download", async route => { expired = true; await route.fulfill({ status: 410, json: { detail: "Video has expired" } }) })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await page.getByRole("button", { name: "下载 MP4" }).click()
+  await expect(page.getByRole("heading", { name: "作品已过期/删除" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "下载 MP4" })).toHaveCount(0)
+})
 
 test("390px home uses dynamic count, fallback media, and three-item nav", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 })

@@ -21,8 +21,7 @@ class ImmediateProvider:
     @staticmethod
     def generate(generation: AppGeneration) -> ai_generation.AIGenerationResult:
         return ai_generation.AIGenerationResult(
-            output_url=generation.reference_image_url
-            or generation.character_image_url,
+            output_url=generation.reference_image_url or generation.character_image_url,
             provider_task_id="provider-task-1",
         )
 
@@ -285,7 +284,6 @@ def test_admin_reads_and_deletes_app_generation(
         for item in deleted_list_response.json()["data"]
     )
     assert any(
-        item["action"] == "app_generation.delete"
-        and item["target_id"] == generation_id
+        item["action"] == "app_generation.delete" and item["target_id"] == generation_id
         for item in logs_response.json()["data"]
     )

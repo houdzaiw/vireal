@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from sqlalchemy import text
@@ -10,9 +10,11 @@ from app.api.deps import CurrentAppUser, SessionDep
 from app.core.config import settings
 from app.models import AppOrder, AppOrderPublic, AppPayPalOrderCreate
 from app.services.commercial_access import (
+    acceptance_request_allowed,
     edge_country,
     lock_commercial_user,
     region_allowed,
+    require_new_commerce_user,
     require_region,
 )
 from app.services.paypal_client import (
@@ -28,7 +30,9 @@ router = APIRouter(prefix="/app/paypal", tags=["app paypal"])
 
 
 @router.get("/config")
-def payment_config(request: Request, response: Response, session: SessionDep) -> dict:
+def payment_config(
+    request: Request, response: Response, session: SessionDep
+) -> dict[str, Any]:
     response.headers["Cache-Control"] = "no-store"
     now = datetime.now(UTC)
     remaining = max(
@@ -37,15 +41,25 @@ def payment_config(request: Request, response: Response, session: SessionDep) ->
         0,
     )
     allowed = region_allowed(request)
+    acceptance_allowed = (
+        acceptance_request_allowed(request)
+        if settings.APP_LIVE_ACCEPTANCE_ENABLED
+        else False
+    )
+    identity_allowed = not settings.APP_LIVE_ACCEPTANCE_ENABLED or acceptance_allowed
     return {
         "environment": settings.PAYPAL_ENVIRONMENT,
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
-        "registration_enabled": settings.APP_PUBLIC_REGISTRATION_ENABLED and allowed,
+        "registration_enabled": (
+            settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
+        )
+        and allowed,
         "recharge_enabled": settings.PAYPAL_ENABLED
         and paypal_configured()
         and allowed
+        and identity_allowed
         and remaining > 0,
         "global_real_limit": settings.APP_GLOBAL_DAILY_REAL_SUBMISSIONS,
         "global_real_remaining": remaining,
@@ -67,6 +81,7 @@ def create_paypal_order(
     idempotency_key: Annotated[str, Header(min_length=8, max_length=120)],
 ) -> AppOrderPublic:
     require_region(request)
+    require_new_commerce_user(request)
     if body.product_id not in PRODUCTS:
         raise HTTPException(422, "Unknown recharge package")
     session.connection().execute(

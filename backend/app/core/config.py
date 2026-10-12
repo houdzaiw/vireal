@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 30
     APP_GLOBAL_DAILY_REAL_SUBMISSIONS: int = 30
     APP_PUBLIC_REGISTRATION_ENABLED: bool = False
+    APP_LIVE_ACCEPTANCE_ENABLED: bool = False
+    APP_LIVE_ACCEPTANCE_SUBJECTS: list[str] = []
+    # Only these catalogue slugs can be browsed/submitted in production.
+    APP_LAUNCH_EFFECT_SLUGS: list[str] = ["dance-1", "romance-1"]
+    # Emergency pause affects new submissions, not provider queries/callbacks.
+    APP_VIDEO_SUBMISSIONS_ENABLED: bool = True
     APP_COMMERCE_TERMS_APPROVED: bool = False
     APP_REGION_ENFORCEMENT_ENABLED: bool = False
     APP_EDGE_SIGNING_SECRET: str | None = None
@@ -237,6 +243,27 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if self.APP_LIVE_ACCEPTANCE_ENABLED:
+            if (
+                self.ENVIRONMENT != "production"
+                or not self.PAYPAL_ENABLED
+                or not self.APP_LIVE_ACCEPTANCE_SUBJECTS
+                or self.APP_PUBLIC_REGISTRATION_ENABLED
+            ):
+                raise ValueError(
+                    "Live acceptance requires production, enabled live payments, a nonempty subject allowlist and closed public registration"
+                )
+        if any(
+            not subject.strip() or subject != subject.strip()
+            for subject in self.APP_LIVE_ACCEPTANCE_SUBJECTS
+        ):
+            raise ValueError(
+                "Acceptance subjects must be nonempty exact Clerk identities"
+            )
+        if self.ENVIRONMENT == "production" and not self.APP_LAUNCH_EFFECT_SLUGS:
+            raise ValueError(
+                "Production must explicitly select a nonempty launch catalogue"
+            )
         if self.APP_GLOBAL_DAILY_REAL_SUBMISSIONS < 1:
             raise ValueError("APP_GLOBAL_DAILY_REAL_SUBMISSIONS must be positive")
         if self.APP_EDGE_SIGNATURE_TOLERANCE_SECONDS < 1:

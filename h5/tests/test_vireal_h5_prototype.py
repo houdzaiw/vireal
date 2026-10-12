@@ -188,8 +188,10 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn("确认前不会自动退款", self.app)
 
     def test_failure_copy_mentions_server_refund(self) -> None:
-        self.assertIn("失败已退款", self.app)
-        self.assertIn("系统已自动退款", self.app)
+        self.assertIn("task.coin_refunded_at", self.app)
+        self.assertIn("金币已退回钱包", self.app)
+        self.assertIn("这不代表发生退款", self.app)
+        self.assertNotIn("若产生扣币，系统已自动退款", self.app)
 
     def test_client_does_not_send_model_price_or_prompt(self) -> None:
         create_task = self.app[

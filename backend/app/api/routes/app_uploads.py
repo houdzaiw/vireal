@@ -10,7 +10,11 @@ from starlette.concurrency import run_in_threadpool
 from app.api.deps import CurrentAppUser, SessionDep
 from app.core.config import settings
 from app.models import AppUpload, AppUploadPublic
-from app.services.commercial_access import lock_commercial_user, require_region
+from app.services.commercial_access import (
+    lock_commercial_user,
+    require_new_commerce_user,
+    require_region,
+)
 from app.services.storage import (
     ImageStorageError,
     build_r2_app_image_url,
@@ -31,6 +35,7 @@ async def upload_app_image(
     Store an App image and return a stable application URL.
     """
     require_region(request)
+    require_new_commerce_user(request)
     lock_commercial_user(session, current_app_user)
     # Do not retain the account lock during object storage network I/O.
     session.commit()

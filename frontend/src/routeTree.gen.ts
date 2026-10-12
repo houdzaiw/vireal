@@ -28,6 +28,7 @@ import { Route as LayoutEffectCategoriesRouteImport } from './routes/_layout/eff
 import { Route as LayoutEffectsRouteImport } from './routes/_layout/effects'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
+import { Route as LayoutVideoTasksRouteImport } from './routes/_layout/video-tasks'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -123,6 +124,11 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutVideoTasksRoute = LayoutVideoTasksRouteImport.update({
+  id: '/video-tasks',
+  path: '/video-tasks',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/effects': typeof LayoutEffectsRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/video-tasks': typeof LayoutVideoTasksRoute
 }
 export interface FileRoutesByTo {
   '/h5': typeof H5Route
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/effects': typeof LayoutEffectsRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/video-tasks': typeof LayoutVideoTasksRoute
   '/': typeof LayoutIndexRoute
 }
 export interface FileRoutesById {
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/_layout/effects': typeof LayoutEffectsRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
+  '/_layout/video-tasks': typeof LayoutVideoTasksRoute
   '/_layout/': typeof LayoutIndexRoute
 }
 export interface FileRouteTypes {
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/effects'
     | '/items'
     | '/settings'
+    | '/video-tasks'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/h5'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/effects'
     | '/items'
     | '/settings'
+    | '/video-tasks'
     | '/'
   id:
     | '__root__'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/_layout/effects'
     | '/_layout/items'
     | '/_layout/settings'
+    | '/_layout/video-tasks'
     | '/_layout/'
   fileRoutesById: FileRoutesById
 }
@@ -394,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/video-tasks': {
+      id: '/_layout/video-tasks'
+      path: '/video-tasks'
+      fullPath: '/video-tasks'
+      preLoaderRoute: typeof LayoutVideoTasksRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
@@ -410,6 +429,7 @@ interface LayoutRouteChildren {
   LayoutEffectsRoute: typeof LayoutEffectsRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
+  LayoutVideoTasksRoute: typeof LayoutVideoTasksRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
@@ -426,6 +446,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutEffectsRoute: LayoutEffectsRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
+  LayoutVideoTasksRoute: LayoutVideoTasksRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 

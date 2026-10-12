@@ -31,6 +31,13 @@
     isSubmitting: false,
     currentTask: null,
     polling: null,
+    pollingVersion: 0,
+    pollingErrors: 0,
+    pollingError: "",
+    playbackTimer: null,
+    playbackRefreshing: false,
+    playbackRetryUrl: new Map(),
+    savingTaskId: null,
     commerce: null,
     commerceError: "",
     authView: "login",
@@ -54,7 +61,7 @@
   const apiUrl = (path) => new URL(path, `${API}/`).toString()
   const mediaUrl = (path) => path ? new URL(path, `${API}/`).toString() : ""
   const formatDate = (value) => value ? new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : ""
-  const statusText = (status) => ({ submitting: "正在提交", pending: "排队中", running: "生成中", rendering_demo: "生成中", saving: "保存中", succeeded: "已完成", failed: "失败已退款", canceled: "已取消", submission_unknown: "服务商确认中", expired: "已删除" })[status] || status
+  const statusText = (status) => ({ submitting: "正在提交", pending: "排队中", running: "生成中", rendering_demo: "生成中", saving: "保存中", succeeded: "已完成", failed: "生成失败", canceled: "已取消", submission_unknown: "服务商确认中", expired: "作品已过期/删除" })[status] || status
 
   function route() {
     const raw = location.hash.slice(1) || "home"
@@ -107,7 +114,7 @@
       ...options,
       headers: { ...options.headers, Authorization: `Bearer ${await token()}` },
     })
-    if ([401, 403].includes(response.status)) state.appUser = null
+    if (response.status === 401 || (response.status === 403 && path === "/api/v1/app/auth/session")) state.appUser = null
     return response
   }
 
@@ -131,7 +138,8 @@
 
   async function loadCommerce(redraw = true) {
     try {
-      state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store" }))
+      const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
+      state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers }))
       state.commerceError = ""
     } catch (_) {
       state.commerce = null
@@ -252,9 +260,12 @@
       state.generationAttempt = null
       state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
       state.uploads = []
-      clearTimeout(state.polling)
+      stopTaskPolling()
       state.authSyncedSessionId = ""
       state.authReady = true
+      stopTaskPolling()
+      clearTimeout(state.playbackTimer)
+      if (authChanged) void loadCommerce(false)
       if (authChanged) render()
       return
     }
@@ -271,12 +282,12 @@
         state.generationAttempt = null
         state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
         state.uploads = []
-        clearTimeout(state.polling)
+        stopTaskPolling()
       }
       state.appUser = payload.app_user
       state.authSyncedSessionId = clerk.session.id
       state.authReady = true
-      await Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders()])
+      await Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders(), loadCommerce(false)])
       const afterLogin = sessionStorage.getItem("vireal-after-login")
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
@@ -286,6 +297,7 @@
       // hashchange event fires, so render the newly authenticated state here.
       render()
       if (route().name === "wallet") void refreshPayments()
+      else if (route().name === "generation" && route().params.get("id")) startPolling(route().params.get("id"))
     } catch (error) {
       state.authReady = true
       toast(`登录同步失败：${errorDetail(error)}`, true)
@@ -381,15 +393,22 @@
   }
 
   function taskVisual(task) {
-    if (task?.status === "succeeded" && task.playback_url) return `<video class="task-video" controls playsinline preload="metadata" src="${esc(task.playback_url)}"></video>`
+    if (task?.status === "succeeded" && task.playback_url) return `<video class="task-video" data-task-video="${esc(task.id)}" controls playsinline preload="metadata" src="${esc(task.playback_url)}"></video>`
     const failed = task && ["failed", "canceled", "expired"].includes(task.status)
-    return `<div class="status-visual"><div class="status-center">${failed ? `<div><span style="color:var(--danger);font-size:42px">!</span><h2>${statusText(task.status)}</h2><p>${esc(task.error || "本次任务没有完成；若产生扣币，系统已自动退款。")}</p></div>` : `<div><div class="status-spinner"></div><h2>${statusText(task?.status || "pending")}</h2><p>${task?.status === "submission_unknown" ? "正在核对服务商状态，确认前不会自动退款，避免重复补偿。" : "生成将在后台继续，可以先去浏览其他效果。"}</p><div class="progress-track"><i></i></div></div>`}</div></div>`
+    return `<div class="status-visual"><div class="status-center">${failed ? `<div><span style="color:var(--danger);font-size:42px">!</span><h2>${statusText(task.status)}</h2><p>${esc(task.error || "请查看任务记录，或联系客服核查。")}</p><p>${task.coin_refunded_at ? "金币已退回钱包" : task.status === "expired" ? "素材保留期已结束或作品已删除；这不代表发生退款。" : "金币结算以钱包流水为准"}</p></div>` : `<div><div class="status-spinner"></div><h2>${statusText(task?.status || "pending")}</h2><p>${task?.status === "submission_unknown" ? "正在核对服务商状态，确认前不会自动退款，避免重复补偿。" : "生成将在后台继续，可以先去浏览其他效果。"}</p><div class="progress-track"><i></i></div></div>`}</div></div>`
+  }
+
+  function taskDelivery(task) {
+    if (!task) return ""
+    const deadline = task.expires_at ? formatDate(task.expires_at) : ""
+    const ready = task.status === "succeeded" && task.playback_url && (!task.expires_at || Date.parse(task.expires_at) > Date.now())
+    return `<div class="catalog-footer"><div><strong>${ready ? `作品保留至 ${esc(deadline)}` : "任务与钱包流水可供核查"}</strong><span>输入照片上传后保留 24 小时；成品保存成功后保留 24 小时，请及时下载。</span>${state.pollingError ? `<span role="status">状态更新暂时中断，正在重试；不会重新生成。</span>` : ""}</div></div><div class="status-actions"><button class="secondary-button" data-refresh-task="${esc(task.id)}">刷新任务状态</button>${ready ? `<button class="primary-button" data-download-task="${esc(task.id)}" ${state.savingTaskId ? "disabled" : ""}>${state.savingTaskId ? "正在下载…" : "下载 MP4"}</button><button class="secondary-button" data-share-task="${esc(task.id)}" ${state.savingTaskId ? "disabled" : ""}>系统保存/分享</button>` : ""}</div>`
   }
 
   function generationPage(params) {
     const task = state.currentTask?.id === params.get("id") ? state.currentTask : state.tasks.find((item) => item.id === params.get("id"))
     if (!state.appUser) return loginPage()
-    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${task?.effect_title || "生成任务"}</h1><p class="screen-copy">任务状态、实际消耗与剩余余额均来自服务端。</p><div class="status-panel">${taskVisual(task)}<div class="status-actions"><button class="secondary-button" data-route="works">查看作品</button><button class="primary-button" data-route="home">继续浏览</button></div></div>${task ? `<div class="catalog-footer"><div><strong>${task.duration} 秒 · ${task.coin_cost ?? 0} ✦</strong><span>${esc(task.execution_type)} · ${esc(task.resolution)} · ${esc(task.aspect_ratio)}</span></div><span class="status-chip ${terminalStatuses.has(task.status) && task.status !== "succeeded" ? "failed" : "pending"}">${statusText(task.status)}</span></div>` : '<div class="catalog-error">正在读取任务状态…</div>'}${nav("works")}</section>`)
+    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${esc(task?.effect_title || "生成任务")}</h1><p class="screen-copy">任务状态、实际消耗与剩余余额均来自服务端。</p><div class="status-panel">${taskVisual(task)}${taskDelivery(task)}<div class="status-actions"><button class="secondary-button" data-route="works">查看作品</button><button class="primary-button" data-route="home">继续浏览</button></div></div>${task ? `<div class="catalog-footer"><div><strong>${task.duration} 秒 · ${task.coin_cost ?? 0} ✦</strong><span>${esc(task.execution_type)} · ${esc(task.resolution)} · ${esc(task.aspect_ratio)}</span></div><span class="status-chip ${terminalStatuses.has(task.status) && task.status !== "succeeded" ? "failed" : "pending"}">${statusText(task.status)}</span></div>` : '<div class="catalog-error">正在读取任务状态…</div>'}${nav("works")}</section>`)
   }
 
   function worksPage() {
@@ -554,22 +573,114 @@
     }
   }
 
-  function startPolling(taskId) {
+  function stopTaskPolling() {
     clearTimeout(state.polling)
+    state.pollingVersion++
+  }
+
+  function cacheTask(task) {
+    state.currentTask = task
+    const index = state.tasks.findIndex((item) => item.id === task.id)
+    if (index >= 0) state.tasks[index] = task
+    else state.tasks.unshift(task)
+  }
+
+  function startPolling(taskId) {
+    stopTaskPolling()
+    const version = state.pollingVersion
+    const owner = state.appUser?.id
+    state.pollingErrors = 0
+    state.pollingError = ""
     const poll = async () => {
-      if (!state.appUser) return
+      if (!state.appUser || version !== state.pollingVersion) return
       try {
         const task = await parseResponse(await authFetch(`/api/v1/app/video-tasks/${taskId}`))
-        state.currentTask = task
-        const index = state.tasks.findIndex((item) => item.id === task.id)
-        if (index >= 0) state.tasks[index] = task
-        else state.tasks.unshift(task)
+        if (version !== state.pollingVersion || state.appUser?.id !== owner) return
+        cacheTask(task)
+        state.pollingErrors = 0
+        state.pollingError = ""
         if (terminalStatuses.has(task.status)) await loadWallet(false)
+        if (version !== state.pollingVersion || state.appUser?.id !== owner) return
         render()
         if (!terminalStatuses.has(task.status)) state.polling = setTimeout(poll, POLL_MS)
-      } catch (error) { toast(errorDetail(error), true) }
+        else schedulePlaybackRefresh(task)
+      } catch (error) {
+        if (version !== state.pollingVersion || state.appUser?.id !== owner) return
+        state.pollingError = errorDetail(error)
+        if (state.pollingErrors === 0) toast("状态查询中断，正在重试；后台任务会继续", true)
+        state.pollingErrors++
+        render()
+        state.polling = setTimeout(poll, Math.min(2000 * 2 ** (state.pollingErrors - 1), 30000))
+      }
     }
     void poll()
+  }
+
+  function schedulePlaybackRefresh(task) {
+    clearTimeout(state.playbackTimer)
+    if (route().name !== "generation" || route().params.get("id") !== task.id) return
+    if (task.status !== "succeeded" || !task.playback_url_expires_at) return
+    state.playbackTimer = setTimeout(() => void refreshPlayback(task.id), Math.max(1000, Date.parse(task.playback_url_expires_at) - Date.now() - 5000))
+  }
+
+  async function refreshPlayback(taskId) {
+    if (!state.appUser || state.playbackRefreshing) return
+    state.playbackRefreshing = true
+    const owner = state.appUser.id
+    try {
+      const task = await parseResponse(await authFetch(`/api/v1/app/video-tasks/${taskId}`))
+      if (state.appUser?.id !== owner || route().name !== "generation" || route().params.get("id") !== taskId) return
+      cacheTask(task)
+      const video = document.querySelector(`[data-task-video="${taskId}"]`)
+      if (video && task.status === "succeeded" && task.playback_url) {
+        const time = video.currentTime
+        const playing = !video.paused && !video.ended
+        video.addEventListener("loadedmetadata", () => {
+          if (Number.isFinite(time) && time > 0 && time < video.duration) video.currentTime = time
+          if (playing) void video.play().catch(() => {})
+        }, { once: true })
+        video.src = mediaUrl(task.playback_url)
+        video.load()
+      } else render()
+      schedulePlaybackRefresh(task)
+    } catch (_) {
+      toast("播放地址暂时无法更新，请刷新任务状态", true)
+    } finally { state.playbackRefreshing = false }
+  }
+
+  async function saveTask(taskId, share = false) {
+    if (!state.appUser || state.savingTaskId) return
+    state.savingTaskId = taskId
+    document.querySelectorAll("[data-download-task], [data-share-task]").forEach(button => { button.disabled = true })
+    try {
+      const response = await authFetch(`/api/v1/app/video-tasks/${taskId}/download`)
+      if (!response.ok) {
+        if (response.status === 410) startPolling(taskId)
+        await parseResponse(response)
+      }
+      const blob = await response.blob()
+      if (!response.headers.get("content-type")?.startsWith("video/mp4") || blob.size < 12) throw new Error("下载响应不是有效视频，请刷新任务状态")
+      const file = new File([blob], `vireal-${taskId}.mp4`, { type: "video/mp4" })
+      if (share && navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: "Vireal video" }); return }
+        catch (error) { if (error.name === "AbortError") return }
+      }
+      const url = URL.createObjectURL(file)
+      const link = document.createElement("a")
+      link.href = url; link.download = file.name
+      document.body.append(link); link.click(); link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      toast("下载已开始；可在浏览器下载或文件中查看")
+    } catch (error) { toast(errorDetail(error), true) }
+    finally { state.savingTaskId = null; document.querySelectorAll("[data-download-task], [data-share-task]").forEach(button => { button.disabled = false }) }
+  }
+
+  function resumeTaskView() {
+    const current = route()
+    if (!state.appUser) return
+    if (current.name === "generation" && current.params.get("id")) startPolling(current.params.get("id"))
+    else if (current.name === "works") void loadTasks(false).then(render)
+    else if (current.name === "wallet") void refreshPayments()
   }
 
   async function deleteTask(id) {
@@ -635,6 +746,12 @@
     }
     if (event.target.closest("[data-confirm-generation]")) { void createTask(); return }
     if (event.target.closest("[data-close-drawer]")) { document.getElementById("overlayRoot").innerHTML = ""; return }
+    const refreshButton = event.target.closest("[data-refresh-task]")
+    if (refreshButton) { state.playbackRetryUrl.delete(refreshButton.dataset.refreshTask); startPolling(refreshButton.dataset.refreshTask); return }
+    const downloadButton = event.target.closest("[data-download-task]")
+    if (downloadButton) { void saveTask(downloadButton.dataset.downloadTask); return }
+    const shareButton = event.target.closest("[data-share-task]")
+    if (shareButton) { void saveTask(shareButton.dataset.shareTask, true); return }
     const taskButton = event.target.closest("[data-open-task]")
     if (taskButton) {
       const task = state.tasks.find((item) => item.id === taskButton.dataset.openTask)
@@ -664,7 +781,8 @@
   })
 
   window.addEventListener("hashchange", () => {
-    clearTimeout(state.polling)
+    stopTaskPolling()
+    clearTimeout(state.playbackTimer)
     const current = route()
     if (["login", "register"].includes(current.name)) state.authView = current.name
     if (current.name !== "wallet") clearTimeout(state.paymentPolling)
@@ -673,7 +791,15 @@
     else if (current.name === "generation" && current.params.get("id")) startPolling(current.params.get("id"))
     render()
   })
-  window.addEventListener("online", () => toast("网络已恢复"))
+  window.addEventListener("online", () => { toast("网络已恢复"); resumeTaskView() })
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) resumeTaskView() })
+  document.addEventListener("error", (event) => {
+    const video = event.target
+    if (!video?.dataset?.taskVideo || !state.appUser) return
+    if (state.playbackRetryUrl.has(video.dataset.taskVideo)) return
+    state.playbackRetryUrl.set(video.dataset.taskVideo, video.src)
+    void refreshPlayback(video.dataset.taskVideo)
+  }, true)
   window.addEventListener("offline", () => toast("网络连接已断开", true))
   window.addEventListener("vireal:clerk-ready", (event) => {
     observeClerk(event.detail)

@@ -2,8 +2,13 @@
 
 ## Release state
 
-Implementation is on `codex/paypal-public-registration`. Production registration,
-recharge and region enforcement have **not** been switched on by this change.
+Implementation is on `codex/paypal-public-registration`. As of **2026-10-12**,
+the compatible production API/worker, signed-region Worker and H5 are deployed
+with independently configured **Live** credentials. Production registration,
+recharge and commerce-terms approval remain **off**; region enforcement is **on**.
+This is closed integration preparation, **not** a public launch or a verified Live
+payment. The dated checkpoints below are historical; the October 12 production
+checkpoint supersedes their statements that production was unchanged/config was 404.
 Controlled **staging-only** registration and Sandbox recharge are now enabled;
 the Development Clerk allowlist admits only the owner-approved new test email.
 The new test user completed verified signup with zero initial credits. All three
@@ -44,9 +49,10 @@ config endpoint is 200 and reports the three USD packages, Sandbox mode and a
 30-submission global daily limit. Production remains unchanged; its health endpoint
 is 200 and PayPal config remains 404.
 
-Pending gates are owner Live readiness,
-fresh production backup/deployment and
-owner-operated live acceptance. Old QA users remain disabled. The owner was asked
+Pending gates are final owner merchant/product/terms review, the generation safety
+cap and stable release-source checks described below, and owner-operated Live
+acceptance. The production backup/deployment preparation is now complete. Old QA
+users remain disabled. The owner was asked
 for a new test email/alias; controlled acceptance activation must not be mistaken
 for a public or Live release. Any financial account upgrade, identity verification
 or binding agreement remains owner-only. The owner has now unlocked the Mac and
@@ -418,6 +424,235 @@ orders and first refund; it supersedes the earlier zero-order checkpoint.
   paid video acceptance remain release gates. This is not acceptance of every
   partial-refund/dispute case or a Live launch.
 
+## Closed production Live integration checkpoint — 2026-10-12
+
+- The owner explicitly authorized creation of **Vireal Production** Live app, then
+  production credential/webhook preparation and compatible rollout while keeping
+  signup, recharge and terms approval off. No public Clerk policy was changed, old
+  QA account reactivated, actual payment/refund initiated or paid video submitted.
+  The owner performed the Business-account conversion/onboarding personally.
+  Dashboard availability and API scopes do not establish all merchant/product
+  qualifications, a genuine buyer payment or receipt/capture acceptance.
+- Created exactly one Live app and one webhook at
+  `https://api.usevireal.com/api/v1/webhooks/payments/paypal`, subscribed to the ten
+  explicit events below. Fresh official Live OAuth and webhook GET checks passed
+  (HTTP 200); payments, webhook and seller-dispute-read scopes are present. Final
+  read-only verification matched the configured Webhook ID, URL and all ten events.
+  Disabled the unused optional Subscriptions, Payouts and Mobile SDK capabilities;
+  advanced cards, Apple Pay and Google Pay were not provisioned or advertised.
+- Matching Live Client ID/Secret, Merchant ID and Webhook ID were configured in
+  production API and the **existing** worker through standard input. An independent
+  production edge signing secret was provisioned to Railway/Cloudflare. Final
+  read-back verifies all five values agree across production services and differ
+  from staging. Actual secrets/tokens were never printed or persisted in plaintext
+  source/evidence; the public Client ID was visible on the ordinary Developer UI.
+  axiom-security guided memory/stdin transfer and the reuse of encrypted Wrangler
+  configuration protected by macOS Keychain, with no expanded Cloudflare scopes.
+- Before migration, took a fresh mode-0600 production custom-format backup:
+  `/Users/huili/Documents/vireal-backups/production-20261012-pre-paypal-1791775412345.dump`.
+  Size **84,844 bytes**, SHA-256
+  `1df41795492eb455dba5015b172c48634953a1df88d04447329e156e74ae175d`.
+  Its companion `.verification.json` records restoration and rehearsal without
+  connection secrets. Used one exported read-only repeatable-read snapshot;
+  restored all **24 historical tables** in an isolated local PostgreSQL cluster
+  with Unix-socket peer authentication, rejected TCP access and no TCP listener.
+  Rehearsed `f2a3b4c5d6e7` → `a3b4c5d6e7f8`; all original-column row/count
+  fingerprints matched, excluding only the expected Alembic revision change.
+  The isolated server was stopped after verification. No pytest cleanup was run
+  against production or this restored production dataset.
+- Released immutable tracked source **bca8336fd742ea99e4fd4665b0120a72b01aff25**
+  through explicit project/environment/service CLI uploads, not a Git push.
+  API predeploy retained `bash scripts/prestart.sh` and applied the compatible
+  additive migration. API/worker start commands and service identities were
+  preserved; no new Railway service or unrelated draft was applied.
+- Final production API deployment
+  **40b4b8be-2f89-4ca5-8019-70fe396e6d12**: **SUCCESS**;
+  existing worker **ed77fa65-8e17-475d-a3a4-7099a3f48376**: **SUCCESS**.
+  Schema is `a3b4c5d6e7f8`. Post-rollout read-only UTC comparison still matches
+  every historical table's original columns (except Alembic); new payment cases
+  and payment holds are both **0**. Recent worker logs contain no payment
+  reconciliation failure markers. Existing financial/account records were not reset.
+- Production region Worker **vireal-api-region-production**, version
+  **9f28e752-32e9-4014-a7f8-6aea165db396**, serves only
+  `api.usevireal.com/api/*`; `workers_dev` remains false. First proved non-null
+  signed edge country and stripping of forged headers with enforcement off;
+  only then enabled enforcement and redeployed API/worker from the existing
+  approved snapshot (without `--from-source`). Final **direct mainland** requests,
+  including forged US country/proof headers, return signed **CN**, region denied
+  and both commerce actions disabled. Direct unsigned Railway-origin requests
+  return unknown country/region denied. Health and public catalog remain 200:
+  **6 categories, 18 effects, only 5/10-second variants**. An unsigned negative
+  PayPal event returns **403 Invalid PayPal webhook signature**, not an Access
+  login redirect, and creates no financial rows. This is rejection testing, not
+  acceptance of a genuine Live transaction or proof of overseas residence.
+- Re-ran local H5 page contracts (**29 passed**), complete mocked browser suite
+  (**24 passed**) and edge signing tests (**3 passed**). Rebuilt after the mock
+  tests against **only** `https://api.usevireal.com` and the actual production
+  `pk_live_…` Clerk key, whose decoded issuer matches the production API.
+  Official-registry isolated compiler overrides avoided the host's broken local
+  binaries; project dependencies/lockfiles were not changed.
+- Published only production Pages **vireal-h5-houdzaiw**, preserving its existing
+  production branch **main**: deployment
+  **fe937a9c-9a33-462a-94e9-2a3d3a53cf8e**, status **success**, source `bca8336`.
+  The custom-domain HTML and all four principal JS/CSS asset SHA-256 values match
+  the real production artifact. Native Chrome at `/#register` displays
+  **注册暂未开放** with no registration form; `/#refunds` displays all three correct
+  packages, zero signup credits, UTC limits and the support address.
+- Final production flags, identically verified in API/worker:
+  `PAYPAL_ENVIRONMENT=live`, `PAYPAL_ENABLED=false`,
+  `APP_PUBLIC_REGISTRATION_ENABLED=false`, `APP_COMMERCE_TERMS_APPROVED=false`,
+  `APP_REGION_ENFORCEMENT_ENABLED=true`, `ADMIN_PUBLIC_SIGNUP_ENABLED=false`.
+  Global/Wan daily limits are **30**, user daily/concurrent limits **5/1**,
+  max duration **10**, legacy video API and local demo **off**.
+- Staging remains controlled Sandbox: API/worker deployments
+  `4b317fc5-c0bf-4969-9ba7-14a72bea7d10` /
+  `d5e293fb-c558-4417-9653-fbd17df81293`, Pages
+  `da642a18-4bf8-42c3-aa28-6705de472302`. Its credentials, policies, domains,
+  balances and three-package/full-refund acceptance were not changed by this rollout.
+- **Remaining release blockers:** production still has its prior conservative
+  `REPLICATE_POC_MAX_SUBMISSIONS=1` lifetime attempt cap. It was deliberately not
+  removed under this no-new-generation-cost preparation authorization. That cap
+  overrides the advertised daily allowance and must be reviewed/explicitly
+  released before paid generation; setting it to 30 would still be a lifetime cap,
+  not 30/day. Retain the real daily/user/concurrency controls when removing it.
+  Also reconcile the approved feature source with the durable Git/CI production
+  release source before public financial traffic: this rollout was a CLI-uploaded
+  snapshot, not a merge/push to `main`. Never let a later auto-deploy restore an
+  older receiver lacking the payment endpoints while retaining Live credentials.
+- Owner must still confirm truthful operating identity, permitted-product/merchant
+  conditions and final terms/privacy/refund notices, then authorize terms approval
+  and restricted Live smoke activation. A region-eligible real buyer must manually
+  confirm the **$5.99** payment; verify merchant receipt and exactly one 100-credit
+  entry. Obtain separate generation-cost authorization before one 5-second task,
+  verify exactly one coin debit and playable output. Only after this acceptance
+  and action-time approval may H5 Clerk/public signup and recharge open together.
+  Feature rollback closes new signup/recharge but retains the compatible receiver,
+  credentials, reconciliation and financial ledger for already-paid orders.
+
+## Selected public release — local convergence checkpoint, 2026-10-12
+
+This checkpoint is **local implementation**, not a deployment, public opening,
+Live payment or newly authorized prediction. Production remains at the closed
+Live-preparation deployments above; never equate mock/API tests with real payment
+or model-output acceptance.
+
+- Production catalog/deep links/recommendations and new task submissions are
+  restricted by `APP_LAUNCH_EFFECT_SLUGS=["dance-1","romance-1"]`. Other records
+  remain intact. Retain the server-side 10-second maximum and existing Wan path.
+- Incremental schema head `b4c5d6e7f8a9` adds nullable provider-last/next-check
+  timestamps and indexes only. Fresh migration and a separate synthetic-history
+  rehearsal preserved a paid order, 88-credit wallet, both ledger entries and an
+  unresolved task exactly. This is **not** a substitute for a fresh production
+  backup and verified restore immediately before the eventual production rollout.
+- Cleanup no longer expires submitting, unknown, pending, running or saving tasks.
+  Provider callbacks, administrator checks and the existing worker use one locked,
+  idempotent settlement path. Provider reconciliation starts independently every
+  minute, with at most five parallel 10-second GETs; video transfer and payment
+  reconciliation cannot block its scheduler. No-ID tasks require investigation.
+  A timeout, 404, malformed identity or missing observation cannot refund coins,
+  release an unknown reservation or initiate another prediction. Repeated delivery
+  transport/R2/local-processing outages stay saving and enter manual review; only
+  verified invalid output or audited supplier evidence can settle delivery failure.
+- H5 retries **queries only** with backoff, manual refresh and online/visible-page
+  recovery. It refreshes expired/failed playback links, exposes authenticated MP4
+  download/system sharing, and reports actual refund timestamps. Input retention
+  starts at upload; result retention starts after successful persistence, each
+  currently 24 hours. The result's server deadline, not a browser estimate, governs
+  delivery. Expiry/deletion does not itself mean a coin or cash refund.
+- Admin **Video Tasks** has list/detail/review queue, original coin ledger and
+  provider ID/check clocks. Reconcile needs a reason/idempotency key; resolve needs
+  supplier evidence and explicit confirmation. It verifies the original debit,
+  forbids settlement while a submission or transfer is in flight, and audits one
+  server-calculated compensation. There is no arbitrary balance, cash-refund or
+  regenerate button. Investigate historical anomalies individually, never bulk
+  rewrite balances or treat absence of a provider record as proof of non-submission.
+- Local verification: **378 backend tests passed; 91% application coverage**;
+  ruff formatting/checks, mypy and ty passed. **29 H5 contract, 31 mocked Chromium
+  H5, 3 mocked admin UI and 3 edge tests passed**; admin/H5 builds and frontend
+  Biome checks passed. The new admin UI has a dedicated read-only/mock CI workflow.
+  Backend tests ran only in a freshly initialized Unix-socket PostgreSQL cluster;
+  teardown now rejects remote/production DBs, and email transport is mocked.
+  This does not yet establish GitHub CI, actual Safari/system-save compatibility,
+  genuine overseas-region acceptance, or a real production media/payment flow.
+
+### Remaining gates and evidence ledger
+
+1. **Public material: blocked.** Owner answered "暂无" for both launch covers and
+   previews. Earlier authorized adult photos and their generated outputs are
+   internal acceptance evidence only; do not publish or substitute them. Obtain
+   explicit website-display/image rights, then use the existing media/catalog
+   administration. Confirm the two titles, descriptions, model and prompt versions
+   against actual output. The seed's generic romance prompt is not evidence of a
+   rain-scene promise; do not advertise an unverified scene or guaranteed motion.
+2. **Stable source/review/CI: pending.** Owner authorized GitHub device login,
+   feature-branch push and PR creation, not merge/deploy. Login verified as `houdzaiw`
+   using the macOS system keyring. Read-only trigger audit: Railway production API
+   and worker follow `main`; staging API/worker still follow the older
+   `codex/vireal-dual-mode-backend` branch. Production Pages is Direct Upload,
+   staging Pages follows `codex/vireal-v1-2-h5` and formerly previewed all branches.
+   Owner explicitly authorized excluding only `codex/paypal-public-registration`
+   before push; keep other previews included (`*`) with custom branch controls.
+   This control follows [Cloudflare's branch deployment documentation](https://developers.cloudflare.com/pages/configuration/branch-build-controls/).
+   The exclusion was applied and read back: custom preview mode includes `*` and
+   excludes that exact branch. Production deployment `fe937a9c-9a33-462a-94e9-2a3d3a53cf8e`
+   and staging `da642a18-4bf8-42c3-aa28-6705de472302`, domains, build settings and
+   environment settings remained unchanged. GitHub CI is still enabled.
+   Do not push this release to the old staging source branch or change those source
+   settings as a side effect. Record the approved commit,
+   migration head and each service/Pages/Worker version after the later rollout.
+   Do not apply unrelated Railway IaC/config drafts. Existing production CLI-upload
+   source still needs reconciliation with the durable reviewed Git source.
+3. **Sandbox exceptions: partial.** Reuse dated three-package/full-refund evidence;
+   cancel/pending/refresh and disputes/reversals are covered by isolated mocks.
+   Still perform owner-approved actual Sandbox partial-refund/freeze/closure and
+   interruption recovery. Never manufacture a Live dispute or chargeback.
+4. **Four effect-duration combinations: pending evidence audit.** Verify
+   dance-1/5s, dance-1/10s, romance-1/5s, romance-1/10s against each exact model,
+   prompt version and input count. Preserve private internal evidence. Request
+   action-time count/cost authorization for missing combinations; no new fee was
+   authorized by this implementation plan.
+5. **Owner readiness and controlled Live acceptance: pending.** Merchant verification,
+   truthful identity, product eligibility, final terms and a region-eligible buyer
+   are owner gates. Then separately authorize restricted activation, a human $5.99
+   payment (one 100-credit entry), and one 5-second generation (one debit, playable
+   result and real download/save). `REPLICATE_POC_MAX_SUBMISSIONS=1` remains unchanged;
+   removing the lifetime test cap with `=0` requires action-time authorization.
+
+### Restricted acceptance and public-opening sequence
+
+- Initial compatible rollout: keep `APP_LIVE_ACCEPTANCE_ENABLED=false`,
+  `APP_LIVE_ACCEPTANCE_SUBJECTS=[]`, public signup/PayPal/terms approval **false**.
+  Back up/restore-check first; publish migrations/API, existing worker, signed-region
+  Worker, admin and H5 from the reviewed, CI-passing source, without downgrading any
+  financial schema. Confirm closed gates and current versions independently.
+- `APP_VIDEO_SUBMISSIONS_ENABLED` is an independent emergency pause for new task
+  creation. Keep Replicate enabled/credentials retained for existing-task GETs and
+  verified callbacks. The old free `/app/generations/` POST is always disabled in
+  production, including restricted acceptance, so it cannot bypass catalog/coins/
+  quota controls; old records remain readable.
+- At explicitly approved Live acceptance, retain public signup **false** and the H5
+  Clerk restriction; configure exact verified **Clerk subject IDs**, not emails or
+  client headers, with `APP_LIVE_ACCEPTANCE_ENABLED=true`. It requires production,
+  approved terms and Live PayPal enabled. Only listed identities can create a new
+  business account, upload, recharge or generate; region, disabled-account and
+  payment-hold rules still apply. Existing captures/callbacks/history are unaffected.
+  Use the real Clerk session login then H5 wallet; anonymous registration remains
+  closed. Do not reactivate disabled historical QA identities.
+- After all evidence and explicit opening authorization, disable temporary acceptance,
+  clear subjects, open the H5 Clerk instance and enable public signup/recharge
+  together. Admin public signup stays false. Verify zero signup balance and all
+  quota/region controls; never reopen 15 seconds or other effects via deep links.
+- First **72 hours**: small public trial, no large promotion. Owner reviews at
+  **09:00, 15:00, 21:00 Beijing time**: paid-but-uncredited orders, reconciliation
+  failures, no-ID/unknown/saving tasks and payment cases. Worker logs/admin polling
+  are not a notification service or 24/7 support. End-to-end automatic alerting is
+  required before expanding promotion; no scheduled monitor was created here.
+- Pause new signup, recharge and generation for duplicate credits/debits, confirmed
+  receipt uncredited for >15 minutes, or unsafe settlement. Disable acceptance as
+  well as public signup/recharge; preserve callback verification, provider/payment
+  GET reconciliation, transfer, records and existing-order fulfilment. See rollback
+  below; never restore an old receiver or financial ledger to undo traffic.
+
 ## Locked business rules
 
 - Overseas registration with verified Clerk email; new business wallets start at zero.
@@ -481,7 +716,7 @@ Do not apply unrelated existing Railway configuration drafts.
 1. Record API/worker/Pages versions and current flags. Take a **new** production
    `pg_dump -Fc` backup before migration; verify restoration to an isolated database.
    Preserve existing production files, accounts, coin balances and financial history.
-2. Rehearse migration `a3b4c5d6e7f8` against a restored database with old orders/ledgers.
+2. Rehearse migrations through `b4c5d6e7f8a9` against a restored database with old orders/ledgers.
    Run `uv run alembic upgrade head` from `backend` with the intended database.
    This migration adds columns/table/indexes and does not rewrite old rows.
 3. Deploy the compatible API and existing worker with public registration/recharge
@@ -500,13 +735,12 @@ Do not apply unrelated existing Railway configuration drafts.
    publishable key. Do not publish the `api.example.com`/dummy-key test build.
 7. Perform sandbox acceptance below. Keep production closed until merchant readiness
    and the owner-operated live smoke acceptance are complete.
-8. For a controlled owner-operated live smoke test, enable the registration and
-   recharge flags together **while Clerk remains restricted** to approved overseas
-   smoke buyers. No uninvited user can register at this point. Production backend
-   refuses new business identities when its registration flag is off, even if
-   someone uses Clerk directly. Do not silently re-enable old QA users. This is a
-   deliberate, recorded release step, not permission for the agent to pay.
-9. After successful acceptance confirm both flags remain enabled and switch the
+8. For controlled owner-operated Live smoke acceptance, use the server-side exact
+   Clerk subject allowlist sequence above; keep public registration **off** and
+   Clerk restricted. This is a recorded action-time-authorized step, not permission
+   for the agent to pay or silently re-enable old QA users.
+9. After successful acceptance remove the temporary allowlist mode, enable public
+   registration/recharge together, and switch the
    **H5 Clerk instance**, not the admin auth system, to Open for the public launch.
    Changing access controls through the browser requires action-time confirmation.
    Check local account synchronization still enforces verified email and zero coins.
@@ -576,7 +810,13 @@ Do not resubmit unknown real generation attempts blindly.
 
 ## Rollback
 
-Disable `APP_PUBLIC_REGISTRATION_ENABLED` and `PAYPAL_ENABLED`; re-restrict H5 Clerk.
+Disable `APP_PUBLIC_REGISTRATION_ENABLED`, `APP_LIVE_ACCEPTANCE_ENABLED` and
+`PAYPAL_ENABLED`; clear acceptance subjects and re-restrict H5 Clerk. To pause new
+generation without disabling read-only reconciliation, set
+`APP_VIDEO_SUBMISSIONS_ENABLED=false` on API and worker. This gate blocks only new
+task submissions; retain the approved daily/concurrent limits. Restore it only
+after incident review and renewed authorization. Do not turn off the worker or
+provider credentials used to query/receive results of already accepted tasks.
 Keep the compatible API, worker, PayPal credentials/Webhook ID, region proxy and
 financial database migration. Continue receiving verified callbacks and fulfilling
 already-paid orders. Do not deploy an older receiver that lacks these endpoints,

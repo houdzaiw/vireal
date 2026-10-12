@@ -16,6 +16,7 @@ from app.models import (
     AppEffectVariant,
     AppManagedMediaAsset,
 )
+from app.services.commercial_access import launch_effect_allowed
 from app.services.storage import ImageStorageError, get_image_storage
 
 router = APIRouter(prefix="/app", tags=["app effect catalog"])
@@ -154,7 +155,7 @@ def read_effect_catalog(
                 variants=variants_by_effect.get(effect.id, []),
             )
             for effect in effects
-            if variants_by_effect.get(effect.id)
+            if variants_by_effect.get(effect.id) and launch_effect_allowed(effect.slug)
         ]
         if public_effects:
             try:
@@ -208,7 +209,7 @@ def read_effect(*, session: SessionDep, slug: str) -> EffectPublic:
             col(AppEffect.is_enabled).is_(True),
         )
     ).first()
-    if effect is None:
+    if effect is None or not launch_effect_allowed(effect.slug):
         raise HTTPException(status_code=404, detail="Effect not found")
     category = session.get(AppEffectCategory, effect.category_id)
     if category is None or not category.is_enabled:
@@ -230,6 +231,9 @@ def read_effect(*, session: SessionDep, slug: str) -> EffectPublic:
             )
         ).all()
     )
+    recommendation_slugs = [
+        slug for slug in recommendation_slugs if launch_effect_allowed(slug)
+    ]
     return _serialize_effect(
         session=session,
         effect=effect,

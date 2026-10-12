@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     admin_app,
     admin_catalog,
+    admin_video_tasks,
     app_auth,
     app_catalog,
     app_configs,
@@ -43,6 +44,7 @@ api_router.include_router(app_video_tasks.router)
 api_router.include_router(app_wallet.router)
 api_router.include_router(admin_app.router)
 api_router.include_router(admin_catalog.router)
+api_router.include_router(admin_video_tasks.router)
 api_router.include_router(payment_webhooks.router)
 api_router.include_router(paypal_webhooks.router)
 api_router.include_router(replicate_webhooks.router)

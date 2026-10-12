@@ -38,7 +38,9 @@ def test_admin_create_and_list_app_config(
     )
 
     assert list_response.status_code == 200
-    assert any(item["id"] == created_config["id"] for item in list_response.json()["data"])
+    assert any(
+        item["id"] == created_config["id"] for item in list_response.json()["data"]
+    )
 
 
 def test_admin_create_app_config_rejects_duplicate_key(

@@ -71,7 +71,9 @@ class ArkAIGenerationProvider:
             return self._generate_image(generation)
         if generation.kind == "video":
             return self._generate_video(generation)
-        raise AIGenerationProviderError(f"Unsupported generation kind: {generation.kind}")
+        raise AIGenerationProviderError(
+            f"Unsupported generation kind: {generation.kind}"
+        )
 
     def _generate_image(self, generation: AppGeneration) -> AIGenerationResult:
         payload: dict[str, Any] = {
@@ -93,7 +95,9 @@ class ArkAIGenerationProvider:
         )
         output_url = self._extract_image_output_url(data)
         if not output_url:
-            raise AIGenerationProviderError("Seedream response did not include output URL")
+            raise AIGenerationProviderError(
+                "Seedream response did not include output URL"
+            )
         return AIGenerationResult(output_url=output_url)
 
     def _generate_video(self, generation: AppGeneration) -> AIGenerationResult:
@@ -243,7 +247,9 @@ class ArkAIGenerationProvider:
             try:
                 data = response.json()
             except ValueError as exc:
-                raise AIGenerationProviderError("Ark API response must be JSON") from exc
+                raise AIGenerationProviderError(
+                    "Ark API response must be JSON"
+                ) from exc
             if not isinstance(data, dict):
                 raise AIGenerationProviderError("Ark API response must be an object")
             return data
@@ -315,7 +321,9 @@ class ArkAIGenerationProvider:
         return cls._extract_error_message(data)
 
 
-def get_ai_generation_provider(provider_name: str | None = None) -> AIGenerationProvider:
+def get_ai_generation_provider(
+    provider_name: str | None = None,
+) -> AIGenerationProvider:
     provider = provider_name or settings.APP_GENERATION_PROVIDER
     if provider == "ark":
         return ArkAIGenerationProvider()

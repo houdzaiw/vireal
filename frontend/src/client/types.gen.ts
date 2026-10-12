@@ -415,6 +415,154 @@ export type AdminVariantPublic = {
 };
 
 /**
+ * AdminVideoTaskAction
+ */
+export type AdminVideoTaskAction = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+};
+
+/**
+ * AdminVideoTaskPublic
+ */
+export type AdminVideoTaskPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Effect Id
+     */
+    effect_id: string | null;
+    /**
+     * Template Id
+     */
+    template_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Provider Task Id
+     */
+    provider_task_id: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Duration
+     */
+    duration: number;
+    /**
+     * Coin Cost Snapshot
+     */
+    coin_cost_snapshot: number | null;
+    /**
+     * Coin Refunded At
+     */
+    coin_refunded_at: string | null;
+    /**
+     * Provider Last Checked At
+     */
+    provider_last_checked_at: string | null;
+    /**
+     * Provider Next Check At
+     */
+    provider_next_check_at: string | null;
+    /**
+     * Submission Attempted At
+     */
+    submission_attempted_at: string | null;
+    /**
+     * Real Submission Counted At
+     */
+    real_submission_counted_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+    /**
+     * Completed At
+     */
+    completed_at: string | null;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Needs Review
+     */
+    needs_review?: boolean;
+    /**
+     * Ledger
+     */
+    ledger?: Array<AppCoinLedgerPublic>;
+};
+
+/**
+ * AdminVideoTaskResolve
+ */
+export type AdminVideoTaskResolve = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+    /**
+     * Resolution
+     */
+    resolution: 'not_submitted' | 'failed' | 'canceled' | 'unavailable';
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Provider Confirmed
+     */
+    provider_confirmed: true;
+};
+
+/**
+ * AdminVideoTasksPublic
+ */
+export type AdminVideoTasksPublic = {
+    /**
+     * Data
+     */
+    data: Array<AdminVideoTaskPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * AppAdminOperationLogPublic
  */
 export type AppAdminOperationLogPublic = {
@@ -1617,6 +1765,14 @@ export type AppVideoTaskPublic = {
      * Playback Url
      */
     playback_url?: string | null;
+    /**
+     * Playback Url Expires At
+     */
+    playback_url_expires_at?: string | null;
+    /**
+     * Coin Refunded At
+     */
+    coin_refunded_at?: string | null;
     /**
      * Created At
      */
@@ -3650,6 +3806,34 @@ export type appVideoTasksReadVideoTaskResponses = {
 
 export type appVideoTasksReadVideoTaskResponse = appVideoTasksReadVideoTaskResponses[keyof appVideoTasksReadVideoTaskResponses];
 
+export type appVideoTasksDownloadVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/video-tasks/{task_id}/download';
+};
+
+export type appVideoTasksDownloadVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksDownloadVideoTaskError = appVideoTasksDownloadVideoTaskErrors[keyof appVideoTasksDownloadVideoTaskErrors];
+
+export type appVideoTasksDownloadVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type appWalletReadWalletData = {
     body?: never;
     path?: never;
@@ -4728,6 +4912,142 @@ export type adminEffectCatalogAdjustUserCoinsResponses = {
 };
 
 export type adminEffectCatalogAdjustUserCoinsResponse = adminEffectCatalogAdjustUserCoinsResponses[keyof adminEffectCatalogAdjustUserCoinsResponses];
+
+export type adminVideoTasksReadVideoTasksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Status
+         */
+        status?: string | null;
+        /**
+         * App User Id
+         */
+        app_user_id?: string | null;
+        /**
+         * Needs Review
+         */
+        needs_review?: boolean;
+    };
+    url: '/api/v1/admin/app/video-tasks';
+};
+
+export type adminVideoTasksReadVideoTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReadVideoTasksError = adminVideoTasksReadVideoTasksErrors[keyof adminVideoTasksReadVideoTasksErrors];
+
+export type adminVideoTasksReadVideoTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTasksPublic;
+};
+
+export type adminVideoTasksReadVideoTasksResponse = adminVideoTasksReadVideoTasksResponses[keyof adminVideoTasksReadVideoTasksResponses];
+
+export type adminVideoTasksReadVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}';
+};
+
+export type adminVideoTasksReadVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReadVideoTaskError = adminVideoTasksReadVideoTaskErrors[keyof adminVideoTasksReadVideoTaskErrors];
+
+export type adminVideoTasksReadVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksReadVideoTaskResponse = adminVideoTasksReadVideoTaskResponses[keyof adminVideoTasksReadVideoTaskResponses];
+
+export type adminVideoTasksReconcileVideoTaskData = {
+    body: AdminVideoTaskAction;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}/reconcile';
+};
+
+export type adminVideoTasksReconcileVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReconcileVideoTaskError = adminVideoTasksReconcileVideoTaskErrors[keyof adminVideoTasksReconcileVideoTaskErrors];
+
+export type adminVideoTasksReconcileVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksReconcileVideoTaskResponse = adminVideoTasksReconcileVideoTaskResponses[keyof adminVideoTasksReconcileVideoTaskResponses];
+
+export type adminVideoTasksResolveVideoTaskData = {
+    body: AdminVideoTaskResolve;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}/resolve';
+};
+
+export type adminVideoTasksResolveVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksResolveVideoTaskError = adminVideoTasksResolveVideoTaskErrors[keyof adminVideoTasksResolveVideoTaskErrors];
+
+export type adminVideoTasksResolveVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksResolveVideoTaskResponse = adminVideoTasksResolveVideoTaskResponses[keyof adminVideoTasksResolveVideoTaskResponses];
 
 export type paymentWebhooksReceiveAppleIapCallbackData = {
     body: PaymentCallbackRequest;

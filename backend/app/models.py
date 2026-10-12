@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import EmailStr, field_validator, model_validator
 from sqlalchemy import CheckConstraint, Column, DateTime, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
-from sqlmodel.main import SQLModelConfig
+from sqlmodel.main import SQLModelConfig  # type: ignore[attr-defined]
 
 
 def get_datetime_utc() -> datetime:
@@ -337,6 +337,14 @@ class AppVideoTask(SQLModel, table=True):
         sa_type=DateTime(timezone=True),  # type: ignore
         index=True,
     )
+    provider_last_checked_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    provider_next_check_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
     worker_attempts: int = Field(default=0)
     worker_locked_at: datetime | None = Field(
         default=None,
@@ -463,6 +471,8 @@ class AppVideoTaskPublic(SQLModel):
     aspect_ratio: str
     error: str | None = None
     playback_url: str | None = None
+    playback_url_expires_at: datetime | None = None
+    coin_refunded_at: datetime | None = None
     created_at: datetime | None = None
     completed_at: datetime | None = None
     expires_at: datetime

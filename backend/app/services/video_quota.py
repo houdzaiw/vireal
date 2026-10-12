@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, or_
+from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import Session, col, select
 
 from app.core.config import settings
@@ -23,7 +24,7 @@ def utc_day_bounds(now: datetime) -> tuple[datetime, datetime]:
     return day_start, day_start + timedelta(days=1)
 
 
-def real_today_filter(now: datetime):
+def real_today_filter(now: datetime) -> ColumnElement[bool]:
     day_start, day_end = utc_day_bounds(now)
     # Charge attempts to the day on which the request was sent, even if its
     # response/webhook arrives after midnight. Unknown older attempts carry over.

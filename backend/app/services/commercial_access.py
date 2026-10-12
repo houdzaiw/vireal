@@ -10,6 +10,52 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models import AppUser
+from app.services.clerk_auth import (
+    ClerkAuthenticationError,
+    ClerkSessionClaims,
+    get_clerk_auth_service,
+)
+
+
+def launch_effect_allowed(slug: str) -> bool:
+    return (
+        settings.ENVIRONMENT != "production" or slug in settings.APP_LAUNCH_EFFECT_SLUGS
+    )
+
+
+def acceptance_subject_allowed(*, subject: str, issuer: str) -> bool:
+    return bool(
+        settings.ENVIRONMENT == "production"
+        and settings.APP_LIVE_ACCEPTANCE_ENABLED
+        and settings.APP_AUTH_MODE == "clerk"
+        and settings.APP_COMMERCE_TERMS_APPROVED
+        and settings.CLERK_ISSUER_URL
+        and issuer.rstrip("/") == str(settings.CLERK_ISSUER_URL).rstrip("/")
+        and subject in settings.APP_LIVE_ACCEPTANCE_SUBJECTS
+    )
+
+
+def acceptance_request_allowed(request: Request) -> bool:
+    claims = getattr(request.state, "clerk_claims", None)
+    if claims is None:
+        authorization = request.headers.get("authorization", "")
+        if not authorization.startswith("Bearer "):
+            return False
+        try:
+            claims = get_clerk_auth_service().verify_session_token(authorization[7:])
+        except ClerkAuthenticationError, ValueError:
+            return False
+    if not isinstance(claims, ClerkSessionClaims):
+        return False
+    return acceptance_subject_allowed(subject=claims.subject, issuer=claims.issuer)
+
+
+def require_new_commerce_user(request: Request) -> None:
+    if settings.APP_LIVE_ACCEPTANCE_ENABLED and not acceptance_request_allowed(request):
+        raise HTTPException(
+            403,
+            "Only approved Live acceptance identities may create new commerce actions",
+        )
 
 
 def edge_country(request: Request) -> str | None:

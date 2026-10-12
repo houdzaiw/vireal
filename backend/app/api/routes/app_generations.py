@@ -134,7 +134,7 @@ def create_generation(
     """
     require_region(request)
     lock_commercial_user(session, current_app_user)
-    if settings.APP_PUBLIC_REGISTRATION_ENABLED:
+    if settings.ENVIRONMENT == "production" or settings.APP_PUBLIC_REGISTRATION_ENABLED:
         raise HTTPException(410, "Use the priced effect video-task endpoint")
     normalized_generation = _normalize_generation_input(generation_in)
     used_count = crud.count_app_generations_by_kind(

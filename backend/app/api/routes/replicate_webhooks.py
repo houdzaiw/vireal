@@ -1,16 +1,13 @@
 import hashlib
 import json
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from app.api.deps import SessionDep
-from app.core.config import settings
 from app.models import AppVideoTask, AppVideoTaskWebhookEvent
-from app.services.coin_wallet import refund_video_task
 from app.services.replicate_video import (
     ReplicateAPIError,
     parse_replicate_task_payload,
@@ -19,17 +16,14 @@ from app.services.replicate_webhook import (
     ReplicateWebhookVerificationError,
     verify_replicate_webhook,
 )
-from app.services.video_generation import VideoTaskStatus
+from app.services.video_task_reconciliation import (
+    PROVIDER_TERMINAL_STATUSES,
+    VideoTaskStateError,
+    apply_provider_result,
+)
 
 router = APIRouter(prefix="/webhooks/replicate", tags=["replicate webhooks"])
-TERMINAL_PROVIDER_STATUSES = {
-    "rendering_demo",
-    "saving",
-    "succeeded",
-    "failed",
-    "canceled",
-    "expired",
-}
+TERMINAL_PROVIDER_STATUSES = set(PROVIDER_TERMINAL_STATUSES)
 
 
 @router.post("", status_code=204)
@@ -81,9 +75,6 @@ async def receive_replicate_webhook(
         raise HTTPException(
             status_code=409, detail="Prediction does not match video task"
         )
-    if not task.provider_task_id:
-        task.provider_task_id = result.provider_task_id
-
     event = AppVideoTaskWebhookEvent(
         video_task_id=task.id,
         webhook_id=webhook_id,
@@ -93,55 +84,10 @@ async def receive_replicate_webhook(
     )
     session.add(event)
 
-    if task.status not in TERMINAL_PROVIDER_STATUSES:
-        now = datetime.now(UTC)
-        if result.status == VideoTaskStatus.SUCCEEDED:
-            if not result.output_url:
-                task.status = "failed"
-                task.error = "Replicate succeeded without a video output URL"
-                task.completed_at = now
-            else:
-                task.status = "saving"
-                task.provider_output_url = result.output_url
-                task.metrics_json = (
-                    json.dumps(result.metrics, ensure_ascii=False, sort_keys=True)
-                    if result.metrics is not None
-                    else None
-                )
-                task.next_attempt_at = now
-        elif result.status == VideoTaskStatus.FAILED:
-            if settings.LOCAL_DEMO_ENABLED:
-                task.status = "rendering_demo"
-                task.execution_type = "local_demo"
-                task.is_demo = True
-                task.fallback_reason = "provider_failed"
-                task.error = None
-                task.next_attempt_at = now
-                task.metrics_json = json.dumps(
-                    {
-                        "fallback_provider_error": result.error
-                        or "Replicate video generation failed",
-                        "provider_metrics": result.metrics,
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                )
-            else:
-                task.status = "failed"
-                task.error = result.error or "Replicate video generation failed"
-                task.completed_at = now
-        elif result.status == VideoTaskStatus.CANCELED:
-            task.status = "canceled"
-            task.error = result.error
-            task.completed_at = now
-        elif result.status == VideoTaskStatus.RUNNING:
-            task.status = "running"
-        elif result.status == VideoTaskStatus.PENDING:
-            task.status = "pending"
-        task.updated_at = now
-        if task.status in {"failed", "canceled"}:
-            refund_video_task(session=session, task=task)
-        session.add(task)
+    try:
+        apply_provider_result(session=session, task=task, result=result)
+    except VideoTaskStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     try:
         session.commit()

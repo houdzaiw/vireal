@@ -43,6 +43,8 @@ def validate_order(order: AppOrder, data: dict[str, Any]) -> dict[str, Any]:
         if len(units) != 1:
             raise ValueError()
         unit = units[0]
+        if not isinstance(unit, dict):
+            raise ValueError()
         if (
             data["id"] != order.provider_order_id
             or data.get("intent") != "CAPTURE"
@@ -226,7 +228,7 @@ def _capture_reference(resource: dict[str, Any]) -> str | None:
     if related.get("capture_id"):
         return str(related["capture_id"])
     for link in resource.get("links", []):
-        parsed = urlsplit(link.get("href", ""))
+        parsed = urlsplit(str(link.get("href", "")))
         if parsed.hostname in {
             "api.paypal.com",
             "api.sandbox.paypal.com",
@@ -235,7 +237,10 @@ def _capture_reference(resource: dict[str, Any]) -> str | None:
         } and parsed.path.startswith("/v2/payments/captures/"):
             return parsed.path.split("/")[4]
     transactions = resource.get("disputed_transactions", [])
-    return transactions[0].get("seller_transaction_id") if transactions else None
+    transaction_id = (
+        transactions[0].get("seller_transaction_id") if transactions else None
+    )
+    return str(transaction_id) if transaction_id is not None else None
 
 
 def process_webhook(

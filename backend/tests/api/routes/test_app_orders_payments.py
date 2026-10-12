@@ -151,8 +151,7 @@ def test_payment_callback_is_idempotent(client: TestClient) -> None:
     assert duplicate_response.json()["message"] == "Duplicate event ignored"
     assert duplicate_response.json()["order"]["status"] == "paid"
     assert (
-        first_response.json()["event"]["id"]
-        == duplicate_response.json()["event"]["id"]
+        first_response.json()["event"]["id"] == duplicate_response.json()["event"]["id"]
     )
 
 

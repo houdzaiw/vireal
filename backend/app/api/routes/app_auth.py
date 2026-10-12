@@ -21,7 +21,7 @@ from app.models import (
 )
 from app.services.app_identity import hash_clerk_session_id, serialize_app_user
 from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
-from app.services.commercial_access import require_region
+from app.services.commercial_access import acceptance_subject_allowed, require_region
 
 router = APIRouter(prefix="/app/auth", tags=["app auth"])
 
@@ -101,6 +101,9 @@ def initialize_clerk_session(
         if (
             settings.ENVIRONMENT == "production"
             and not settings.APP_PUBLIC_REGISTRATION_ENABLED
+            and not acceptance_subject_allowed(
+                subject=clerk_session.subject, issuer=clerk_session.issuer
+            )
         ):
             raise HTTPException(403, "Registration is not yet open / 注册尚未开放")
         email_name = profile.primary_email.split("@", 1)[0].strip()
