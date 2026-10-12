@@ -1,0 +1,3 @@
+# Preserve the upstream Wan input field's spelling; changing it breaks the API.
+[default.extend-identifiers]
+refert_num = "refert_num"

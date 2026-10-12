@@ -597,6 +597,12 @@ or model-output acceptance.
    excludes that exact branch. Production deployment `fe937a9c-9a33-462a-94e9-2a3d3a53cf8e`
    and staging `da642a18-4bf8-42c3-aa28-6705de472302`, domains, build settings and
    environment settings remained unchanged. GitHub CI is still enabled.
+   Draft [PR #17](https://github.com/houdzaiw/vireal/pull/17) contains the feature
+   source (`dc2ed87` implementation checkpoint) and is **not merged**. Initial CI
+   backend/H5/admin checks passed with 91% coverage; the spelling hook identified
+   the upstream `refert_num` request field, now explicitly retained as an API
+   identifier rather than renaming the provider payload. Full PR CI/review remains
+   a release gate; see the PR's latest checks, not a historical checkpoint alone.
    Do not push this release to the old staging source branch or change those source
    settings as a side effect. Record the approved commit,
    migration head and each service/Pages/Worker version after the later rollout.
