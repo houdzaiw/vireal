@@ -167,6 +167,35 @@
   }
 
   let paypalSdkPromise
+  let paypalInstancePromise
+  let paypalInstanceKey
+  let paypalActiveMount
+  const paypalMounts = new WeakMap()
+
+  function paymentContext() {
+    return JSON.stringify([state.appUser?.id, state.authSyncedSessionId, state.commerce?.environment, state.commerce?.client_id, state.rechargeProduct])
+  }
+
+  function releasePayPal(root) {
+    const mount = root && paypalMounts.get(root)
+    if (!mount) return
+    if (paypalActiveMount === mount) { paypalActiveMount = null; state.checkoutActive = false }
+    // The SDK session owns overlay/iframe resources outside the wallet DOM.
+    try { mount.checkout?.destroy?.() } catch (_) {}
+    paypalMounts.delete(root)
+  }
+
+  async function paymentInstance(config) {
+    const key = JSON.stringify([config.environment, config.client_id])
+    if (!paypalInstancePromise || paypalInstanceKey !== key) {
+      paypalInstanceKey = key
+      const pending = paypalSdk(config).then(sdk => sdk.createInstance({ clientId: config.client_id, components: ["paypal-payments"] }))
+      paypalInstancePromise = pending
+      pending.catch(() => { if (paypalInstancePromise === pending) paypalInstancePromise = null })
+    }
+    return paypalInstancePromise
+  }
+
   async function paypalSdk(config) {
     if (window.paypal?.createInstance) return window.paypal
     if (!paypalSdkPromise) paypalSdkPromise = new Promise((resolve, reject) => {
@@ -187,18 +216,22 @@
     const product = state.rechargeProduct
     if (!root || root.dataset.mounted || !userId || !config?.recharge_enabled || state.wallet?.payment_hold) return
     root.dataset.mounted = "true"
+    const mount = { context: paymentContext(), checkout: null }
+    paypalMounts.set(root, mount)
+    const current = () => root.isConnected && paypalMounts.get(root) === mount && mount.context === paymentContext()
+    const finish = () => { if (paypalActiveMount === mount) { paypalActiveMount = null; state.checkoutActive = false } }
     const message = text => { if (root.isConnected) root.querySelector("[data-payment-message]").textContent = text }
     const key = `vireal-payment:${userId}`
     let activeOrder
     try {
-      const sdk = await paypalSdk(config)
-      const instance = await sdk.createInstance({ clientId: config.client_id, components: ["paypal-payments"] })
+      const instance = await paymentInstance(config)
+      if (!current()) return
       const eligible = await instance.findEligibleMethods({ currencyCode: "USD" })
-      if (!root.isConnected) return
+      if (!current()) return
       if (!eligible.isEligible("paypal")) { message(paymentText("PayPal 当前不可用，请联系客服", "PayPal is not available; please contact support")); return }
       const checkout = await instance.createPayPalOneTimePaymentSession({
         async onApprove(data) {
-          state.checkoutActive = false
+          finish()
           if (!activeOrder || data.orderId !== activeOrder.provider_order_id || state.appUser?.id !== userId) {
             message(paymentText("订单需要重新确认，请刷新记录", "Please refresh to verify the order")); return
           }
@@ -211,16 +244,18 @@
           } catch (_) { toast(paymentText("支付结果待确认，请查看充值记录，不要重复付款", "Payment confirmation is pending; check your orders before paying again"), true) }
           await refreshPayments()
         },
-        onCancel() { state.checkoutActive = false; toast(paymentText("支付已取消，请以订单状态为准", "Checkout cancelled; check your order status")); void refreshPayments() },
-        onError() { state.checkoutActive = false; toast(paymentText("支付暂未确认，请查看记录后再操作", "Payment has not been confirmed; please check order history"), true); void refreshPayments() },
+        onCancel() { finish(); toast(paymentText("支付已取消，请以订单状态为准", "Checkout cancelled; check your order status")); void refreshPayments() },
+        onError() { finish(); toast(paymentText("支付暂未确认，请查看记录后再操作", "Payment has not been confirmed; please check order history"), true); void refreshPayments() },
       })
-      if (!root.isConnected) return
+      if (!current()) { checkout.destroy?.(); return }
+      mount.checkout = checkout
       const button = document.createElement("paypal-button")
       root.prepend(button)
       let starting = false
       button.addEventListener("click", async () => {
-        if (starting || state.appUser?.id !== userId) return
+        if (starting || state.checkoutActive || !current()) return
         starting = true
+        paypalActiveMount = mount
         state.checkoutActive = true
         message(paymentText("正在创建安全支付订单…", "Creating a secure payment order…"))
         // Start immediately within the click's user activation; do not await creation first.
@@ -238,11 +273,11 @@
           return { orderId: activeOrder.provider_order_id }
         })()
         try { await checkout.start({ presentationMode: "auto" }, orderPromise) }
-        catch (_) { state.checkoutActive = false; message(paymentText("订单暂未确认，请刷新充值记录", "Order confirmation unavailable; refresh your payment records")); void refreshPayments() }
+        catch (_) { finish(); message(paymentText("订单暂未确认，请刷新充值记录", "Order confirmation unavailable; refresh your payment records")); void refreshPayments() }
         finally { starting = false }
       })
       message(paymentText("由 PayPal 安全收款，后端确认后到账", "Secure PayPal checkout; credits are issued after server verification"))
-    } catch (_) { message(paymentText("支付组件加载失败，请稍后刷新", "Checkout could not load; please refresh later")); root.dataset.mounted = "" }
+    } catch (_) { releasePayPal(root); message(paymentText("支付组件加载失败，请稍后刷新", "Checkout could not load; please refresh later")); root.dataset.mounted = "" }
   }
 
   async function syncSession() {
@@ -485,7 +520,13 @@
       privacy: () => legalPage("privacy"),
       refunds: () => legalPage("refunds"),
     }
+    const checkoutRoot = document.getElementById("paypalCheckout")
+    const keepCheckout = current.name === "wallet" && state.appUser && state.commerce?.recharge_enabled && !state.wallet?.payment_hold
+      && paypalMounts.get(checkoutRoot)?.context === paymentContext()
+    if (!keepCheckout) releasePayPal(checkoutRoot)
     app().innerHTML = (pages[current.name] || homePage)()
+    // Balance/order polling must not reinitialize the SDK or payment session.
+    if (keepCheckout) document.getElementById("paypalCheckout")?.replaceWith(checkoutRoot)
     document.querySelectorAll("video[autoplay], .effect-card video").forEach((video) => video.play?.().catch(() => {}))
   }
 
