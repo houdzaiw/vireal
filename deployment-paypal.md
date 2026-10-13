@@ -9,7 +9,8 @@ A fresh backup `production-20261013-153609-pre-selected-release.dump` in
 tables matched the exported snapshot. The isolated additive migration to
 `b4c5d6e7f8a9` preserved every existing column/row in the other 24 tables.
 Verification and migration-rehearsal JSON records sit alongside the dump (0600).
-This checkpoint does not yet claim merging or deployment has occurred.
+The completed closed deployment is recorded below; this authorization is not a
+public-opening approval.
 
 The owner confirms Li Qihui (李启辉), brand Vireal, support
 `li522903183@gmail.com`, prices, limits, 24-hour retention and manual-refund rules
@@ -32,7 +33,202 @@ Synthetic concept covers are not genuine video previews; never publish the
 earlier internally authorized real-person inputs/results. Public opening remains
 separately authorized after all acceptance gates pass.
 
-Implementation is on `codex/paypal-public-registration`. As of **2026-10-12**,
+## Delivery-recovery follow-up — 2026-10-13
+
+The owner still has no eligible independent overseas Live buyer. Do not manufacture
+an overseas account, misstate residence, bypass region checks, or use merchant
+self-payment. Recruit the first real overseas customer for an explicitly disclosed,
+restricted first-order acceptance instead of requiring the owner to own a foreign
+PayPal account. This does **not** waive the genuine receipt/unique credit/debit/
+delivery gate or authorize general paid opening. A buyer may see card guest
+checkout without a PayPal account, but availability is determined by PayPal's
+region/risk decisions and is not guaranteed; see
+[PayPal's guest-checkout explanation](https://www.paypal.com/c2/cshelp/article/how-do-i-accept-cards-with-checkout-using-the-guest-checkout-option--help307?locale.x=en_C2).
+
+A failing regression identified a specific recovery gap: a scheduled signed
+playback-address GET failure displayed a toast but scheduled no subsequent query
+after terminal-task polling had stopped. The follow-up retries **only authenticated
+GETs**, using 2/4/8-second backoff capped at 30 seconds, guards the current identity,
+task and polling version, ignores invalid expiry timestamps, and re-arms player-
+error recovery only after successful media loading. It never resubmits generation
+or payment. Four new mocked cases cover transient address refresh, re-arming,
+leaving the page and canceled system sharing. Local acceptance passed **70 tests
+across Chromium/WebKit**, 40 H5 contracts, and targeted pre-commit checks. These
+are browser-engine/synthetic tests, not physical iPhone save certification. The
+fix requires fresh PR review/CI before a closed H5 update; the deployed source at
+this checkpoint remains `9afed5b`.
+
+Real signed-in staging Chrome was put into DevTools **Offline**: five task GETs
+failed with `net::ERR_INTERNET_DISCONNECTED`, and H5 displayed interrupted-status
+retry without another generation. Restoring **No throttling** cleared the warning,
+restored completed state and real 5-second player playback, with balance **566**.
+DevTools was closed and normal network restored. This is actual staged transport
+failure, not a physical phone radio-network test or proof of the new fix online.
+`browser-network-recovery-evidence.json` records the scoped result. The owner has
+offered an iPhone/Safari check of these existing works; its playback, real system
+save and offline recovery results remain pending.
+
+At 10:22:05 UTC, an official Sandbox
+[negative-testing header](https://developer.paypal.com/negative-testing/request-headers/)
+returned `INTERNAL_SERVER_ERROR` / HTTP 500 for one scoped request on the existing
+unapproved/canceled-window order `d738ab18-932a-406c-800c-c366059395e7`.
+The actual payment client mapped it to 502. Merchant, local order, USD 5.99 and
+unapproved-state guards were verified before the request. No buyer approved it,
+no capture/credit occurred, and the financial snapshot remained unchanged at
+566 coins. `paypal-official-negative-evidence.json` records it. This does **not**
+certify an actual pending capture or browser loss of an approved payment response;
+both remain separate acceptance items. No Live request or additional paid
+prediction was sent.
+
+## Closed selected release checkpoint — 2026-10-13
+
+PR [#17](https://github.com/houdzaiw/vireal/pull/17) passed review/CI and merged at
+08:01:59 UTC. Published source is `main` commit
+`9afed5b700652f0d1c62bbafced3b636cfa870c9`; the clean local tree was synchronized
+to that commit before every build/deployment. Main CI passed: **396 backend tests,
+91% coverage**, H5, admin task UI, Playwright and Smokeshow. Local checks additionally
+passed 40 H5 contract, 31 mocked Chromium H5 and 3 edge tests, pre-commit and H5 build.
+
+| Target | Successful deployment/version |
+| --- | --- |
+| Production API / bundled admin | `6ca4f91d-a16c-42fa-89e4-10e044a3ba6a` |
+| Production existing video/payment worker | `1ca20296-fb9c-45d3-bfae-71fcac725088` |
+| Production signed-region Worker | `a8763b6d-2d36-407a-830e-d3a5460e2910` |
+| Production H5 Pages | `cf62b703.vireal-h5-houdzaiw.pages.dev` |
+| Staging API / bundled admin | `53249ad6-aae1-4fce-8198-353609958a0b` |
+| Staging existing video/payment worker | `ad8c13c8-2f2a-458b-8f10-eaf0f549bf39` |
+| Staging signed-region Worker | `4262b51f-2fb6-4a2d-92d0-a48ec290a2b8` |
+| Staging H5 Pages | `17039902.vireal-h5-staging.pages.dev` |
+
+Use custom domains for authenticated acceptance, not the Pages preview URLs.
+Staging Railway sources and the staging H5 production branch now use `main`;
+the existing feature-branch preview exclusion remains unchanged. No new service
+or unrelated configuration draft was applied.
+
+The first production API rollout failed before migration with PostgreSQL
+`InvalidSchemaName` / no schema selected. Its predecessor remained serving.
+The pooled Neon URL was replaced **only on the production API and worker** with
+the same database's SSL direct URL, consistent with the existing initial-release
+runbook. Read-only checks matched all 25 tables between endpoints and verified
+SQLAlchemy's schema across transactions before this change. The exact source
+commit was redeployed; do not use `PGOPTIONS search_path` with the pooled endpoint,
+which rejected that startup option. This evidence supports the successful repair,
+not a proven root-cause diagnosis of the pooler's session state.
+
+Production and staging are at `b4c5d6e7f8a9`. Production post-migration verification
+matched every pre-existing row/column in all 24 non-version tables. The fresh dump,
+restore verification, migration rehearsal, direct-connection comparison,
+deployed-migration verification and runtime evidence are in
+`/Users/huili/Documents/vireal-backups/` with 0600 permissions. Both temporary
+local restore servers were stopped; production was never used as the test DB.
+
+`verify-production.sh` passed against `app.usevireal.com` / `api.usevireal.com`
+with the expected commit and `RELEASE_CHECK_MODE=closed`: correct H5 recovery/
+download/payment code, two effects with only 5/10s, exact three USD packages,
+daily 30 cap, closed registration/recharge, anonymous wallet/download denial,
+blocked docs and unsigned callback rejection. Runtime configuration separately
+confirmed public registration, payments, acceptance and commerce-terms approval
+remain closed; signed geography is on, daily/user/concurrency caps remain
+30/5/1, demo/legacy/admin public signup are off. The cumulative generation lock
+is still **1**, with one counted production prediction; it was **not unlocked**.
+These checks did not exercise a Live payment or new production prediction.
+
+Real staging evidence this run, using only newly generated fictional adult imagery:
+
+| Combination | Task | Verified state / single debit |
+| --- | --- | --- |
+| dance-1 / 5s | `ac12ee92-4226-4085-9c7a-e1971cb6b279` | succeeded, private result saved, 28 coins |
+| dance-1 / 10s | `d633ffca-bbbc-4f55-85e8-c2698865688c` | succeeded, private result saved, 47 coins |
+| romance-1 / 5s | `1aaea428-5ca6-42f4-aed3-e49689443d64` | succeeded, private result saved, 22 coins |
+| romance-1 / 10s | `7b3ae163-fedd-4233-ab13-044d1f29a248` | succeeded, private result saved, 38 coins |
+
+All four use actual `wan-video/wan-2.7-r2v`, 720p, configured v1 prompts. Dance
+prompt hash is `fa16aa887182aa88c0a26375da66a561` with one reference; romance is
+`c26c90ee59bf50cc176498ff8f47eff9` with two. Supplier GET corroborated durations,
+completion, reference counts and prompt match. Four of the five authorized
+predictions were submitted, **estimated USD 3.00** using the provider's verified
+[USD 0.10/s rate](https://replicate.com/wan-video/wan-2.7-r2v#pricing), not a final
+provider invoice. No blind resubmission or production prediction occurred. Each
+task has exactly one debit and no generation refund; wallet 720 -> 692 -> 645 ->
+623 -> 585. The fifth prediction remains reserved for production acceptance.
+
+All four outputs were played in the real H5 browser and downloaded through the
+authenticated MP4 endpoint to `/Users/huili/Downloads/vireal-<task-id>.mp4`.
+Downloaded SHA-256 hashes match the independently archived private results.
+Refreshing dance 10s recovered its completed state, wallet and exact retention
+timestamp. Romance 10s was revisited after its old player could not load media;
+manual task refresh obtained a working link and real playback reached the end
+of the 10.031s container, including while the account was payment-frozen. Existing
+records/works remained accessible. Actual expiry-driven automatic recovery,
+physical offline/online transitions and iOS/Android system-save are **not**
+certified by this desktop run; mocked recovery coverage is recorded separately.
+
+Built-in image generation produced `dance-concept.png`, `romance-concept.png`
+and `romance-male-reference.png`, with full prompts and classification in
+`/Users/huili/project/new-chat/output/imagegen/vireal-launch-20261013/asset-manifest.json`.
+They are original synthetic adult concepts/inputs, **not actual previews**.
+The public catalogue uses actual video frames `dance-actual-poster.png` (5s
+sample, 0.5s frame) and `romance-actual-poster.png` (10s sample, 8s frame), with
+their corresponding unmodified real MP4 samples. Internal real-person material
+was not used or published. `generation-evidence.json` records safe supplier/task/
+ledger observations without private object URLs or credentials.
+
+The four synthetic outputs were archived read-only from their exact private
+staging R2 keys under `real-video-evidence/` in that asset directory. `ffprobe`
+confirmed 720x1280 H.264 video streams of exactly 5.000 / 10.000 seconds; AAC
+padding makes the MP4 containers 5.038 / 10.031 seconds. All fully decoded with
+FFmpeg. Sampled-frame QA confirms single-adult dance and romantic close-ups,
+turns and approach; the romance clips do not substantiate the old rain promise.
+`video-verification.json` records hashes and actual website expiry timestamps.
+Local archives do not change private user works' 24-hour retention or grant
+public bucket access. The separately uploaded managed catalogue samples are
+intentionally public marketing media, not exposure of user works.
+
+Actual production and staging admin sessions saved both covers, previews and
+accurate bilingual descriptions. Dance is `Solo Dance` / 节拍律动; romance is
+`Gentle Approach` / 温柔靠近, without guaranteed rain, gestures or exact identity.
+Models, prices, durations and prompts were not modified. Production exposes only
+these two effects, 5/10s; staging retains its 18 historical test effects under its
+existing controlled Clerk email allowlist, not a public registration rollout.
+`catalog-media-evidence.json` confirms each of eight managed media routes returns
+206 with PNG/MP4 content, and all four production opening flags remain false.
+Production browser QA confirmed the sample card, matching description and 5/10s
+options. `production-immutability-evidence.json` checks finance, tasks, variants,
+configs and uploads against the post-migration baseline; catalogue/media/audit
+changes are intentional and separately recorded.
+
+Real Sandbox cancel/window-close/refresh passed after action-time Sandbox terms
+approval. The popup used `sandbox.paypal.com`; it was closed before payment.
+Order `d738ab18-932a-406c-800c-c366059395e7` remains created/unpaid, with no capture,
+fulfilment or recharge ledger credit. Reload preserved the 585-coin balance and
+showed waiting for payment, not a false success.
+
+An official **Sandbox-only virtual USD 1.00 partial refund** of the existing
+220-coin USD 11.99 order `e24f5606-8344-4b0b-ad59-acf021228b19` completed as
+`8U746287CW894423W`. Verified refund webhook
+`WH-74537774K6344772U-05732634BH657203C` froze the account. The actual H5 disabled
+new recharge while retaining records and working existing playback. Its refund
+case required ceil(220 * 100 / 1199) = **19 coins**. A real authenticated staging
+administrator supplied evidence/reason and completed audited recovery at
+09:38:42 UTC: one `recharge_recovery` debit of 19, original recharge credit still
+unique, correlated review resolved with zero additional recovery, wallet
+**585 -> 566**, payment hold cleared. Real H5 refresh showed 566 and restored
+the recharge options. `sandbox-partial-refund.json`,
+`sandbox-acceptance-evidence.json` and `browser-acceptance-evidence.json` preserve
+scoped evidence. No Live refund, manual wallet override or duplicate debit occurred.
+
+**Still outstanding:** actual PayPal pending capture and transport-failure
+recovery are not certified by mocked tests. Dispute/reversal and insufficient-
+balance cases have isolated automated coverage, not manufactured Live events.
+Live remains blocked by the owner's confirmed lack of an eligible independent
+overseas buyer: USD 5.99 genuine payment, unique 100-coin receipt, the reserved
+production 5s generation/debit/playback/download, final public terms approval
+and separately authorized public opening remain gates;
+**this successful closed deployment is not readiness to promote publicly**.
+
+## Previous release checkpoint (historical)
+
+Implementation was on `codex/paypal-public-registration`. As of **2026-10-12**,
 the compatible production API/worker, signed-region Worker and H5 are deployed
 with independently configured **Live** credentials. Production registration,
 recharge and commerce-terms approval remain **off**; region enforcement is **on**.
@@ -683,52 +879,42 @@ or future monitor is authorized or implemented by this preparation note.
 
 ### Remaining gates and evidence ledger
 
-1. **Public material: blocked.** Owner answered "暂无" for both launch covers and
-   previews. Earlier authorized adult photos and their generated outputs are
-   internal acceptance evidence only; do not publish or substitute them. Obtain
-   explicit website-display/image rights, then use the existing media/catalog
-   administration. Confirm the two titles, descriptions, model and prompt versions
-   against actual output. The seed's generic romance prompt is not evidence of a
-   rain-scene promise; do not advertise an unverified scene or guaranteed motion.
-2. **Stable source/review/CI: pending.** Owner authorized GitHub device login,
-   feature-branch push and PR creation, not merge/deploy. Login verified as `houdzaiw`
-   using the macOS system keyring. Read-only trigger audit: Railway production API
-   and worker follow `main`; staging API/worker still follow the older
-   `codex/vireal-dual-mode-backend` branch. Production Pages is Direct Upload,
-   staging Pages follows `codex/vireal-v1-2-h5` and formerly previewed all branches.
-   Owner explicitly authorized excluding only `codex/paypal-public-registration`
-   before push; keep other previews included (`*`) with custom branch controls.
-   This control follows [Cloudflare's branch deployment documentation](https://developers.cloudflare.com/pages/configuration/branch-build-controls/).
-   The exclusion was applied and read back: custom preview mode includes `*` and
-   excludes that exact branch. Production deployment `fe937a9c-9a33-462a-94e9-2a3d3a53cf8e`
-   and staging `da642a18-4bf8-42c3-aa28-6705de472302`, domains, build settings and
-   environment settings remained unchanged. GitHub CI is still enabled.
-   Draft [PR #17](https://github.com/houdzaiw/vireal/pull/17) contains the feature
-   source (`dc2ed87` implementation checkpoint) and is **not merged**. Initial CI
-   backend/H5/admin checks passed with 91% coverage; the spelling hook identified
-   the upstream `refert_num` request field, now explicitly retained as an API
-   identifier rather than renaming the provider payload. Full PR CI/review remains
-   a release gate; see the PR's latest checks, not a historical checkpoint alone.
-   Do not push this release to the old staging source branch or change those source
-   settings as a side effect. Record the approved commit,
-   migration head and each service/Pages/Worker version after the later rollout.
-   Do not apply unrelated Railway IaC/config drafts. Existing production CLI-upload
-   source still needs reconciliation with the durable reviewed Git source.
-3. **Sandbox exceptions: partial.** Reuse dated three-package/full-refund evidence;
-   cancel/pending/refresh and disputes/reversals are covered by isolated mocks.
-   Still perform owner-approved actual Sandbox partial-refund/freeze/closure and
-   interruption recovery. Never manufacture a Live dispute or chargeback.
-4. **Four effect-duration combinations: pending evidence audit.** Verify
-   dance-1/5s, dance-1/10s, romance-1/5s, romance-1/10s against each exact model,
-   prompt version and input count. Preserve private internal evidence. Request
-   action-time count/cost authorization for missing combinations; no new fee was
-   authorized by this implementation plan.
-5. **Owner readiness and controlled Live acceptance: pending.** Merchant verification,
-   truthful identity, product eligibility, final terms and a region-eligible buyer
-   are owner gates. Then separately authorize restricted activation, a human $5.99
-   payment (one 100-credit entry), and one 5-second generation (one debit, playable
-   result and real download/save). `REPLICATE_POC_MAX_SUBMISSIONS=1` remains unchanged;
-   removing the lifetime test cap with `=0` requires action-time authorization.
+1. **Public material: completed for the two selected effects.** Original synthetic
+   adult inputs, true model output previews and matching actual-frame covers are
+   installed through real admin sessions in staging and closed production. Titles,
+   descriptions, prompt/model evidence and eight managed media routes were
+   verified. Old internal real-person inputs/results remain unpublished.
+2. **Reviewed source: base release completed; recovery follow-up pending.** PR #17
+   merged after green CI at `9afed5b`; the version table above records all closed
+   deployments and database restore/migration evidence. Railway staging and Pages
+   production now follow `main`. Before pushing the follow-up, the exact existing
+   `codex/paypal-public-registration` Pages preview exclusion was read back;
+   other previews still include `*`. Reuse that branch, preserve CI, and require
+   fresh review/checks before any follow-up closed deployment. Do not apply
+   unrelated configuration drafts.
+3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
+   cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
+   500 client handling have dated evidence. Actual pending capture and approved-
+   payment response-loss recovery remain unverified; isolated mock coverage is
+   not a substitute. Dispute/reversal/insufficient balance remain isolated tests;
+   never manufacture a Live dispute or chargeback.
+4. **Four effect-duration combinations: completed.** Dance/romance each 5/10s
+   have genuine Wan 2.7 task/prompt/input-count evidence, one debit each, saved
+   private outputs, real authenticated downloads with matching hashes, and decoded
+   MP4 validation. Four authorized predictions are consumed (estimated USD 3),
+   with only the production 5s prediction reserved inside the total USD 10 cap.
+5. **Real phone delivery: pending owner iPhone/Safari feedback.** Existing staging
+   outputs are available until their recorded October 14 expiry. Check actual
+   playback, system-save/download and physical offline/online recovery without
+   another generation or payment; do not disguise geography.
+6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
+   identity/rules for controlled acceptance only; final public terms and separately
+   authorized opening remain gates. No eligible independent overseas buyer is
+   available. Recruit a genuine first customer for restricted acceptance, verify
+   USD 5.99 receipt, unique 100 coins, one production 5s debit/play/save, then decide
+   public opening. `REPLICATE_POC_MAX_SUBMISSIONS=1` and all production opening
+   flags remain unchanged. Removing the cumulative test lock happens only at the
+   authorized production acceptance stage, not to bypass the missing buyer.
 
 ### Restricted acceptance and public-opening sequence
 

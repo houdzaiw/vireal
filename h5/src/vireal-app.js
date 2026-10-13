@@ -36,6 +36,7 @@
     pollingError: "",
     playbackTimer: null,
     playbackRefreshing: false,
+    playbackErrors: 0,
     playbackRetryUrl: new Map(),
     savingTaskId: null,
     commerce: null,
@@ -587,6 +588,8 @@
 
   function startPolling(taskId) {
     stopTaskPolling()
+    clearTimeout(state.playbackTimer)
+    state.playbackErrors = 0
     const version = state.pollingVersion
     const owner = state.appUser?.id
     state.pollingErrors = 0
@@ -620,16 +623,24 @@
     clearTimeout(state.playbackTimer)
     if (route().name !== "generation" || route().params.get("id") !== task.id) return
     if (task.status !== "succeeded" || !task.playback_url_expires_at) return
-    state.playbackTimer = setTimeout(() => void refreshPlayback(task.id), Math.max(1000, Date.parse(task.playback_url_expires_at) - Date.now() - 5000))
+    const deadline = Date.parse(task.playback_url_expires_at)
+    if (!Number.isFinite(deadline)) return
+    state.playbackTimer = setTimeout(() => void refreshPlayback(task.id), Math.max(1000, deadline - Date.now() - 5000))
+  }
+
+  function currentTaskView(taskId, owner, version) {
+    return state.appUser?.id === owner && state.pollingVersion === version && route().name === "generation" && route().params.get("id") === taskId
   }
 
   async function refreshPlayback(taskId) {
     if (!state.appUser || state.playbackRefreshing) return
     state.playbackRefreshing = true
     const owner = state.appUser.id
+    const version = state.pollingVersion
     try {
       const task = await parseResponse(await authFetch(`/api/v1/app/video-tasks/${taskId}`))
-      if (state.appUser?.id !== owner || route().name !== "generation" || route().params.get("id") !== taskId) return
+      if (!currentTaskView(taskId, owner, version)) return
+      state.playbackErrors = 0
       cacheTask(task)
       const video = document.querySelector(`[data-task-video="${taskId}"]`)
       if (video && task.status === "succeeded" && task.playback_url) {
@@ -644,7 +655,14 @@
       } else render()
       schedulePlaybackRefresh(task)
     } catch (_) {
-      toast("播放地址暂时无法更新，请刷新任务状态", true)
+      if (!currentTaskView(taskId, owner, version)) return
+      if (state.playbackErrors === 0) toast("播放地址暂时无法更新，正在重试；也可刷新任务状态", true)
+      state.playbackErrors++
+      // Retry only the authenticated GET. Never replay a generation or payment.
+      clearTimeout(state.playbackTimer)
+      state.playbackTimer = setTimeout(() => {
+        if (currentTaskView(taskId, owner, version)) void refreshPlayback(taskId)
+      }, Math.min(2000 * 2 ** (state.playbackErrors - 1), 30000))
     } finally { state.playbackRefreshing = false }
   }
 
@@ -793,6 +811,12 @@
   })
   window.addEventListener("online", () => { toast("网络已恢复"); resumeTaskView() })
   document.addEventListener("visibilitychange", () => { if (!document.hidden) resumeTaskView() })
+  document.addEventListener("loadeddata", (event) => {
+    // Re-arm player-error recovery only after actual media successfully loaded.
+    // An invalid fresh address must not create a request loop.
+    const video = event.target
+    if (video?.dataset?.taskVideo) state.playbackRetryUrl.delete(video.dataset.taskVideo)
+  }, true)
   document.addEventListener("error", (event) => {
     const video = event.target
     if (!video?.dataset?.taskVideo || !state.appUser) return

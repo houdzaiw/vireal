@@ -530,6 +530,89 @@ test("playback error refreshes its signed address once and cannot loop on a bad 
   expect(queries).toBe(2)
 })
 
+test("signed-address refresh retries a transient query failure without another generation", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/retry-video.mp4?token=old" }))
+  let queries = 0
+  let submissions = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks", async route => { submissions++; await route.fulfill({ status: 500, json: {} }) })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    if (queries === 2) return route.fulfill({ status: 503, json: { detail: "Temporary refresh failure" } })
+    await route.fulfill({ json: existingDeliveryTask({
+      status: "succeeded", playback_url: `https://api.example.com/retry-video.mp4?token=${queries >= 3 ? "fresh" : "old"}`,
+      playback_url_expires_at: new Date(Date.now() + (queries >= 3 ? 600000 : 6500)).toISOString(),
+    }) })
+  })
+  // Keep the media request pending to isolate the scheduled address refresh
+  // from the separate player-error recovery path.
+  await page.route("https://api.example.com/retry-video.mp4?**", async () => {})
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=old/)
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=fresh/, { timeout: 10000 })
+  expect(queries).toBe(3)
+  expect(submissions).toBe(0)
+})
+
+test("player recovery re-arms only after a successful media load", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/rearm-video.mp4?token=1" }))
+  let queries = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    await route.fulfill({ json: existingDeliveryTask({ status: "succeeded", playback_url: `https://api.example.com/rearm-video.mp4?token=${queries}` }) })
+  })
+  await page.route("https://api.example.com/rearm-video.mp4?**", async () => {})
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=1/)
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("error")))
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=2/)
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("error")))
+  expect(queries).toBe(2)
+  // Synthetic browser events verify the recovery guard, not physical playback.
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("loadeddata")))
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("error")))
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=3/)
+  expect(queries).toBe(3)
+})
+
+test("failed playback refresh cannot poll a work after leaving its page", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/leave-video.mp4" }))
+  let queries = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    if (queries > 1) return route.fulfill({ status: 503, json: { detail: "Temporary refresh failure" } })
+    await route.fulfill({ json: existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/leave-video.mp4", playback_url_expires_at: new Date(Date.now() + 6500).toISOString() }) })
+  })
+  await page.route("https://api.example.com/leave-video.mp4", async () => {})
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect.poll(() => queries).toBe(2)
+  await page.getByRole("button", { name: "继续浏览", exact: true }).click()
+  await expect(page.locator(".effect-card")).toHaveCount(4)
+  await page.clock.install()
+  await page.clock.runFor(35000)
+  expect(queries).toBe(2)
+})
+
+test("system-share cancellation does not trigger a second download", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }))
+  await page.route("https://api.example.com/mock-video.mp4", route => route.abort())
+  let downloads = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task/download", async route => {
+    downloads++
+    await route.fulfill({ contentType: "video/mp4", body: Buffer.from("00000018667479706d7034326d6f636b766964656f", "hex") })
+  })
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "canShare", { value: () => true })
+    Object.defineProperty(navigator, "share", { value: async () => { throw new DOMException("User canceled", "AbortError") } })
+  })
+  let browserDownloads = 0
+  page.on("download", () => { browserDownloads++ })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await page.getByRole("button", { name: "系统保存/分享" }).click()
+  await expect.poll(() => downloads).toBe(1)
+  await expect(page.getByRole("button", { name: "系统保存/分享" })).toBeEnabled()
+  expect(browserDownloads).toBe(0)
+})
+
 test("expired download refreshes task state and removes stale download controls", async ({ page }) => {
   await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }))
   let expired = false

@@ -4,6 +4,10 @@ export default defineConfig({
   testDir: "./tests/browser",
   fullyParallel: false,
   reporter: "line",
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    { name: "webkit", use: { browserName: "webkit" } },
+  ],
   use: {
     baseURL: "http://127.0.0.1:4174",
     trace: "retain-on-failure",
