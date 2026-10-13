@@ -226,6 +226,8 @@ The production release is an all-traffic switch, not a percentage rollout.
    ```bash
    H5_URL=https://app.usevireal.com \
    API_URL=https://api.usevireal.com \
+   EXPECTED_RELEASE_COMMIT="$(git rev-parse HEAD)" \
+   RELEASE_CHECK_MODE=closed \
    R2_PRIVATE_OBJECT_URL=https://example-private-object \
    bash scripts/verify-production.sh
    ```

@@ -8,12 +8,14 @@ on:
       - h5/**
       - edge/**
       - scripts/verify-production.sh
+      - scripts/verify-release-contract.py
       - .github/workflows/test-h5.yml
   pull_request:
     paths:
       - h5/**
       - edge/**
       - scripts/verify-production.sh
+      - scripts/verify-release-contract.py
       - .github/workflows/test-h5.yml
 
 permissions:

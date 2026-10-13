@@ -14,6 +14,12 @@ clerk_publishable_key="${VITE_CLERK_PUBLISHABLE_KEY:-}"
 # CI and deployment continue to use the lockfile's compiler by default.
 esbuild_bin="${VIREAL_ESBUILD_BIN:-$workspace_dir/node_modules/.bin/esbuild}"
 tailwind_bin="${VIREAL_TAILWIND_BIN:-$workspace_dir/node_modules/.bin/tailwindcss}"
+release_commit="${VIREAL_RELEASE_COMMIT:-$(git -C "$workspace_dir" rev-parse HEAD 2>/dev/null || true)}"
+
+if [[ ! "$release_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "VIREAL_RELEASE_COMMIT must identify the reviewed 40-character Git commit" >&2
+  exit 1
+fi
 
 if [[ -z "$api_base_url" ]]; then
   echo "VIREAL_API_BASE_URL is required, for example https://api.example.com" >&2
@@ -50,6 +56,7 @@ sed \
   -e "s|__VIREAL_API_BASE_URL__|$escaped_api_base_url|g" \
   -e "s|__VIREAL_BACKEND_MODE__|1|g" \
   -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
+  -e "s|__VIREAL_RELEASE_COMMIT__|$release_commit|g" \
   "$source_file" > "$output_dir/index.html"
 
 sed \
@@ -87,7 +94,7 @@ awk '/<style>/{capture=1;next}/<\/style>/{capture=0}capture' \
 cp "$prototype_dir/_headers" "$output_dir/_headers"
 printf 'User-agent: *\nDisallow: /\n' > "$output_dir/robots.txt"
 
-if grep -Eq '__VIREAL_API_BASE_URL__|__VIREAL_BACKEND_MODE__|__VIREAL_CLERK_PUBLISHABLE_KEY__' "$output_dir/index.html"; then
+if grep -Eq '__VIREAL_API_BASE_URL__|__VIREAL_BACKEND_MODE__|__VIREAL_CLERK_PUBLISHABLE_KEY__|__VIREAL_RELEASE_COMMIT__' "$output_dir/index.html"; then
   echo "Cloudflare Pages placeholders were not fully replaced" >&2
   exit 1
 fi

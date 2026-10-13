@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -730,8 +731,7 @@ def test_catalogue_media_binding_redirect_and_delete_guards(
         f"{settings.API_V1_STR}/app/media-assets/{poster['id']}",
         follow_redirects=False,
     )
-    assert media.status_code == 307
-    assert media.headers["location"].startswith("/uploads/catalog/poster/")
+    assert media.status_code == 404  # An upload is not a public release.
     assert (
         client.get(
             f"{settings.API_V1_STR}/app/media-assets/{uuid.uuid4()}",
@@ -762,6 +762,30 @@ def test_catalogue_media_binding_redirect_and_delete_guards(
     )
     assert bound.status_code == 200
     assert (
+        client.get(
+            f"{settings.API_V1_STR}/app/media-assets/{poster['id']}",
+            follow_redirects=False,
+        ).status_code
+        == 404  # Binding to a draft still does not authorize public access.
+    )
+    client.post(
+        f"{settings.API_V1_STR}/admin/app/effects/{effect['id']}/variants",
+        headers=superuser_token_headers,
+        json=_variant_payload(),
+    )
+    client.post(
+        f"{settings.API_V1_STR}/admin/app/effects/{effect['id']}/publish",
+        headers=superuser_token_headers,
+    )
+    for asset in (poster, preview):
+        media = client.get(
+            f"{settings.API_V1_STR}/app/media-assets/{asset['id']}",
+            follow_redirects=False,
+        )
+        assert media.status_code == 307
+        assert media.headers["location"].startswith("/uploads/catalog/")
+        assert media.headers["cache-control"] == "private, no-store"
+    assert (
         client.delete(
             f"{settings.API_V1_STR}/admin/app/media-assets/{poster['id']}",
             headers=superuser_token_headers,
@@ -772,6 +796,13 @@ def test_catalogue_media_binding_redirect_and_delete_guards(
         f"{settings.API_V1_STR}/admin/app/effects/{effect['id']}",
         headers=superuser_token_headers,
         json=_effect_payload(category["id"], effect["slug"]),
+    )
+    assert (
+        client.get(
+            f"{settings.API_V1_STR}/app/media-assets/{poster['id']}",
+            follow_redirects=False,
+        ).status_code
+        == 404
     )
     assert (
         client.delete(
@@ -790,6 +821,94 @@ def test_catalogue_media_binding_redirect_and_delete_guards(
     deleted_record = db.get(AppManagedMediaAsset, uuid.UUID(poster["id"]))
     assert deleted_record is not None
     assert deleted_record.status == "deleted"
+
+
+@pytest.mark.parametrize("kind", ["poster", "preview_video"])
+@pytest.mark.parametrize(
+    "restriction",
+    [
+        "none",
+        "unbound",
+        "draft",
+        "hidden",
+        "effect",
+        "category",
+        "variant",
+        "duration",
+        "deleted",
+    ],
+)
+def test_public_media_respects_current_catalog_publication(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    restriction: str,
+) -> None:
+    slug = f"media-gate-{uuid.uuid4().hex[:8]}"
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "APP_LAUNCH_EFFECT_SLUGS", [slug])
+    monkeypatch.setattr(settings, "APP_EFFECT_MAX_DURATION_SECONDS", 10)
+    asset = AppManagedMediaAsset(
+        kind=kind,
+        object_key=f"catalog/{kind}/{uuid.uuid4()}.{'png' if kind == 'poster' else 'mp4'}",
+        content_type="image/png" if kind == "poster" else "video/mp4",
+        size_bytes=20,
+        checksum_sha256="0" * 64,
+        deleted_at=datetime.now(UTC) if restriction == "deleted" else None,
+    )
+    category = AppEffectCategory(
+        slug=slug, name_zh="测试", name_en="Test", is_enabled=restriction != "category"
+    )
+    db.add(asset)
+    db.add(category)
+    db.flush()
+    effect = AppEffect(
+        category_id=category.id,
+        slug=slug if restriction != "hidden" else f"hidden-{slug}",
+        title_zh="测试",
+        title_en="Test",
+        publish_status="draft" if restriction == "draft" else "published",
+        is_enabled=restriction != "effect",
+    )
+    if restriction != "unbound":
+        setattr(
+            effect,
+            "poster_asset_id" if kind == "poster" else "preview_asset_id",
+            asset.id,
+        )
+    db.add(effect)
+    db.flush()
+    variant = AppEffectVariant(
+        effect_id=effect.id,
+        duration_seconds=15 if restriction == "duration" else 5,
+        coin_cost=12,
+        model="wan-video/wan-2.7-r2v",
+        model_type="image-to-video",
+        prompt="A test motion",
+        is_enabled=restriction != "variant",
+    )
+    db.add(variant)
+    db.commit()
+    response = client.get(
+        f"{settings.API_V1_STR}/app/media-assets/{asset.id}", follow_redirects=False
+    )
+    assert response.status_code == (307 if restriction == "none" else 404)
+    if restriction == "none":
+        assert response.headers["cache-control"] == "private, no-store"
+        # Hiding an effect must also stop issuing new URLs through an old asset ID.
+        effect.is_enabled = False
+        db.add(effect)
+        db.commit()
+        assert (
+            client.get(
+                f"{settings.API_V1_STR}/app/media-assets/{asset.id}",
+                follow_redirects=False,
+            ).status_code
+            == 404
+        )
+    else:
+        assert "location" not in response.headers
 
 
 def test_public_effect_detail_filters_and_recommendation_order(

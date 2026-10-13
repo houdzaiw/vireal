@@ -1,6 +1,9 @@
 from pathlib import Path
+import copy
+import json
 import os
 import subprocess
+import sys
 import unittest
 
 
@@ -14,28 +17,90 @@ PROTOTYPE = (
 BUILD_SCRIPT = ROOT / "scripts" / "build-vireal-pages.sh"
 AUTH_ENTRY = PROTOTYPE.parent / "vireal-auth.js"
 VERIFY_SCRIPT = ROOT.parent / "scripts" / "verify-production.sh"
+CONTRACT_SCRIPT = ROOT.parent / "scripts" / "verify-release-contract.py"
+REVIEWED_COMMIT = "a" * 40
+
+
+def launch_catalog():
+    return {
+        "categories": [
+            {
+                "effects": [
+                    {
+                        "slug": slug,
+                        "title_en": slug,
+                        "input_image_count": inputs,
+                        "poster_url": "/api/v1/app/media-assets/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                        "preview_video_url": "/api/v1/app/media-assets/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                        "variants": [
+                            {"duration_seconds": duration, "coin_cost": 12}
+                            for duration in [5, 10]
+                        ],
+                    }
+                    for slug, inputs in [("dance-1", 1), ("romance-1", 2)]
+                ]
+            }
+        ]
+    }
+
+
+def launch_commerce():
+    return {
+        "environment": "live",
+        "country": "US",
+        "region_allowed": True,
+        "registration_enabled": False,
+        "recharge_enabled": False,
+        "global_real_limit": 30,
+        "global_real_remaining": 30,
+        "resets_at": "2026-10-14T00:00:00Z",
+        "support_email": "li522903183@gmail.com",
+        "products": [
+            {"product_id": product, "coins": coins, "amount": cents, "currency": "USD"}
+            for product, coins, cents in [
+                ("coins_100", 100, 599),
+                ("coins_220", 220, 1199),
+                ("coins_500", 500, 2499),
+            ]
+        ],
+    }
 
 
 class ProductionEdgeCheckTests(unittest.TestCase):
-    def run_edge_check(self, *, docs_status: int, private_status: int = 403):
+    def run_edge_check(
+        self,
+        *,
+        docs_status: int,
+        private_status: int = 403,
+        commit: str = REVIEWED_COMMIT,
+        features: str | None = None,
+        catalog=None,
+        commerce=None,
+        paypal_status="422 ",
+        protected_status=401,
+    ):
         # Export a shell curl stub so no real service or credential is used.
         curl_stub = r"""
 curl() {
   case "${@: -1}" in
     https://h5.example.com/)
-      printf '%s' '<meta name="vireal-api-base-url" content="https://api.example.com"><meta name="vireal-backend-mode" content="1"><meta name="vireal-release" content="v1.2-production"><meta name="clerk-publishable-key" content="pk_live_test">' ;;
+      printf '%s' "$TEST_H5_HTML" ;;
     https://h5.example.com/assets/vireal-app.js)
-      printf '%s' '/api/v1/app/effect-catalog' ;;
+      printf '%s' "$TEST_H5_JS" ;;
     https://api.example.com/api/v1/utils/health-check/)
       printf '%s' 'true' ;;
     https://api.example.com/api/v1/app/effect-catalog)
-      printf '%s' '{"categories":[]}' ;;
-    https://api.example.com/api/v1/app/auth/device-login)
-      printf '%s' '410' ;;
+      printf '%s' "$TEST_CATALOG" ;;
+    https://api.example.com/api/v1/app/paypal/config)
+      printf '%s' "$TEST_COMMERCE" ;;
+    https://api.example.com/api/v1/app/wallet|https://api.example.com/api/v1/app/video-tasks/00000000-0000-0000-0000-000000000000/download)
+      printf '%s' "$TEST_PROTECTED_STATUS" ;;
     https://api.example.com/docs)
       printf '%s' "$TEST_DOCS_STATUS" ;;
     https://api.example.com/api/v1/webhooks/replicate)
       printf '%s' '401 ' ;;
+    https://api.example.com/api/v1/webhooks/payments/paypal)
+      printf '%s' "$TEST_PAYPAL_STATUS" ;;
     https://r2.example.com/private.mp4)
       printf '%s' "$TEST_PRIVATE_STATUS" ;;
     *) return 9 ;;
@@ -53,6 +118,22 @@ bash "$1"
                 "R2_PRIVATE_OBJECT_URL": "https://r2.example.com/private.mp4",
                 "TEST_DOCS_STATUS": str(docs_status),
                 "TEST_PRIVATE_STATUS": str(private_status),
+                "RELEASE_CHECK_MODE": "closed",
+                "EXPECTED_RELEASE_COMMIT": REVIEWED_COMMIT,
+                "PYTHON_BIN": sys.executable,
+                "TEST_H5_HTML": '<meta name="vireal-api-base-url" content="https://api.example.com"><meta name="vireal-backend-mode" content="1"><meta name="vireal-release" content="v1.2-production"><meta name="clerk-publishable-key" content="pk_live_test">'
+                + f'<meta name="vireal-release-commit" content="{commit}">',
+                "TEST_H5_JS": features
+                if features is not None
+                else "/api/v1/app/effect-catalog /api/v1/app/paypal/orders data-refresh-task data-download-task playback_url_expires_at",
+                "TEST_CATALOG": json.dumps(
+                    catalog if catalog is not None else launch_catalog()
+                ),
+                "TEST_COMMERCE": json.dumps(
+                    commerce if commerce is not None else launch_commerce()
+                ),
+                "TEST_PAYPAL_STATUS": paypal_status,
+                "TEST_PROTECTED_STATUS": str(protected_status),
             },
             capture_output=True,
             text=True,
@@ -70,6 +151,157 @@ bash "$1"
             with self.subTest(status=status):
                 result = self.run_edge_check(docs_status=403, private_status=status)
                 self.assertEqual(result.returncode == 0, status in {400, 401, 403, 404})
+
+    def test_old_source_and_missing_payment_recovery_are_rejected(self):
+        self.assertNotEqual(
+            self.run_edge_check(docs_status=403, commit="b" * 40).returncode, 0
+        )
+        self.assertNotEqual(
+            self.run_edge_check(
+                docs_status=403, features="/api/v1/app/effect-catalog"
+            ).returncode,
+            0,
+        )
+
+    def test_old_catalog_and_missing_paypal_receiver_are_rejected(self):
+        self.assertNotEqual(
+            self.run_edge_check(docs_status=403, catalog={"categories": []}).returncode,
+            0,
+        )
+        for status in ["200 ", "204 ", "404 ", "503 ", "302 https://example.com/"]:
+            with self.subTest(status=status):
+                self.assertNotEqual(
+                    self.run_edge_check(
+                        docs_status=403, paypal_status=status
+                    ).returncode,
+                    0,
+                )
+
+    def test_anonymous_wallet_and_download_must_remain_protected(self):
+        for status in [200, 302, 404, 500]:
+            with self.subTest(status=status):
+                self.assertNotEqual(
+                    self.run_edge_check(
+                        docs_status=403, protected_status=status
+                    ).returncode,
+                    0,
+                )
+
+    def test_checks_never_claim_real_acceptance_or_create_device_accounts(self):
+        result = self.run_edge_check(docs_status=403)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no payment or generation was exercised", result.stdout)
+        self.assertIn(
+            "Region-scoped checks do not prove global switches", result.stdout
+        )
+        self.assertNotIn("/app/auth/device-login", VERIFY_SCRIPT.read_text())
+
+
+class ReleaseContractTests(unittest.TestCase):
+    def check(self, contract, data, mode="closed"):
+        return subprocess.run(
+            [sys.executable, str(CONTRACT_SCRIPT), contract, mode],
+            input=json.dumps(data),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+    def test_selected_catalog_accepts_only_complete_5_10_combinations(self):
+        self.assertEqual(self.check("catalog", launch_catalog()).returncode, 0)
+        for change in [
+            "extra",
+            "empty",
+            "slug",
+            "duration",
+            "cost",
+            "inputs",
+            "private",
+        ]:
+            data = copy.deepcopy(launch_catalog())
+            effects = data["categories"][0]["effects"]
+            if change == "extra":
+                effects.append(copy.deepcopy(effects[0]))
+            elif change == "empty":
+                effects.clear()
+            elif change == "slug":
+                effects[0]["slug"] = "hidden-1"
+            elif change == "duration":
+                effects[0]["variants"][1]["duration_seconds"] = 15
+            elif change == "cost":
+                effects[0]["variants"][0]["coin_cost"] = 0
+            elif change == "inputs":
+                effects[1]["input_image_count"] = 1
+            elif change == "private":
+                effects[0]["variants"][0]["prompt"] = "private-canary-token"
+            with self.subTest(change=change):
+                result = self.check("catalog", data)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("private-canary-token", result.stdout + result.stderr)
+
+    def test_public_checks_require_real_managed_media_references(self):
+        self.assertEqual(
+            self.check("catalog", launch_catalog(), "public").returncode, 0
+        )
+        for field in ["poster_url", "preview_video_url"]:
+            for value in [None, "https://example.com/placeholder.png", ""]:
+                data = launch_catalog()
+                data["categories"][0]["effects"][0][field] = value
+                self.assertNotEqual(self.check("catalog", data, "public").returncode, 0)
+                self.assertEqual(self.check("catalog", data).returncode, 0)
+
+    def test_prices_capacity_and_observed_closed_flags_are_verified(self):
+        self.assertEqual(self.check("commerce", launch_commerce()).returncode, 0)
+        for field, value in [
+            ("environment", "sandbox"),
+            ("global_real_limit", 3),
+            ("global_real_remaining", -1),
+            ("global_real_remaining", True),
+            ("registration_enabled", True),
+            ("recharge_enabled", True),
+            ("support_email", "wrong@example.com"),
+        ]:
+            data = launch_commerce()
+            data[field] = value
+            self.assertNotEqual(self.check("commerce", data).returncode, 0)
+        for field, value in [("coins", 999), ("amount", 599.0), ("currency", "CNY")]:
+            data = launch_commerce()
+            data["products"][0][field] = value
+            self.assertNotEqual(self.check("commerce", data).returncode, 0)
+
+    def test_public_mode_does_not_bypass_region_or_closed_payment_state(self):
+        data = launch_commerce()
+        data.update(
+            registration_enabled=True,
+            recharge_enabled=True,
+            client_id="public-client-id",
+        )
+        self.assertEqual(self.check("commerce", data, "public").returncode, 0)
+        for field, value in [
+            ("country", "CN"),
+            ("country", None),
+            ("country", "XX"),
+            ("region_allowed", False),
+            ("registration_enabled", False),
+            ("recharge_enabled", False),
+            ("client_id", None),
+            ("global_real_remaining", 0),
+        ]:
+            invalid = {**data, field: value}
+            self.assertNotEqual(self.check("commerce", invalid, "public").returncode, 0)
+
+    def test_malformed_responses_fail_without_echoing_payloads(self):
+        for contract in ["catalog", "commerce"]:
+            for data in [
+                None,
+                [],
+                "private-canary-token",
+                {"categories": [None]},
+                {"products": [None]},
+            ]:
+                result = self.check(contract, data)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("private-canary-token", result.stdout + result.stderr)
 
 
 class VirealH5ProductionTests(unittest.TestCase):
@@ -89,6 +321,19 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertTrue(SOURCE.exists())
         self.assertIn('content="v1.2-production"', self.html)
         self.assertIn("vireal-v1.2.html", self.build_script)
+
+    def test_build_stamps_a_reviewed_commit_and_rejects_invalid_values(self) -> None:
+        self.assertIn('name="vireal-release-commit"', self.html)
+        self.assertIn("__VIREAL_RELEASE_COMMIT__", self.build_script)
+        result = subprocess.run(
+            ["bash", str(BUILD_SCRIPT)],
+            env={**os.environ, "VIREAL_RELEASE_COMMIT": "invalid-commit"},
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("40-character Git commit", result.stderr)
 
     def test_v11_fallback_is_built(self) -> None:
         self.assertIn("fallback/v1.1", self.build_script)

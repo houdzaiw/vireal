@@ -575,6 +575,73 @@ or model-output acceptance.
   This does not yet establish GitHub CI, actual Safari/system-save compatibility,
   genuine overseas-region acceptance, or a real production media/payment flow.
 
+### Follow-up remediation and review, 2026-10-13
+
+Owner explicitly chose **finish remediation/review only; do not merge or deploy**.
+PR #17 remains the feature delivery location. No production database, cloud
+configuration, real payment/refund or new prediction is changed by this follow-up.
+
+- Review found that `/app/media-assets/{id}` could issue new signed URLs for any
+  active admin upload, even when its effect was hidden or still a draft. It now
+  requires attachment to a published/enabled effect in an enabled category, at
+  least one enabled duration within the release limit, and membership in the
+  production launch selection. Soft-deleted media is excluded. Admin uploads still
+  return their authorized preview URLs; only public access is restricted. Redirects
+  are `private, no-store`; already-issued R2 URLs expire under their existing TTL,
+  not instantly. This is not proof of display/portrait authorization.
+- H5 builds embed `vireal-release-commit`, derived from the Git checkout or an
+  explicit 40-character `VIREAL_RELEASE_COMMIT`. This is a source marker, not a
+  cryptographic build attestation. Build only from a clean reviewed commit for a
+  later deployment, and independently match Railway API/worker and Worker versions.
+- `scripts/verify-production.sh` now requires the reviewed commit and checks the
+  PayPal/task-recovery/download frontend, exactly the two 5/10s effects, approved
+  USD packages/site capacity, protected wallet/download and the malformed-input
+  rejection at the PayPal receiver. It no longer POSTs a valid device-login request
+  that could create a business account on a misconfigured old backend. A production
+  read-only run on this date correctly stopped at the missing release-commit marker;
+  the existing online H5 is not the new candidate. No rollout was performed.
+- Verification has **closed** (default) and **public** observation modes. Closed
+  mode tolerates not-yet-supplied cover/preview URLs. Public mode requires both
+  managed media references, a genuinely eligible edge country, open registration/
+  recharge and remaining capacity. A CN/unknown response cannot certify worldwide
+  closure; confirm the global Railway/Clerk switches separately. Neither mode
+  certifies merchant readiness, rights, cash receipt, generation or mobile saving.
+  JSON diagnostics never echo payloads, private fields or tokens.
+- Local full regression: **396 backend tests passed; 91% application coverage**,
+  including 18 new poster/preview visibility cases. Testing used a fresh disposable
+  local PostgreSQL cluster with no repository `.env` or production backup. **39 H5
+  contract, 31 mocked Chromium browser and 3 edge checks passed**; H5 build and
+  ruff/mypy/ty passed. CI evidence for this follow-up must be recorded in the PR's latest checks,
+  not inferred from the previous revision's green CI.
+
+After an independently approved closed deployment, run from its reviewed checkout:
+
+```bash
+H5_URL=https://app.usevireal.com \
+API_URL=https://api.usevireal.com \
+EXPECTED_RELEASE_COMMIT="$(git rev-parse HEAD)" \
+RELEASE_CHECK_MODE=closed \
+bash scripts/verify-production.sh
+```
+
+Use `public` mode only after separately authorized opening, from a genuine eligible
+region; do not spoof geography or pass a fabricated signing header. The check does
+not toggle any feature. Its success is observable technical evidence, never the
+approval to open commerce or promote the product.
+
+Promotion preparation remains **draft/not published**. Prepare brand accounts and
+use “Vireal is preparing a small public beta. Follow for launch updates” for textual
+prelaunch updates; do not claim current payment availability or free generation.
+Once the later release/rights/Live gates pass, prepare three authorized demonstrations
+(dance, romance, full mobile workflow) for Instagram Reels/YouTube Shorts. Clearly
+label realistic AI output, verify music and portrait/social-advertising rights, and
+show 5/10s duration, credits from $5.99, limits and 24-hour result retention. First
+72 hours use organic posts only, target roughly 3–5 generating users/day within
+actual remaining site capacity, keep the same public registration policy, and
+record paid/credited/generated/downloaded outcomes without publishing user media.
+No account creation, social posting, advertising purchase, attribution collection
+or future monitor is authorized or implemented by this preparation note.
+
 ### Remaining gates and evidence ledger
 
 1. **Public material: blocked.** Owner answered "暂无" for both launch covers and
