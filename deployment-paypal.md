@@ -613,6 +613,15 @@ configuration, real payment/refund or new prediction is changed by this follow-u
   contract, 31 mocked Chromium browser and 3 edge checks passed**; H5 build and
   ruff/mypy/ty passed. CI evidence for this follow-up must be recorded in the PR's latest checks,
   not inferred from the previous revision's green CI.
+- CI report review reproduced `Z_BUF_ERROR` in the download action's streaming
+  inflater for one digest-valid outer ZIP, even when downloaded serially; the
+  GitHub CLI extracted all four report blobs successfully. Local reconstruction
+  with stored outer ZIPs passed the same parser for every shard. Playwright blob
+  uploads now use `compression-level: 0` (the blobs are already ZIP-compressed),
+  with missing reports and digest mismatches remaining fatal. The aggregate
+  green check also requires HTML report merge/upload success. This is a report
+  packaging fix, not a skipped test or a relaxed integrity check; fresh CI is
+  still required on the updated head.
 
 After an independently approved closed deployment, run from its reviewed checkout:
 
