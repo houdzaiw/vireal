@@ -474,6 +474,17 @@ class VirealH5ProductionTests(unittest.TestCase):
             logout.index("VirealClerk?.signOut"),
         )
 
+    def test_confirmed_operator_and_exact_media_retention_are_disclosed(self) -> None:
+        self.assertIn("经营者：李启辉（品牌 Vireal）", self.app)
+        self.assertIn("Operator: Li Qihui (李启辉)", self.app)
+        self.assertIn("输入照片从上传起保留24小时", self.app)
+        self.assertIn("成品从保存成功起保留24小时", self.app)
+        self.assertIn("results for 24 hours from successful persistence", self.app)
+        self.assertNotIn(
+            "Merchant identity and applicable terms must be confirmed", self.app
+        )
+        self.assertIn("受控验收不代表公众注册或充值已经开放", self.app)
+
     def test_mobile_shell_has_no_horizontal_overflow(self) -> None:
         self.assertIn("overflow-x: hidden", PROTOTYPE.read_text(encoding="utf-8"))
         self.assertIn("width: 100%", self.css)

@@ -2,6 +2,36 @@
 
 ## Release state
 
+**2026-10-13 authorization update:** the owner now authorizes merging PR #17
+after review/green CI and deploying the selected release in the **closed** state.
+A fresh backup `production-20261013-153609-pre-selected-release.dump` in
+`/Users/huili/Documents/vireal-backups/` restored successfully: all 25 public
+tables matched the exported snapshot. The isolated additive migration to
+`b4c5d6e7f8a9` preserved every existing column/row in the other 24 tables.
+Verification and migration-rehearsal JSON records sit alongside the dump (0600).
+This checkpoint does not yet claim merging or deployment has occurred.
+
+The owner confirms Li Qihui (李启辉), brand Vireal, support
+`li522903183@gmail.com`, prices, limits, 24-hour retention and manual-refund rules
+**for controlled Live acceptance**. H5 now states that identity and the separate
+upload/result retention start times. PayPal telephone advice (owner reported)
+was that no advance product approval was required and compliance may be reviewed
+after receipt; this is not independent legal/compliance clearance. The PayPal
+contact-settings search fails for the owner as well; keep the site's support
+email accessible and treat the PayPal profile issue as an open follow-up, not a
+verified optional requirement.
+
+Maximum newly authorized paid predictions: **four staging combinations plus one
+production 5-second acceptance, five total and combined model spend <= USD 10**.
+Confirm the provider's actual current price before submission; no blind retries.
+The production cumulative test lock may be removed only at the production
+acceptance stage. **No eligible independent overseas Live buyer is available**
+(owner confirmed); production acceptance and lock removal must wait. Keep
+public registration, payments, acceptance and terms flags closed meanwhile.
+Synthetic concept covers are not genuine video previews; never publish the
+earlier internally authorized real-person inputs/results. Public opening remains
+separately authorized after all acceptance gates pass.
+
 Implementation is on `codex/paypal-public-registration`. As of **2026-10-12**,
 the compatible production API/worker, signed-region Worker and H5 are deployed
 with independently configured **Live** credentials. Production registration,
