@@ -58,6 +58,17 @@ are browser-engine/synthetic tests, not physical iPhone save certification. The
 fix requires fresh PR review/CI before a closed H5 update; the deployed source at
 this checkpoint remains `9afed5b`.
 
+The first follow-up CI run `38383181453` passed 64/70 checks but stalled on six
+Linux WebKit cases (click stability and query/timer progress), unlike the full
+macOS local pass. Its traces are preserved as GitHub artifacts and in
+`/tmp/vireal-pr19-browser.30S4yc`; a specific compositor root cause is **not**
+claimed. CI now runs every Chromium case on Ubuntu and every WebKit case on macOS,
+without forced clicks, skips, extra retries or disabled animations. This follows
+[Playwright's platform guidance](https://playwright.dev/docs/browsers#webkit)
+for the closest Safari/media experience, not a claim that Linux WebKit was fixed.
+The original stable `test-h5` check fails unless both host jobs succeed. Physical
+iPhone acceptance remains necessary even after that cross-platform CI passes.
+
 Real signed-in staging Chrome was put into DevTools **Offline**: five task GETs
 failed with `net::ERR_INTERNET_DISCONNECTED`, and H5 displayed interrupted-status
 retry without another generation. Restoring **No throttling** cleared the warning,
