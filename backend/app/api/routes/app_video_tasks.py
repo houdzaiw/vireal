@@ -6,9 +6,11 @@ from typing import Annotated, Literal, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, text
 from sqlmodel import col, select
+from starlette.background import BackgroundTask
 
 from app.api.deps import CurrentAppUser, SessionDep
 from app.core.config import settings
@@ -29,6 +31,12 @@ from app.services.coin_wallet import (
     get_coin_balance,
     refund_video_task,
 )
+from app.services.commercial_access import (
+    launch_effect_allowed,
+    lock_commercial_user,
+    require_new_commerce_user,
+    require_region,
+)
 from app.services.effect_validation import (
     execution_type_for_model,
     validate_effect_variant,
@@ -40,7 +48,7 @@ from app.services.replicate_video import (
 )
 from app.services.storage import ImageStorageError, get_image_storage
 from app.services.video_generation import VideoTaskStatus
-from app.services.video_quota import build_video_quota, quota_counts
+from app.services.video_quota import build_video_quota, global_real_count, quota_counts
 
 router = APIRouter(prefix="/app/video-tasks", tags=["app video tasks"])
 
@@ -77,19 +85,34 @@ def _serialize_video_task(
     task: AppVideoTask,
 ) -> AppVideoTaskPublic:
     playback_url: str | None = None
-    if task.status == "succeeded" and task.output_object_key:
+    playback_url_expires_at: datetime | None = None
+    now = datetime.now(UTC)
+    if task.status == "succeeded" and task.output_object_key and task.expires_at > now:
         try:
+            expires_in = max(
+                1,
+                min(
+                    settings.R2_VIDEO_PLAYBACK_URL_EXPIRE_SECONDS,
+                    int((task.expires_at - now).total_seconds()),
+                ),
+            )
             playback_url = get_image_storage().create_object_read_url(
                 task.output_object_key,
-                expires_in=settings.R2_VIDEO_PLAYBACK_URL_EXPIRE_SECONDS,
+                expires_in=expires_in,
             )
+            playback_url_expires_at = now + timedelta(seconds=expires_in)
         except ImageStorageError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     effect = session.get(AppEffect, task.effect_id) if task.effect_id else None
     return AppVideoTaskPublic(
         id=task.id,
         template_id=task.template_id,
-        status=cast(TaskStatus, task.status),
+        status=cast(
+            TaskStatus,
+            "expired"
+            if task.status == "succeeded" and task.expires_at <= now
+            else task.status,
+        ),
         mode=cast(TaskMode, task.mode),
         execution_type=cast(TaskExecution, task.execution_type),
         is_demo=task.is_demo,
@@ -105,6 +128,8 @@ def _serialize_video_task(
         aspect_ratio=task.aspect_ratio,
         error=task.error,
         playback_url=playback_url,
+        playback_url_expires_at=playback_url_expires_at,
+        coin_refunded_at=task.coin_refunded_at,
         created_at=task.created_at,
         completed_at=task.completed_at,
         expires_at=task.expires_at,
@@ -244,11 +269,14 @@ def _route_to_local_demo(
 )
 async def create_video_task(
     *,
+    request: Request,
     session: SessionDep,
     current_app_user: CurrentAppUser,
     body: AppVideoTaskCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> AppVideoTaskPublic:
+    require_region(request)
+    require_new_commerce_user(request)
     if not settings.REPLICATE_ENABLED and not settings.LOCAL_DEMO_ENABLED:
         raise HTTPException(status_code=503, detail="Replicate integration is disabled")
     idempotency_key = idempotency_key.strip()
@@ -267,6 +295,9 @@ async def create_video_task(
     if existing is not None:
         return _serialize_idempotent_task(session, existing, body)
 
+    if not settings.APP_VIDEO_SUBMISSIONS_ENABLED:
+        raise HTTPException(503, "New video submissions are temporarily paused")
+
     effect: AppEffect | None = None
     variant: AppEffectVariant | None = None
     if body.effect_id is not None and body.variant_id is not None:
@@ -283,6 +314,7 @@ async def create_video_task(
             or not category.is_enabled
             or effect.publish_status != "published"
             or not effect.is_enabled
+            or not launch_effect_allowed(effect.slug)
             or not variant.is_enabled
             or variant.duration_seconds > settings.APP_EFFECT_MAX_DURATION_SECONDS
         ):
@@ -358,6 +390,7 @@ async def create_video_task(
         return _serialize_idempotent_task(session, existing, body)
 
     now = datetime.now(UTC)
+    lock_commercial_user(session, current_app_user)
     user_count, wan_count, active_count, _resets_at = quota_counts(
         session=session,
         app_user_id=current_app_user.id,
@@ -381,6 +414,11 @@ async def create_video_task(
         fallback_reason = "replicate_disabled"
     elif user_count >= settings.APP_USER_DAILY_REAL_SUBMISSIONS:
         fallback_reason = "user_daily_quota"
+    elif (
+        global_real_count(session=session, now=now)
+        >= settings.APP_GLOBAL_DAILY_REAL_SUBMISSIONS
+    ):
+        fallback_reason = "global_daily_quota"
     elif (
         settings.REPLICATE_POC_MAX_SUBMISSIONS > 0
         and attempted_count >= settings.REPLICATE_POC_MAX_SUBMISSIONS
@@ -581,6 +619,38 @@ def read_video_task(
             current_app_user=current_app_user,
             task_id=task_id,
         ),
+    )
+
+
+@router.get("/{task_id}/download", response_class=StreamingResponse)
+def download_video_task(
+    *, session: SessionDep, current_app_user: CurrentAppUser, task_id: uuid.UUID
+) -> StreamingResponse:
+    task = _get_task_for_user(
+        session=session, current_app_user=current_app_user, task_id=task_id
+    )
+    if (
+        task.deleted_at is not None
+        or task.status == "expired"
+        or task.expires_at <= datetime.now(UTC)
+    ):
+        raise HTTPException(410, "Video has expired / 作品已过期")
+    if task.status != "succeeded" or not task.output_object_key:
+        raise HTTPException(409, "Video is not ready for download")
+    try:
+        video = get_image_storage().open_video(task.output_object_key)
+    except ImageStorageError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    return StreamingResponse(
+        video.chunks,
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": f'attachment; filename="vireal-{task.id}.mp4"',
+            "Content-Length": str(video.size),
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+        background=BackgroundTask(video.close),
     )
 
 

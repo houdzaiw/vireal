@@ -586,3 +586,62 @@ def test_r2_constructor_and_unmanaged_image_urls_are_rejected(
         storage.create_read_url("https://example.com/image.png", expires_in=60)
     with pytest.raises(ImageStorageError, match="not managed"):
         storage.read_app_image("https://example.com/image.png")
+
+
+def test_private_r2_video_stream_is_bounded_and_closes() -> None:
+    content = b"\x00\x00\x00\x18ftypmp42" + b"video" * 40000
+    body = BytesIO(content)
+
+    class VideoClient(FakeR2Client):
+        def get_object(self, **kwargs: Any) -> dict[str, Any]:
+            self.get_calls.append(kwargs)
+            return {"Body": body, "ContentLength": len(content)}
+
+    client = VideoClient()
+    storage = R2ImageStorage(
+        client=client, bucket_name="private-test", object_prefix="vireal"
+    )
+    video = storage.open_video("vireal/videos/test/result.mp4")
+    chunks = list(video.chunks)
+    assert b"".join(chunks) == content and max(map(len, chunks)) <= 64 * 1024
+    assert video.size == len(content) and body.closed
+    video.close()
+    assert client.get_calls == [
+        {"Bucket": "private-test", "Key": "vireal/videos/test/result.mp4"}
+    ]
+
+
+@pytest.mark.parametrize("size", [0, -1, "invalid", 999999999])
+def test_private_video_rejects_bad_size_without_leaking_stream(size: Any) -> None:
+    body = BytesIO(b"video")
+
+    class BadSizeClient(FakeR2Client):
+        def get_object(self, **_kwargs: Any) -> dict[str, Any]:
+            return {"Body": body, "ContentLength": size}
+
+    storage = R2ImageStorage(
+        client=BadSizeClient(), bucket_name="private-test", object_prefix="vireal"
+    )
+    with pytest.raises(ImageStorageError, match="size is invalid"):
+        storage.open_video("vireal/videos/test/result.mp4")
+    assert body.closed
+
+
+def test_private_video_missing_object_and_local_size_are_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class MissingClient(FakeR2Client):
+        def get_object(self, **_kwargs: Any) -> dict[str, Any]:
+            raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
+
+    storage = R2ImageStorage(
+        client=MissingClient(), bucket_name="private-test", object_prefix="vireal"
+    )
+    with pytest.raises(ImageStorageError, match="Unable to read private video"):
+        storage.open_video("vireal/videos/test/missing.mp4")
+    local = LocalImageStorage(tmp_path)
+    path = tmp_path / "large.mp4"
+    path.write_bytes(b"video" * 10)
+    monkeypatch.setattr(settings, "MAX_GENERATED_VIDEO_BYTES", 8)
+    with pytest.raises(ImageStorageError, match="size is invalid"):
+        local.open_video("large.mp4")

@@ -179,6 +179,71 @@ def test_effect_duration_release_gate_defaults_to_ten_seconds() -> None:
     )
 
 
+def _commerce_settings(**overrides: Any) -> Settings:
+    values = {
+        "ENVIRONMENT": "production",
+        "PAYPAL_ENABLED": True,
+        "PAYPAL_ENVIRONMENT": "live",
+        "PAYPAL_CLIENT_ID": "unit-public",
+        "PAYPAL_CLIENT_SECRET": "unit-private",
+        "PAYPAL_MERCHANT_ID": "unit-merchant",
+        "PAYPAL_WEBHOOK_ID": "unit-webhook",
+        "APP_PUBLIC_REGISTRATION_ENABLED": True,
+        "APP_COMMERCE_TERMS_APPROVED": True,
+        "APP_AUTH_MODE": "clerk",
+        "CLERK_ISSUER_URL": "https://clerk.example.com",
+        "CLERK_JWKS_URL": "https://clerk.example.com/.well-known/jwks.json",
+        "CLERK_AUDIENCE": "vireal",
+        "CLERK_SECRET_KEY": "unit-clerk-secret",
+        "CLERK_AUTHORIZED_PARTIES": ["https://app.example.com"],
+        "ADMIN_PUBLIC_SIGNUP_ENABLED": False,
+        "APP_REGION_ENFORCEMENT_ENABLED": True,
+        "APP_EDGE_SIGNING_SECRET": "unit-edge-secret-with-at-least-32-characters",
+        "LOCAL_DEMO_ENABLED": False,
+        "APP_LEGACY_VIDEO_TASKS_ENABLED": False,
+    }
+    values.update(overrides)
+    return _settings(**values)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"APP_COMMERCE_TERMS_APPROVED": False},
+        {"PAYPAL_ENVIRONMENT": "sandbox"},
+        {"APP_REGION_ENFORCEMENT_ENABLED": False},
+        {"APP_EDGE_SIGNING_SECRET": "short"},
+        {"PAYPAL_ENABLED": False},
+        {"PAYPAL_CLIENT_SECRET": None},
+        {"LOCAL_DEMO_ENABLED": True},
+        {"APP_LEGACY_VIDEO_TASKS_ENABLED": True},
+        {"ADMIN_PUBLIC_SIGNUP_ENABLED": True},
+        {"APP_AUTH_MODE": "device"},
+        {"APP_GLOBAL_DAILY_REAL_SUBMISSIONS": 0},
+        {"PAYPAL_REQUEST_TIMEOUT_SECONDS": 0},
+    ],
+)
+def test_unsafe_public_commerce_configuration_is_rejected(overrides: Any) -> None:
+    with pytest.raises(ValidationError):
+        _commerce_settings(**overrides)
+
+
+def test_complete_public_commerce_configuration_and_safe_defaults() -> None:
+    assert _commerce_settings().PAYPAL_ENABLED
+    defaults = _settings()
+    assert not defaults.PAYPAL_ENABLED and not defaults.APP_PUBLIC_REGISTRATION_ENABLED
+    assert defaults.APP_GLOBAL_DAILY_REAL_SUBMISSIONS == 30
+    assert defaults.APP_WAN_DAILY_GLOBAL_SUBMISSIONS == 30
+
+
+def test_railway_environment_is_recognized_without_a_duplicate_variable(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT_NAME", "production")
+    assert _settings().ENVIRONMENT == "production"
+
+
 def test_cross_service_configuration_guards() -> None:
     replicate = {
         "REPLICATE_ENABLED": True,

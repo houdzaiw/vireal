@@ -2,7 +2,9 @@ import warnings
 from typing import Literal, Self
 
 from pydantic import (
+    AliasChoices,
     EmailStr,
+    Field,
     HttpUrl,
     PostgresDsn,
     computed_field,
@@ -20,6 +22,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: Literal["local", "staging", "production"] = Field(
+        default="local",
+        validation_alias=AliasChoices("ENVIRONMENT", "RAILWAY_ENVIRONMENT_NAME"),
+    )
     SECRET_KEY: str
     # Keep production administrator sessions bounded to one working day.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
@@ -81,7 +87,28 @@ class Settings(BaseSettings):
     REPLICATE_POC_MAX_SUBMISSIONS: int = 0
     APP_USER_DAILY_REAL_SUBMISSIONS: int = 5
     APP_USER_MAX_CONCURRENT_VIDEO_TASKS: int = 1
-    APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 3
+    APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 30
+    APP_GLOBAL_DAILY_REAL_SUBMISSIONS: int = 30
+    APP_PUBLIC_REGISTRATION_ENABLED: bool = False
+    APP_LIVE_ACCEPTANCE_ENABLED: bool = False
+    APP_LIVE_ACCEPTANCE_SUBJECTS: list[str] = []
+    # Only these catalogue slugs can be browsed/submitted in production.
+    APP_LAUNCH_EFFECT_SLUGS: list[str] = ["dance-1", "romance-1"]
+    # Emergency pause affects new submissions, not provider queries/callbacks.
+    APP_VIDEO_SUBMISSIONS_ENABLED: bool = True
+    APP_COMMERCE_TERMS_APPROVED: bool = False
+    APP_REGION_ENFORCEMENT_ENABLED: bool = False
+    APP_EDGE_SIGNING_SECRET: str | None = None
+    APP_EDGE_SIGNATURE_TOLERANCE_SECONDS: int = 60
+    PAYPAL_ENABLED: bool = False
+    PAYPAL_ENVIRONMENT: Literal["sandbox", "live"] = "sandbox"
+    PAYPAL_CLIENT_ID: str | None = None
+    PAYPAL_CLIENT_SECRET: str | None = None
+    PAYPAL_MERCHANT_ID: str | None = None
+    PAYPAL_WEBHOOK_ID: str | None = None
+    PAYPAL_REQUEST_TIMEOUT_SECONDS: float = 20.0
+    PAYPAL_RECONCILE_INTERVAL_SECONDS: float = 60.0
+    APP_SUPPORT_EMAIL: EmailStr = "li522903183@gmail.com"
     # Release gate only: retain longer variants and historical task snapshots.
     APP_EFFECT_MAX_DURATION_SECONDS: Literal[5, 10, 15] = 10
     # Preserve compatibility in development; disable the unpriced legacy
@@ -212,6 +239,83 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_LOGIN_MAX_FAILURES must be positive")
         if self.ADMIN_LOGIN_WINDOW_SECONDS < 1:
             raise ValueError("ADMIN_LOGIN_WINDOW_SECONDS must be positive")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_commerce_configuration(self) -> Self:
+        if self.APP_LIVE_ACCEPTANCE_ENABLED:
+            if (
+                self.ENVIRONMENT != "production"
+                or not self.PAYPAL_ENABLED
+                or not self.APP_LIVE_ACCEPTANCE_SUBJECTS
+                or self.APP_PUBLIC_REGISTRATION_ENABLED
+            ):
+                raise ValueError(
+                    "Live acceptance requires production, enabled live payments, a nonempty subject allowlist and closed public registration"
+                )
+        if any(
+            not subject.strip() or subject != subject.strip()
+            for subject in self.APP_LIVE_ACCEPTANCE_SUBJECTS
+        ):
+            raise ValueError(
+                "Acceptance subjects must be nonempty exact Clerk identities"
+            )
+        if self.ENVIRONMENT == "production" and not self.APP_LAUNCH_EFFECT_SLUGS:
+            raise ValueError(
+                "Production must explicitly select a nonempty launch catalogue"
+            )
+        if self.APP_GLOBAL_DAILY_REAL_SUBMISSIONS < 1:
+            raise ValueError("APP_GLOBAL_DAILY_REAL_SUBMISSIONS must be positive")
+        if self.APP_EDGE_SIGNATURE_TOLERANCE_SECONDS < 1:
+            raise ValueError("APP_EDGE_SIGNATURE_TOLERANCE_SECONDS must be positive")
+        if self.APP_REGION_ENFORCEMENT_ENABLED and (
+            not self.APP_EDGE_SIGNING_SECRET or len(self.APP_EDGE_SIGNING_SECRET) < 32
+        ):
+            raise ValueError("Region enforcement requires a 32-character edge secret")
+        if (
+            self.PAYPAL_REQUEST_TIMEOUT_SECONDS <= 0
+            or self.PAYPAL_RECONCILE_INTERVAL_SECONDS <= 0
+        ):
+            raise ValueError("PayPal timeouts and reconcile interval must be positive")
+        if self.PAYPAL_ENABLED:
+            required = (
+                self.PAYPAL_CLIENT_ID,
+                self.PAYPAL_CLIENT_SECRET,
+                self.PAYPAL_MERCHANT_ID,
+                self.PAYPAL_WEBHOOK_ID,
+            )
+            if not all(required):
+                raise ValueError(
+                    "PayPal requires client ID, secret, merchant ID and webhook ID"
+                )
+        if self.ENVIRONMENT == "production" and (
+            self.PAYPAL_ENABLED or self.APP_PUBLIC_REGISTRATION_ENABLED
+        ):
+            if not self.APP_COMMERCE_TERMS_APPROVED:
+                raise ValueError(
+                    "Public commerce requires confirmed merchant identity and terms"
+                )
+            if self.APP_AUTH_MODE != "clerk":
+                raise ValueError(
+                    "Public commerce requires verified Clerk authentication"
+                )
+            if self.ADMIN_PUBLIC_SIGNUP_ENABLED:
+                raise ValueError("Public commerce must not enable administrator signup")
+            if (
+                self.PAYPAL_ENVIRONMENT != "live"
+                or not self.APP_REGION_ENFORCEMENT_ENABLED
+            ):
+                raise ValueError(
+                    "Public commerce requires live PayPal and signed region enforcement"
+                )
+            if self.APP_PUBLIC_REGISTRATION_ENABLED and not self.PAYPAL_ENABLED:
+                raise ValueError(
+                    "Public registration and live recharge must launch together"
+                )
+            if self.LOCAL_DEMO_ENABLED or self.APP_LEGACY_VIDEO_TASKS_ENABLED:
+                raise ValueError(
+                    "Public commerce requires real, priced generation only"
+                )
         return self
 
     @model_validator(mode="after")

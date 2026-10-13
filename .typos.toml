@@ -1,0 +1,7 @@
+# Preserve the upstream Wan input field's spelling; changing it breaks the API.
+[default.extend-identifiers]
+refert_num = "refert_num"
+
+# Keep the upstream alls-green action/status name stable for branch protection.
+[default.extend-words]
+alls = "alls"

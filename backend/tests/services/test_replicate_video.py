@@ -108,9 +108,7 @@ async def test_minimax_video_01_uses_uploaded_image_as_first_frame() -> None:
 
     assert submission.provider_task_id == "prediction-minimax"
     assert captured_request is not None
-    assert captured_request.url.path == (
-        "/v1/models/minimax/video-01/predictions"
-    )
+    assert captured_request.url.path == ("/v1/models/minimax/video-01/predictions")
     assert json.loads(captured_request.content)["input"] == {
         "prompt": "A single adult person performs a natural full-body dance.",
         "prompt_optimizer": True,

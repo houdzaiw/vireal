@@ -71,7 +71,9 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_current_app_user(session: SessionDep, token: AppTokenDep) -> AppUser:
+def get_current_app_user(
+    request: Request, session: SessionDep, token: AppTokenDep
+) -> AppUser:
     if settings.APP_AUTH_MODE in {"dual", "clerk"}:
         try:
             unverified = jwt.decode(token, options={"verify_signature": False})
@@ -85,6 +87,7 @@ def get_current_app_user(session: SessionDep, token: AppTokenDep) -> AppUser:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Could not validate app credentials",
                 ) from exc
+            request.state.clerk_claims = claims
             identity = session.exec(
                 select(AppUserIdentity).where(
                     AppUserIdentity.issuer == claims.issuer,

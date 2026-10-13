@@ -30,4 +30,7 @@ def read_wallet(
         concurrent_remaining=quota.concurrent_remaining,
         resets_at=quota.resets_at,
         ledger=[AppCoinLedgerPublic.model_validate(item) for item in ledger],
+        payment_hold=current_app_user.payment_hold,
+        global_real_limit=quota.global_real_limit,
+        global_real_remaining=quota.global_real_remaining,
     )

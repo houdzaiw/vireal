@@ -9,6 +9,8 @@
       "!**/src/routeTree.gen.ts",
       "!**/src/client/**/*",
       "!**/src/components/ui/**/*",
+      "!**/openapi.json",
+      "!**/test-results/**/*",
       "!**/playwright-report",
       "!**/playwright.config.ts"
     ]

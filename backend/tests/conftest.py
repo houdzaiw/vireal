@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,6 +37,16 @@ from tests.utils.user import authentication_token_from_email
 from tests.utils.utils import get_superuser_token_headers
 
 
+@pytest.fixture(autouse=True)
+def isolated_email_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit/API tests must not deliver email to a real external SMTP service."""
+    monkeypatch.setattr(settings, "EMAILS_FROM_EMAIL", "no-reply@example.com")
+    monkeypatch.setattr(
+        "emails.message.Message.send",
+        lambda *_args, **_kwargs: SimpleNamespace(status_code=250),
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def local_image_storage_for_tests() -> Generator[None]:
     """Keep API tests deterministic when a developer .env enables R2."""
@@ -47,6 +58,16 @@ def local_image_storage_for_tests() -> Generator[None]:
 
 @pytest.fixture(scope="session", autouse=True)
 def db() -> Generator[Session]:
+    # This fixture deletes every application table on teardown. Never permit
+    # accidental execution against a deployed database loaded from a local .env.
+    url = engine.url
+    host = str(url.query.get("host", url.host or ""))
+    local_hosts = {"localhost", "127.0.0.1", "::1", "db", "postgres"}
+    temporary_socket = host.startswith("/tmp/vireal-convergence-tests.")
+    if settings.ENVIRONMENT == "production" or (
+        host not in local_hosts and not temporary_socket
+    ):
+        raise RuntimeError("Destructive tests require an isolated local test database")
     with Session(engine) as session:
         init_db(session)
         yield session

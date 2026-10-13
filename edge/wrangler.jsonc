@@ -1,0 +1,10 @@
+{
+  "name": "vireal-api-region",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "env": {
+    "staging": { "name": "vireal-api-region-staging", "routes": [{ "pattern": "staging-api.usevireal.com/api/*", "zone_name": "usevireal.com" }] },
+    "production": { "name": "vireal-api-region-production", "routes": [{ "pattern": "api.usevireal.com/api/*", "zone_name": "usevireal.com" }] }
+  }
+}

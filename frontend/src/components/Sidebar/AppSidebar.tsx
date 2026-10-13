@@ -1,6 +1,7 @@
 import {
   Briefcase,
   Coins,
+  Film,
   FolderKanban,
   History,
   Home,
@@ -45,6 +46,7 @@ export function AppSidebar() {
         },
         { icon: Images, title: "Effects", path: "/effects" },
         { icon: Coins, title: "Coin Wallet", path: "/coin-wallet" },
+        { icon: Film, title: "Video Tasks", path: "/video-tasks" },
         {
           icon: MessageSquareText,
           title: "App Contents",

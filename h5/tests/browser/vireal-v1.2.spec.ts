@@ -67,6 +67,9 @@ async function mockPublicApi(page: Page) {
   await page.route("https://api.example.com/api/v1/app/effect-catalog", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) })
   })
+  await page.route("https://api.example.com/api/v1/app/paypal/config", async (route) => {
+    await route.fulfill({ json: { region_allowed: true, registration_enabled: false, recharge_enabled: false, products: [], global_real_limit: 30, global_real_remaining: 30, support_email: "li522903183@gmail.com" } })
+  })
   await page.route(/https:\/\/(?!api\.example\.com).*/, async (route) => route.abort())
 }
 
@@ -90,7 +93,220 @@ async function mockSignedInApi(page: Page) {
   await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
     await route.fulfill({ json: { data: [] } })
   })
+  await page.route("https://api.example.com/api/v1/app/orders?**", async (route) => {
+    await route.fulfill({ json: { data: [] } })
+  })
 }
+
+const paymentConfig = {
+  region_allowed: true, registration_enabled: true, recharge_enabled: true,
+  client_id: "qa-sandbox-public", environment: "sandbox", global_real_limit: 30,
+  global_real_remaining: 30, resets_at: "2026-10-09T00:00:00Z",
+  support_email: "li522903183@gmail.com",
+  products: [
+    { product_id: "coins_100", coins: 100, amount: 599, currency: "USD" },
+    { product_id: "coins_220", coins: 220, amount: 1199, currency: "USD" },
+    { product_id: "coins_500", coins: 500, amount: 2499, currency: "USD" },
+  ],
+}
+
+// UI contract mocks only; these do not constitute PayPal sandbox acceptance.
+for (const outcome of ["cancel", "pending", "error", "completed"] as const) {
+test(`PayPal wallet: ${outcome} never grants unverified credits`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  let paid = false
+  let created = false
+  let captures = 0
+  const order = () => ({ id: "qa-payment-order", provider_order_id: "QA-PAYPAL", provider: "paypal", app_user_id: "qa-app-user", coin_quantity: 100, amount: 599, created_at: "2026-10-08T10:00:00Z", status: paid ? "paid" : "capture_pending", fulfilled_at: paid ? "2026-10-08T10:01:00Z" : null })
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({ json: { data: created ? [order()] : [] } }))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance: paid ? 100 : 0, daily_remaining: 5, concurrent_remaining: 1, payment_hold: false, global_real_remaining: 30, ledger: [] } }))
+  await page.route("https://api.example.com/api/v1/app/paypal/orders", async route => {
+    expect(route.request().postDataJSON()).toEqual({ product_id: "coins_100" })
+    expect(route.request().headers()["idempotency-key"]).toBeTruthy()
+    created = true
+    await route.fulfill({ json: { ...order(), status: "created" } })
+  })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-payment-order/capture", async route => {
+    captures++
+    paid = outcome === "completed"
+    await route.fulfill(outcome === "error" ? { status: 502, json: { detail: "Confirmation unavailable" } } : { json: order() })
+  })
+  await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement { connectedCallback() { this.textContent='PayPal checkout (UI mock)'; this.style.display='block'; this.style.padding='12px'; } }); window.paypal = { createInstance: async () => ({
+      findEligibleMethods: async () => ({isEligible: () => true}),
+      createPayPalOneTimePaymentSession: async callbacks => ({start: async (_, orderPromise) => {
+        const order = await orderPromise;
+        if (${JSON.stringify(outcome)} === 'cancel') callbacks.onCancel();
+        else await callbacks.onApprove({orderId: order.orderId});
+      }}),
+    }) }`,
+  }))
+  await page.goto("/#wallet")
+  await expect(page.locator(".recharge-product")).toHaveCount(3)
+  for (const price of ["$5.99 USD", "$11.99 USD", "$24.99 USD"]) await expect(page.locator(".recharge-products")).toContainText(price)
+  await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  if (outcome === "completed") await page.screenshot({ path: testInfo.outputPath("wallet-390.png"), fullPage: true, animations: "disabled" })
+  await page.locator("paypal-button").click()
+  if (outcome === "completed") {
+    await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+    await expect(page.getByText("Credits received · 100 ✦", { exact: true })).toBeVisible()
+  } else {
+    await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+    await expect(page.getByText("Credits received · 100 ✦", { exact: true })).toHaveCount(0)
+    await expect(page.locator(".profile-card").filter({ hasText: "Payment pending" })).toBeVisible()
+    // Simulate independent server reconciliation after the buyer closes checkout.
+    paid = true
+    await page.reload()
+    await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+    await expect(page.getByText("Credits received · 100 ✦", { exact: true })).toBeVisible()
+  }
+  expect(captures).toBe(outcome === "cancel" ? 0 : 1)
+})
+}
+
+for (const locale of ["en-US", "zh-CN"]) {
+  test.describe(`refund status (${locale})`, () => {
+    test.use({ locale })
+    for (const held of [true, false]) {
+      test(`refund record stays accurate when payment hold is ${held}`, async ({ page }) => {
+        await mockSignedInApi(page)
+        await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+        await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({ json: { data: [{
+          id: "qa-refunded-order", status: "refunded", provider: "paypal", coin_quantity: 100,
+          amount: 599, currency: "USD", created_at: "2026-10-08T10:00:00Z", fulfilled_at: "2026-10-08T10:01:00Z",
+        }] } }))
+        await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: {
+          balance: held ? 820 : 720, payment_hold: held, daily_remaining: 5, concurrent_remaining: 1,
+          global_real_remaining: 30, ledger: held ? [] : [{
+            entry_type: "recharge_recovery", delta: -100, balance_after: 720,
+            reason: "Payment recovery: QA-REFUND", created_at: "2026-10-08T10:02:00Z",
+          }],
+        } }))
+        await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+          contentType: "application/javascript",
+          body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement { connectedCallback() { this.textContent='PayPal checkout (UI mock)'; } }); window.paypal = { createInstance: async () => ({ findEligibleMethods: async () => ({isEligible: () => true}), createPayPalOneTimePaymentSession: () => ({ start() {throw new Error('Refund UI contract must not start a payment')} }) }) }`,
+        }))
+        await page.goto("/#wallet")
+        const zh = locale === "zh-CN"
+        await expect(page.locator(".wallet-card strong")).toHaveText(`${held ? 820 : 720} ✦`)
+        await expect(page.getByText(`${zh ? "已退款" : "Refunded"} · 100 ✦`, { exact: true })).toBeVisible()
+        const reviewNotice = page.getByText(zh ? "支付账户正在人工审核，请联系客服。" : "Your payment account is under review. Please contact support.", { exact: true })
+        if (held) {
+          await expect(reviewNotice).toBeVisible()
+          await expect(page.locator("paypal-button")).toHaveCount(0)
+          for (const product of await page.locator(".recharge-product").all()) await expect(product).toBeDisabled()
+        } else {
+          await expect(reviewNotice).toHaveCount(0)
+          await expect(page.locator("paypal-button")).toBeVisible()
+          for (const product of await page.locator(".recharge-product").all()) await expect(product).toBeEnabled()
+          await expect(page.getByText(zh ? "已退款，待核对金币" : "Refunded; credits under review", { exact: false })).toHaveCount(0)
+          await expect(page.getByText("Payment recovery: QA-REFUND", { exact: true })).toBeVisible()
+        }
+      })
+    }
+  })
+}
+
+test("region denied does not mount Clerk signup while public browsing works", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: { ...paymentConfig, region_allowed: false, registration_enabled: false, recharge_enabled: false } }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: "window.VirealClerk = {session:null,user:null,addListener() {}, mountSignUp() {throw new Error('Must not mount')}, mountSignIn() {throw new Error('Must not mount')} }" }))
+  await page.goto("/#register")
+  await expect(page.getByText("Service unavailable in this region", { exact: true })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+  await page.getByRole("button", { name: "Browse effects" }).click()
+  await expect(page.locator(".effect-card")).toHaveCount(4)
+})
+
+test("Clerk's slash-suffixed signup link respects the closed registration gate", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {
+      session:null, user:null, addListener() {},
+      mountSignIn(root) { root.innerHTML='<a href="#register/">Sign up</a>' },
+      unmountSignIn() {}, mountSignUp() {throw new Error('Closed signup must not mount')},
+    }`,
+  }))
+  await page.goto("/#login")
+  await page.getByRole("link", { name: "Sign up", exact: true }).click()
+  await expect(page).toHaveURL(/#register\/$/)
+  await expect(page.getByText("Registration is not yet open", { exact: true })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+})
+
+test("slash-suffixed auth routes switch Clerk components and preserve verification", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {
+      session:null, user:null, addListener() {},
+      mountSignIn(root) { root.innerHTML='<a href="#register/">Sign up</a>' },
+      unmountSignIn() {}, unmountSignUp() {},
+      mountSignUp(root) {
+        root.innerHTML='<input aria-label="Signup email"><button>Verify QA email</button><a href="#login/">Sign in</a>';
+        root.querySelector('button').onclick=()=>{
+          root.innerHTML='<input aria-label="Signup OTP"><a href="#login/">Sign in</a>';
+          location.hash='/verify-email-address';
+        };
+      },
+    }`,
+  }))
+  await page.goto("/#login/")
+  await page.getByRole("link", { name: "Sign up", exact: true }).click()
+  await page.getByRole("textbox", { name: "Signup email" }).fill("verified@example.com")
+  await page.getByRole("button", { name: "Verify QA email" }).click()
+  await expect(page).toHaveURL(/#\/verify-email-address$/)
+  await page.getByRole("textbox", { name: "Signup OTP" }).fill("123456")
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+  await expect(page.getByRole("textbox", { name: "Signup OTP" })).toHaveValue("123456")
+  await page.getByRole("link", { name: "Sign in", exact: true }).click()
+  await expect(page).toHaveURL(/#login\/$/)
+  await expect(page.getByRole("link", { name: "Sign up", exact: true })).toBeVisible()
+  await page.goto("/#register/?redirect_url=%23wallet")
+  await expect(page.getByRole("textbox", { name: "Signup email" })).toBeVisible()
+})
+
+test("open signup preserves verification state and returns to a zero-credit wallet", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance: 0, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {
+      session:null, user:null, addListener(listener) {window.qaSignupNotify=listener;listener()},
+      mountSignUp(root, options) {
+        if (options.routing !== 'hash') throw new Error('Hash routing required');
+        root.innerHTML='<input aria-label="Signup email"><button>Verify QA email</button>';
+        root.querySelector('button').onclick=()=>{
+          root.innerHTML='<input aria-label="Signup OTP"><button>Complete QA verification</button>';
+          location.hash='/verify-email-address'; window.qaSignupNotify();
+          root.querySelector('button').onclick=()=>{
+            window.VirealClerk.session={id:'verified-session',getToken:async()=>'qa-token'};
+            window.VirealClerk.user={id:'qa-user'}; window.qaSignupNotify();
+            location.hash='wallet';
+          };
+        };
+      }, unmountSignUp() {},
+    }`,
+  }))
+  await page.goto("/#register")
+  await page.getByRole("textbox", { name: "Signup email" }).fill("verified@example.com")
+  await page.getByRole("button", { name: "Verify QA email" }).click()
+  await expect(page).toHaveURL(/#\/verify-email-address$/)
+  await page.getByRole("textbox", { name: "Signup OTP" }).fill("123456")
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+  await expect(page.getByRole("textbox", { name: "Signup OTP" })).toHaveValue("123456")
+  await page.getByRole("button", { name: "Complete QA verification" }).click()
+  await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+  await expect(page.locator(".recharge-product")).toHaveCount(3)
+})
 
 test("signing out clears the previous account's cached generation details", async ({ page }) => {
   await mockSignedInApi(page)
@@ -201,12 +417,13 @@ test("terminal task refunds refresh the visible balance without leaving the page
   })
   await page.route("https://api.example.com/api/v1/app/video-tasks/qa-refund-task", async (route) => {
     balance = 500
-    await route.fulfill({ json: { ...task, status: "failed" } })
+    await route.fulfill({ json: { ...task, status: "failed", coin_refunded_at: new Date().toISOString() } })
   })
   await page.goto("/#works")
   await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("488")
   await page.getByRole("button", { name: "排队中", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "失败已退款" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "生成失败" })).toBeVisible()
+  await expect(page.getByText("金币已退回钱包", { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "查看金币余额", exact: true })).toContainText("500")
 })
 
@@ -220,7 +437,111 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.root).toBeLessThanOrEqual(dimensions.viewport)
 }
 
-test("390px home uses dynamic count, fallback media, and three-item nav", async ({ page }) => {
+function existingDeliveryTask(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "qa-delivery-task", status: "running", duration: 5, coin_cost: 12,
+    effect_title: "节拍律动", execution_type: "wan", resolution: "720p", aspect_ratio: "9:16",
+    expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
+    coin_refunded_at: null, playback_url: null, ...overrides,
+  }
+}
+
+async function mockExistingDelivery(page: Page, task = existingDeliveryTask()) {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/video-tasks?**", route => route.fulfill({ json: { data: [task] } }))
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill({ json: task }))
+}
+
+test("task polling retries transient failures and resumes online without creating a prediction", async ({ page }) => {
+  await mockExistingDelivery(page)
+  let queries = 0
+  let submissions = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks", async route => { submissions++; await route.fulfill({ status: 500, json: {} }) })
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    await route.fulfill(queries === 1 ? { status: 503, json: { detail: "Temporary network failure" } } : { json: existingDeliveryTask() })
+  })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByText("状态更新暂时中断，正在重试；不会重新生成。", { exact: true })).toBeVisible()
+  await expect.poll(() => queries).toBeGreaterThanOrEqual(2)
+  await expect(page.getByText("状态更新暂时中断，正在重试；不会重新生成。", { exact: true })).toHaveCount(0)
+  const before = queries
+  await page.evaluate(() => window.dispatchEvent(new Event("online")))
+  await expect.poll(() => queries).toBeGreaterThan(before)
+  const beforeVisible = queries
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")))
+  await expect.poll(() => queries).toBeGreaterThan(beforeVisible)
+  expect(submissions).toBe(0)
+})
+
+test("manual task refresh recovers status and uses actual refund timestamp", async ({ page }) => {
+  await mockExistingDelivery(page)
+  let recovered = false
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill(recovered ? { json: existingDeliveryTask({ status: "failed", coin_refunded_at: new Date().toISOString() }) } : { status: 503, json: { detail: "Unavailable" } }))
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByRole("button", { name: "刷新任务状态" })).toBeVisible()
+  recovered = true
+  await page.getByRole("button", { name: "刷新任务状态" }).click()
+  await expect(page.getByText("金币已退回钱包", { exact: true })).toBeVisible()
+})
+
+for (const status of ["failed", "expired"] as const) {
+  test(`${status} without a server refund timestamp never promises a refund`, async ({ page }) => {
+    await mockExistingDelivery(page, existingDeliveryTask({ status, expires_at: new Date(Date.now() - 1000).toISOString() }))
+    await page.goto("/#generation?id=qa-delivery-task")
+    await expect(page.getByRole("heading", { name: status === "failed" ? "生成失败" : "作品已过期/删除" })).toBeVisible()
+    await expect(page.getByText("金币已退回钱包", { exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "下载 MP4" })).toHaveCount(0)
+  })
+}
+
+test("owned result download sends authentication and saves MP4 without a public object URL", async ({ page }) => {
+  const task = existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" })
+  await mockExistingDelivery(page, task)
+  const bytes = Buffer.from("00000018667479706d7034326d6f636b766964656f", "hex")
+  await page.route("https://api.example.com/mock-video.mp4", route => route.fulfill({ contentType: "video/mp4", body: bytes }))
+  let downloads = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task/download", async route => {
+    expect(route.request().headers().authorization).toBe("Bearer qa-session-token")
+    downloads++
+    await route.fulfill({ contentType: "video/mp4", headers: { "Content-Disposition": 'attachment; filename="vireal-qa-delivery-task.mp4"' }, body: bytes })
+  })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.getByText(/作品保留至/)).toBeVisible()
+  const saved = page.waitForEvent("download")
+  await page.getByRole("button", { name: "下载 MP4" }).click()
+  expect((await saved).suggestedFilename()).toBe("vireal-qa-delivery-task.mp4")
+  expect(downloads).toBe(1)
+  await expectNoHorizontalOverflow(page)
+})
+
+test("playback error refreshes its signed address once and cannot loop on a bad video", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/bad-video.mp4?token=old" }))
+  let queries = 0
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", async route => {
+    queries++
+    await route.fulfill({ json: existingDeliveryTask({ status: "succeeded", playback_url: `https://api.example.com/bad-video.mp4?token=${queries > 1 ? "fresh" : "old"}` }) })
+  })
+  await page.route("https://api.example.com/bad-video.mp4?**", route => route.fulfill({ status: 403, body: "Expired mock signature" }))
+  await page.goto("/#generation?id=qa-delivery-task")
+  await expect(page.locator("[data-task-video]")).toHaveAttribute("src", /token=fresh/)
+  await page.evaluate(() => document.querySelector("[data-task-video]")?.dispatchEvent(new Event("error")))
+  // Initial lookup plus one playback recovery; repeat errors must not spam APIs.
+  expect(queries).toBe(2)
+})
+
+test("expired download refreshes task state and removes stale download controls", async ({ page }) => {
+  await mockExistingDelivery(page, existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }))
+  let expired = false
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task", route => route.fulfill({ json: expired ? existingDeliveryTask({ status: "expired", expires_at: new Date(Date.now() - 1000).toISOString() }) : existingDeliveryTask({ status: "succeeded", playback_url: "https://api.example.com/mock-video.mp4" }) }))
+  await page.route("https://api.example.com/api/v1/app/video-tasks/qa-delivery-task/download", async route => { expired = true; await route.fulfill({ status: 410, json: { detail: "Video has expired" } }) })
+  await page.goto("/#generation?id=qa-delivery-task")
+  await page.getByRole("button", { name: "下载 MP4" }).click()
+  await expect(page.getByRole("heading", { name: "作品已过期/删除" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "下载 MP4" })).toHaveCount(0)
+})
+
+test("390px home uses dynamic count, fallback media, and three-item nav", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await mockPublicApi(page)
   await page.goto("/#home")
@@ -229,10 +550,10 @@ test("390px home uses dynamic count, fallback media, and three-item nav", async 
   await expect(page.locator(".utility-nav button")).toHaveCount(3)
   await expect(page.locator(".utility-nav")).not.toContainText("金币")
   await expectNoHorizontalOverflow(page)
-  await page.screenshot({ path: "../.impeccable/review/user-390.png", fullPage: true, animations: "disabled" })
+  await page.screenshot({ path: testInfo.outputPath("user-390.png"), fullPage: true, animations: "disabled" })
 })
 
-test("430px kiss generation presents two real upload inputs", async ({ page }) => {
+test("430px kiss generation presents two real upload inputs", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 430, height: 932 })
   await mockPublicApi(page)
   await page.goto("/#generate?category=kiss&video=kiss-1")
@@ -241,13 +562,13 @@ test("430px kiss generation presents two real upload inputs", async ({ page }) =
   await expect(page.locator(".duration-button")).toHaveCount(2)
   await expect(page.locator(".generator-panel")).toContainText("12 ✦")
   await expectNoHorizontalOverflow(page)
-  await page.screenshot({ path: "../.impeccable/review/generate-mobile.png", fullPage: true, animations: "disabled" })
+  await page.screenshot({ path: testInfo.outputPath("generate-mobile.png"), fullPage: true, animations: "disabled" })
   await page.goto("/#home")
   await expect(page.locator(".effect-card")).toHaveCount(4)
-  await page.screenshot({ path: "../.impeccable/review/mobile.png", fullPage: true, animations: "disabled" })
+  await page.screenshot({ path: testInfo.outputPath("mobile.png"), fullPage: true, animations: "disabled" })
 })
 
-test("desktop keeps the approved phone composition centered", async ({ page }) => {
+test("desktop keeps the approved phone composition centered", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await mockPublicApi(page)
   await page.goto("/#home")
@@ -256,7 +577,7 @@ test("desktop keeps the approved phone composition centered", async ({ page }) =
   expect(box?.width).toBeLessThanOrEqual(432)
   expect(box?.x).toBeGreaterThan(450)
   await expectNoHorizontalOverflow(page)
-  await page.screenshot({ path: "../.impeccable/review/desktop.png", fullPage: true, animations: "disabled" })
+  await page.screenshot({ path: testInfo.outputPath("desktop.png"), fullPage: true, animations: "disabled" })
 })
 
 for (const entry of ["account navigation", "generation deep link"]) {
@@ -334,7 +655,7 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
   await expect(page.locator("#clerkStatus")).toContainText("正在载入")
   await page.evaluate(() => window.dispatchEvent(new Event("qa-clerk-load")))
   await expect(page.getByRole("textbox", { name: "Late QA email" })).toBeVisible()
-  await expect(page.locator("#clerkStatus")).toContainText("仅限受邀请用户登录")
+  await expect(page.locator("#clerkStatus")).toContainText("Secure email verification")
 })
 
 for (const returnToAccount of [false, true]) {
@@ -364,6 +685,9 @@ for (const returnToAccount of [false, true]) {
       await route.fulfill({ json: { balance: 500, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } })
     })
     await page.route("https://api.example.com/api/v1/app/video-tasks?**", async (route) => {
+      await route.fulfill({ json: { data: [] } })
+    })
+    await page.route("https://api.example.com/api/v1/app/orders?**", async (route) => {
       await route.fulfill({ json: { data: [] } })
     })
     if (returnToAccount) {

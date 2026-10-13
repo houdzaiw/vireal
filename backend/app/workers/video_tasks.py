@@ -2,6 +2,7 @@ import json
 import logging
 import subprocess
 import tempfile
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -17,6 +18,7 @@ from app.core.db import engine
 from app.models import AppUpload, AppVideoTask
 from app.services.coin_wallet import refund_video_task
 from app.services.storage import ImageStorage, ImageStorageError, get_image_storage
+from app.services.video_task_reconciliation import lock_task, reconcile_video_tasks
 
 logger = logging.getLogger(__name__)
 WORKER_LOCK_TIMEOUT = timedelta(minutes=10)
@@ -27,6 +29,10 @@ ProviderVideoNormalizer = Callable[[Path, Path, int], None]
 
 class VideoOutputError(RuntimeError):
     pass
+
+
+class VideoProcessingUnavailable(VideoOutputError):
+    """Local processing availability is not evidence of provider failure."""
 
 
 def _claim_video_task(session: Session) -> uuid.UUID | None:
@@ -136,13 +142,13 @@ def _run_ffmpeg(command: list[str], *, operation: str) -> None:
             timeout=settings.LOCAL_DEMO_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
-        raise VideoOutputError(
+        raise VideoProcessingUnavailable(
             "FFmpeg is not installed for local video rendering"
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        raise VideoOutputError(f"FFmpeg timed out while {operation}") from exc
+        raise VideoProcessingUnavailable(f"FFmpeg timed out while {operation}") from exc
     except subprocess.CalledProcessError as exc:
-        raise VideoOutputError(f"FFmpeg failed while {operation}") from exc
+        raise VideoProcessingUnavailable(f"FFmpeg failed while {operation}") from exc
 
 
 def render_local_demo(source: Path, output: Path, duration: int) -> None:
@@ -215,15 +221,26 @@ def _record_worker_failure(
     now = datetime.now(UTC)
     task.worker_locked_at = None
     task.updated_at = now
-    if task.worker_attempts >= settings.VIDEO_WORKER_MAX_ATTEMPTS:
+    confirmed_invalid_output = isinstance(exc, VideoOutputError) and not isinstance(
+        exc, VideoProcessingUnavailable
+    )
+    if (
+        task.worker_attempts >= settings.VIDEO_WORKER_MAX_ATTEMPTS
+        and confirmed_invalid_output
+    ):
         task.status = "failed"
         task.error = f"Unable to persist generated video: {exc}"
         task.completed_at = now
         task.next_attempt_at = None
         refund_video_task(session=session, task=task)
     else:
-        delay_seconds = min(15 * (2 ** (task.worker_attempts - 1)), 300)
+        # Even repeated HTTP 404/timeouts or an R2 outage cannot prove an output
+        # is permanently unavailable. Keep the debit/capacity for human review;
+        # retry delivery only, never POST another provider prediction.
+        delay_seconds = min(15 * (2 ** min(task.worker_attempts - 1, 5)), 300)
         task.next_attempt_at = now + timedelta(seconds=delay_seconds)
+        if task.worker_attempts >= settings.VIDEO_WORKER_MAX_ATTEMPTS:
+            task.error = "Video delivery remains unconfirmed; manual review required"
     session.add(task)
     session.commit()
 
@@ -249,8 +266,8 @@ def process_next_video_task(
     temp_paths: list[Path] = []
     try:
         with Session(engine) as session:
-            task = session.get(AppVideoTask, task_id)
-            if task is None:
+            task = lock_task(session, task_id)
+            if task is None or task.status not in {"saving", "rendering_demo"}:
                 return True
             try:
                 if task.status == "rendering_demo":
@@ -404,9 +421,10 @@ def cleanup_expired_media(*, storage: ImageStorage | None = None) -> int:
             session.exec(
                 select(AppVideoTask)
                 .where(
-                    AppVideoTask.status != "expired",
+                    col(AppVideoTask.status).in_(("succeeded", "failed", "canceled")),
                     AppVideoTask.expires_at <= now,
                 )
+                .with_for_update(skip_locked=True)
                 .limit(100)
             ).all()
         )
@@ -430,17 +448,54 @@ def cleanup_expired_media(*, storage: ImageStorage | None = None) -> int:
     return cleaned
 
 
+def _reconciliation_loop(
+    stop: threading.Event, callback: Callable[[], object], interval: float, label: str
+) -> None:
+    while not stop.is_set():
+        started = time.monotonic()
+        try:
+            callback()
+        except Exception:
+            # No payloads or credentials in operational failure messages.
+            logger.error("%s reconciliation failed; will retry", label)
+        stop.wait(max(0.1, interval - (time.monotonic() - started)))
+
+
 def run_worker() -> None:
+    from app.services.paypal_orders import reconcile_paypal_orders
+
     logger.info("Video task worker started")
+    stop = threading.Event()
+    # Scheduling is independent of slow R2/FFmpeg work, not merely a future
+    # dispatched after that work has finished. No new service/process is needed.
+    for callback, interval, label in (
+        (
+            reconcile_paypal_orders,
+            settings.PAYPAL_RECONCILE_INTERVAL_SECONDS,
+            "Payment",
+        ),
+        (reconcile_video_tasks, 60.0, "Video"),
+    ):
+        threading.Thread(
+            target=_reconciliation_loop,
+            args=(stop, callback, interval, label),
+            name=f"{label.lower()}-reconcile",
+            daemon=True,
+        ).start()
     next_cleanup_at = 0.0
-    while True:
-        processed = process_next_video_task()
-        monotonic_now = time.monotonic()
-        if monotonic_now >= next_cleanup_at:
-            cleanup_expired_media()
-            next_cleanup_at = monotonic_now + settings.VIDEO_CLEANUP_INTERVAL_SECONDS
-        if not processed:
-            time.sleep(settings.VIDEO_WORKER_POLL_SECONDS)
+    try:
+        while True:
+            processed = process_next_video_task()
+            monotonic_now = time.monotonic()
+            if monotonic_now >= next_cleanup_at:
+                cleanup_expired_media()
+                next_cleanup_at = (
+                    monotonic_now + settings.VIDEO_CLEANUP_INTERVAL_SECONDS
+                )
+            if not processed:
+                stop.wait(settings.VIDEO_WORKER_POLL_SECONDS)
+    finally:
+        stop.set()
 
 
 if __name__ == "__main__":

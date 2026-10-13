@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
+from sqlalchemy import or_
 from sqlmodel import Field, SQLModel, col, select
 
 from app.api.deps import SessionDep
@@ -16,6 +17,7 @@ from app.models import (
     AppEffectVariant,
     AppManagedMediaAsset,
 )
+from app.services.commercial_access import launch_effect_allowed
 from app.services.storage import ImageStorageError, get_image_storage
 
 router = APIRouter(prefix="/app", tags=["app effect catalog"])
@@ -63,7 +65,7 @@ def _asset_url(session: SessionDep, asset_id: uuid.UUID | None) -> str | None:
     if asset_id is None:
         return None
     asset = session.get(AppManagedMediaAsset, asset_id)
-    if asset is None or asset.status != "active":
+    if asset is None or asset.status != "active" or asset.deleted_at is not None:
         return None
     return f"{settings.API_V1_STR}/app/media-assets/{asset.id}"
 
@@ -154,7 +156,7 @@ def read_effect_catalog(
                 variants=variants_by_effect.get(effect.id, []),
             )
             for effect in effects
-            if variants_by_effect.get(effect.id)
+            if variants_by_effect.get(effect.id) and launch_effect_allowed(effect.slug)
         ]
         if public_effects:
             try:
@@ -184,7 +186,34 @@ def read_effect_catalog(
 @router.get("/media-assets/{asset_id}", response_model=None)
 def read_media_asset(*, session: SessionDep, asset_id: uuid.UUID) -> RedirectResponse:
     asset = session.get(AppManagedMediaAsset, asset_id)
-    if asset is None or asset.status != "active":
+    if asset is None or asset.status != "active" or asset.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Media asset not found")
+    # An opaque asset ID is not publication authorization. Only sign media that
+    # is still attached to an effect available through the current public catalog.
+    statement = (
+        select(AppEffect.id)
+        .join(
+            AppEffectCategory, col(AppEffect.category_id) == col(AppEffectCategory.id)
+        )
+        .join(AppEffectVariant, col(AppEffectVariant.effect_id) == col(AppEffect.id))
+        .where(
+            or_(
+                col(AppEffect.poster_asset_id) == asset_id,
+                col(AppEffect.preview_asset_id) == asset_id,
+            ),
+            AppEffect.publish_status == "published",
+            col(AppEffect.is_enabled).is_(True),
+            col(AppEffectCategory.is_enabled).is_(True),
+            col(AppEffectVariant.is_enabled).is_(True),
+            AppEffectVariant.duration_seconds
+            <= settings.APP_EFFECT_MAX_DURATION_SECONDS,
+        )
+    )
+    if settings.ENVIRONMENT == "production":
+        statement = statement.where(
+            col(AppEffect.slug).in_(settings.APP_LAUNCH_EFFECT_SLUGS)
+        )
+    if session.exec(statement.limit(1)).first() is None:
         raise HTTPException(status_code=404, detail="Media asset not found")
     try:
         url = get_image_storage().create_object_read_url(
@@ -195,7 +224,7 @@ def read_media_asset(*, session: SessionDep, asset_id: uuid.UUID) -> RedirectRes
     return RedirectResponse(
         url=url,
         status_code=307,
-        headers={"Cache-Control": "public, max-age=60"},
+        headers={"Cache-Control": "private, no-store"},
     )
 
 
@@ -208,7 +237,7 @@ def read_effect(*, session: SessionDep, slug: str) -> EffectPublic:
             col(AppEffect.is_enabled).is_(True),
         )
     ).first()
-    if effect is None:
+    if effect is None or not launch_effect_allowed(effect.slug):
         raise HTTPException(status_code=404, detail="Effect not found")
     category = session.get(AppEffectCategory, effect.category_id)
     if category is None or not category.is_enabled:
@@ -230,6 +259,9 @@ def read_effect(*, session: SessionDep, slug: str) -> EffectPublic:
             )
         ).all()
     )
+    recommendation_slugs = [
+        slug for slug in recommendation_slugs if launch_effect_allowed(slug)
+    ]
     return _serialize_effect(
         session=session,
         effect=effect,

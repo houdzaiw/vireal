@@ -99,16 +99,12 @@ def test_ark_video_generation_creates_and_polls_task(
             assert payload["content"][0]["type"] == "text"
             assert payload["content"][1] == {
                 "type": "image_url",
-                "image_url": {
-                    "url": "data:image/png;base64,iVBORw0KGgpmaXJzdA=="
-                },
+                "image_url": {"url": "data:image/png;base64,iVBORw0KGgpmaXJzdA=="},
                 "role": "reference_image",
             }
             assert payload["content"][2] == {
                 "type": "image_url",
-                "image_url": {
-                    "url": "data:image/png;base64,iVBORw0KGgpzZWNvbmQ="
-                },
+                "image_url": {"url": "data:image/png;base64,iVBORw0KGgpzZWNvbmQ="},
                 "role": "reference_image",
             }
             return httpx.Response(200, json={"id": "video-task-1"})
@@ -156,7 +152,9 @@ def test_ark_provider_uses_public_base_url_for_local_upload_when_configured(
             payload = json.loads(request.content)
             assert payload["content"][1] == {
                 "type": "image_url",
-                "image_url": {"url": "https://app.example.com/uploads/images/u/file.png"},
+                "image_url": {
+                    "url": "https://app.example.com/uploads/images/u/file.png"
+                },
                 "role": "reference_image",
             }
             return httpx.Response(200, json={"id": "video-task-1"})

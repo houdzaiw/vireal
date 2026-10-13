@@ -1,6 +1,7 @@
 import logging
 import shutil
 import uuid
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -53,6 +54,13 @@ class StoredManagedAsset:
     size: int
 
 
+@dataclass(frozen=True)
+class VideoStream:
+    chunks: Iterator[bytes]
+    close: Callable[[], None]
+    size: int
+
+
 class ImageStorageError(Exception):
     def __init__(self, detail: str, status_code: int = 400) -> None:
         self.detail = detail
@@ -78,6 +86,9 @@ class ImageStorage(Protocol):
 
     def create_object_read_url(self, object_key: str, *, expires_in: int) -> str:
         """Return a short-lived URL for one managed object key."""
+
+    def open_video(self, object_key: str) -> VideoStream:
+        """Open a backend-authorized object without exposing its storage URL."""
 
     def store_video_file(
         self,
@@ -236,6 +247,25 @@ class LocalImageStorage:
         self._object_path(object_key)
         return f"/uploads/{object_key}"
 
+    def open_video(self, object_key: str) -> VideoStream:
+        path = self._object_path(object_key)
+        try:
+            size = path.stat().st_size
+            if not 0 < size <= settings.MAX_GENERATED_VIDEO_BYTES:
+                raise ImageStorageError("Stored video size is invalid", 502)
+            stream = path.open("rb")
+        except FileNotFoundError as exc:
+            raise ImageStorageError("Video not found", 404) from exc
+
+        def chunks() -> Iterator[bytes]:
+            try:
+                while chunk := stream.read(64 * 1024):
+                    yield chunk
+            finally:
+                stream.close()
+
+        return VideoStream(chunks=chunks(), close=stream.close, size=size)
+
     def store_video_file(
         self,
         *,
@@ -373,6 +403,36 @@ class R2ImageStorage:
                 "Unable to create Cloudflare R2 read URL",
                 status_code=502,
             ) from exc
+
+    def open_video(self, object_key: str) -> VideoStream:
+        self._validate_object_key(object_key)
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=object_key)
+        except (BotoCoreError, ClientError) as exc:
+            raise ImageStorageError("Unable to read private video", 502) from exc
+        body = response["Body"]
+        try:
+            size = int(response.get("ContentLength", -1))
+        except (TypeError, ValueError) as exc:
+            body.close()
+            raise ImageStorageError("Stored video size is invalid", 502) from exc
+        if not 0 < size <= settings.MAX_GENERATED_VIDEO_BYTES:
+            body.close()
+            raise ImageStorageError("Stored video size is invalid", 502)
+
+        def chunks() -> Iterator[bytes]:
+            try:
+                remaining = size
+                while remaining > 0:
+                    chunk = body.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+            finally:
+                body.close()
+
+        return VideoStream(chunks=chunks(), close=body.close, size=size)
 
     def read_app_image(self, url: str) -> ReadImage:
         image_location = parse_r2_app_image_url(url)

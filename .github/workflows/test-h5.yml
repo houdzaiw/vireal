@@ -6,12 +6,16 @@ on:
       - main
     paths:
       - h5/**
+      - edge/**
       - scripts/verify-production.sh
+      - scripts/verify-release-contract.py
       - .github/workflows/test-h5.yml
   pull_request:
     paths:
       - h5/**
+      - edge/**
       - scripts/verify-production.sh
+      - scripts/verify-release-contract.py
       - .github/workflows/test-h5.yml
 
 permissions:
@@ -42,6 +46,8 @@ jobs:
         run: bun ci
       - name: Run H5 contract tests
         run: bun run test
+      - name: Test signed region proxy
+        run: node --test ../edge/test/worker.test.js
       - name: Build production H5
         run: bun run build
         env:
@@ -71,10 +77,6 @@ jobs:
         with:
           name: vireal-h5-browser-evidence
           path: |
-            .impeccable/review/user-390.png
-            .impeccable/review/generate-mobile.png
-            .impeccable/review/mobile.png
-            .impeccable/review/desktop.png
             h5/test-results
           if-no-files-found: ignore
           retention-days: 14

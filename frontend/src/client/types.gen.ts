@@ -415,6 +415,154 @@ export type AdminVariantPublic = {
 };
 
 /**
+ * AdminVideoTaskAction
+ */
+export type AdminVideoTaskAction = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+};
+
+/**
+ * AdminVideoTaskPublic
+ */
+export type AdminVideoTaskPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Effect Id
+     */
+    effect_id: string | null;
+    /**
+     * Template Id
+     */
+    template_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Provider Task Id
+     */
+    provider_task_id: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Duration
+     */
+    duration: number;
+    /**
+     * Coin Cost Snapshot
+     */
+    coin_cost_snapshot: number | null;
+    /**
+     * Coin Refunded At
+     */
+    coin_refunded_at: string | null;
+    /**
+     * Provider Last Checked At
+     */
+    provider_last_checked_at: string | null;
+    /**
+     * Provider Next Check At
+     */
+    provider_next_check_at: string | null;
+    /**
+     * Submission Attempted At
+     */
+    submission_attempted_at: string | null;
+    /**
+     * Real Submission Counted At
+     */
+    real_submission_counted_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+    /**
+     * Completed At
+     */
+    completed_at: string | null;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Needs Review
+     */
+    needs_review?: boolean;
+    /**
+     * Ledger
+     */
+    ledger?: Array<AppCoinLedgerPublic>;
+};
+
+/**
+ * AdminVideoTaskResolve
+ */
+export type AdminVideoTaskResolve = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+    /**
+     * Resolution
+     */
+    resolution: 'not_submitted' | 'failed' | 'canceled' | 'unavailable';
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Provider Confirmed
+     */
+    provider_confirmed: true;
+};
+
+/**
+ * AdminVideoTasksPublic
+ */
+export type AdminVideoTasksPublic = {
+    /**
+     * Data
+     */
+    data: Array<AdminVideoTaskPublic>;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * AppAdminOperationLogPublic
  */
 export type AppAdminOperationLogPublic = {
@@ -511,6 +659,10 @@ export type AppCoinLedgerPublic = {
      * Task Id
      */
     task_id?: string | null;
+    /**
+     * Order Id
+     */
+    order_id?: string | null;
     /**
      * Created At
      */
@@ -1188,6 +1340,26 @@ export type AppOrderPublic = {
      * Paid At
      */
     paid_at?: string | null;
+    /**
+     * Payment Environment
+     */
+    payment_environment?: string | null;
+    /**
+     * Provider Order Id
+     */
+    provider_order_id?: string | null;
+    /**
+     * Capture Id
+     */
+    capture_id?: string | null;
+    /**
+     * Coin Quantity
+     */
+    coin_quantity?: number | null;
+    /**
+     * Fulfilled At
+     */
+    fulfilled_at?: string | null;
 };
 
 /**
@@ -1202,6 +1374,80 @@ export type AppOrdersPublic = {
      * Count
      */
     count: number;
+};
+
+/**
+ * AppPayPalOrderCreate
+ */
+export type AppPayPalOrderCreate = {
+    /**
+     * Product Id
+     */
+    product_id: string;
+};
+
+/**
+ * AppPaymentCasePublic
+ */
+export type AppPaymentCasePublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Order Id
+     */
+    order_id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * External Id
+     */
+    external_id: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Required Coins
+     */
+    required_coins: number;
+    /**
+     * Recovered Coins
+     */
+    recovered_coins: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Resolution
+     */
+    resolution?: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Resolved At
+     */
+    resolved_at?: string | null;
+};
+
+/**
+ * AppPaymentCaseResolve
+ */
+export type AppPaymentCaseResolve = {
+    /**
+     * Resolution
+     */
+    resolution: 'recover' | 'dismiss';
+    /**
+     * Reason
+     */
+    reason: string;
 };
 
 /**
@@ -1520,6 +1766,14 @@ export type AppVideoTaskPublic = {
      */
     playback_url?: string | null;
     /**
+     * Playback Url Expires At
+     */
+    playback_url_expires_at?: string | null;
+    /**
+     * Coin Refunded At
+     */
+    coin_refunded_at?: string | null;
+    /**
      * Created At
      */
     created_at?: string | null;
@@ -1566,6 +1820,14 @@ export type AppVideoTaskQuotaPublic = {
      * Concurrent Remaining
      */
     concurrent_remaining?: number;
+    /**
+     * Global Real Limit
+     */
+    global_real_limit?: number;
+    /**
+     * Global Real Remaining
+     */
+    global_real_remaining?: number;
 };
 
 /**
@@ -1606,6 +1868,18 @@ export type AppWalletPublic = {
      * Ledger
      */
     ledger?: Array<AppCoinLedgerPublic>;
+    /**
+     * Payment Hold
+     */
+    payment_hold?: boolean;
+    /**
+     * Global Real Limit
+     */
+    global_real_limit?: number;
+    /**
+     * Global Real Remaining
+     */
+    global_real_remaining?: number;
 };
 
 /**
@@ -3326,6 +3600,87 @@ export type appOrdersReadOrderResponses = {
 
 export type appOrdersReadOrderResponse = appOrdersReadOrderResponses[keyof appOrdersReadOrderResponses];
 
+export type appPaypalPaymentConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/paypal/config';
+};
+
+export type appPaypalPaymentConfigResponses = {
+    /**
+     * Response App Paypal-Payment Config
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type appPaypalPaymentConfigResponse = appPaypalPaymentConfigResponses[keyof appPaypalPaymentConfigResponses];
+
+export type appPaypalCreatePaypalOrderData = {
+    body: AppPayPalOrderCreate;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'idempotency-key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/app/paypal/orders';
+};
+
+export type appPaypalCreatePaypalOrderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalCreatePaypalOrderError = appPaypalCreatePaypalOrderErrors[keyof appPaypalCreatePaypalOrderErrors];
+
+export type appPaypalCreatePaypalOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalCreatePaypalOrderResponse = appPaypalCreatePaypalOrderResponses[keyof appPaypalCreatePaypalOrderResponses];
+
+export type appPaypalCapturePaypalOrderData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/paypal/orders/{order_id}/capture';
+};
+
+export type appPaypalCapturePaypalOrderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalCapturePaypalOrderError = appPaypalCapturePaypalOrderErrors[keyof appPaypalCapturePaypalOrderErrors];
+
+export type appPaypalCapturePaypalOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalCapturePaypalOrderResponse = appPaypalCapturePaypalOrderResponses[keyof appPaypalCapturePaypalOrderResponses];
+
 export type appVideoTasksReadVideoTasksData = {
     body?: never;
     path?: never;
@@ -3450,6 +3805,34 @@ export type appVideoTasksReadVideoTaskResponses = {
 };
 
 export type appVideoTasksReadVideoTaskResponse = appVideoTasksReadVideoTaskResponses[keyof appVideoTasksReadVideoTaskResponses];
+
+export type appVideoTasksDownloadVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/video-tasks/{task_id}/download';
+};
+
+export type appVideoTasksDownloadVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appVideoTasksDownloadVideoTaskError = appVideoTasksDownloadVideoTaskErrors[keyof appVideoTasksDownloadVideoTaskErrors];
+
+export type appVideoTasksDownloadVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type appWalletReadWalletData = {
     body?: never;
@@ -3762,11 +4145,11 @@ export type adminAppReadAppOrdersData = {
         /**
          * Status
          */
-        status?: 'created' | 'paid' | 'failed' | 'refunded' | 'canceled' | null;
+        status?: 'created' | 'approved' | 'capture_pending' | 'payment_review' | 'paid' | 'failed' | 'refunded' | 'reversed' | 'canceled' | null;
         /**
          * Provider
          */
-        provider?: 'apple' | 'google' | null;
+        provider?: 'apple' | 'google' | 'paypal' | null;
     };
     url: '/api/v1/admin/app/orders';
 };
@@ -3848,6 +4231,68 @@ export type adminAppReadAppOrderEventsResponses = {
 };
 
 export type adminAppReadAppOrderEventsResponse = adminAppReadAppOrderEventsResponses[keyof adminAppReadAppOrderEventsResponses];
+
+export type adminAppReadPaymentCasesData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/orders/{order_id}/payment-cases';
+};
+
+export type adminAppReadPaymentCasesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppReadPaymentCasesError = adminAppReadPaymentCasesErrors[keyof adminAppReadPaymentCasesErrors];
+
+export type adminAppReadPaymentCasesResponses = {
+    /**
+     * Response Admin App-Read Payment Cases
+     *
+     * Successful Response
+     */
+    200: Array<AppPaymentCasePublic>;
+};
+
+export type adminAppReadPaymentCasesResponse = adminAppReadPaymentCasesResponses[keyof adminAppReadPaymentCasesResponses];
+
+export type adminAppResolvePaymentCaseData = {
+    body: AppPaymentCaseResolve;
+    path: {
+        /**
+         * Case Id
+         */
+        case_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/payment-cases/{case_id}/resolve';
+};
+
+export type adminAppResolvePaymentCaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppResolvePaymentCaseError = adminAppResolvePaymentCaseErrors[keyof adminAppResolvePaymentCaseErrors];
+
+export type adminAppResolvePaymentCaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppPaymentCasePublic;
+};
+
+export type adminAppResolvePaymentCaseResponse = adminAppResolvePaymentCaseResponses[keyof adminAppResolvePaymentCaseResponses];
 
 export type adminAppReadAppAdminOperationLogsData = {
     body?: never;
@@ -4468,6 +4913,142 @@ export type adminEffectCatalogAdjustUserCoinsResponses = {
 
 export type adminEffectCatalogAdjustUserCoinsResponse = adminEffectCatalogAdjustUserCoinsResponses[keyof adminEffectCatalogAdjustUserCoinsResponses];
 
+export type adminVideoTasksReadVideoTasksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Status
+         */
+        status?: string | null;
+        /**
+         * App User Id
+         */
+        app_user_id?: string | null;
+        /**
+         * Needs Review
+         */
+        needs_review?: boolean;
+    };
+    url: '/api/v1/admin/app/video-tasks';
+};
+
+export type adminVideoTasksReadVideoTasksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReadVideoTasksError = adminVideoTasksReadVideoTasksErrors[keyof adminVideoTasksReadVideoTasksErrors];
+
+export type adminVideoTasksReadVideoTasksResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTasksPublic;
+};
+
+export type adminVideoTasksReadVideoTasksResponse = adminVideoTasksReadVideoTasksResponses[keyof adminVideoTasksReadVideoTasksResponses];
+
+export type adminVideoTasksReadVideoTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}';
+};
+
+export type adminVideoTasksReadVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReadVideoTaskError = adminVideoTasksReadVideoTaskErrors[keyof adminVideoTasksReadVideoTaskErrors];
+
+export type adminVideoTasksReadVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksReadVideoTaskResponse = adminVideoTasksReadVideoTaskResponses[keyof adminVideoTasksReadVideoTaskResponses];
+
+export type adminVideoTasksReconcileVideoTaskData = {
+    body: AdminVideoTaskAction;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}/reconcile';
+};
+
+export type adminVideoTasksReconcileVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksReconcileVideoTaskError = adminVideoTasksReconcileVideoTaskErrors[keyof adminVideoTasksReconcileVideoTaskErrors];
+
+export type adminVideoTasksReconcileVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksReconcileVideoTaskResponse = adminVideoTasksReconcileVideoTaskResponses[keyof adminVideoTasksReconcileVideoTaskResponses];
+
+export type adminVideoTasksResolveVideoTaskData = {
+    body: AdminVideoTaskResolve;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/video-tasks/{task_id}/resolve';
+};
+
+export type adminVideoTasksResolveVideoTaskErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminVideoTasksResolveVideoTaskError = adminVideoTasksResolveVideoTaskErrors[keyof adminVideoTasksResolveVideoTaskErrors];
+
+export type adminVideoTasksResolveVideoTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminVideoTaskPublic;
+};
+
+export type adminVideoTasksResolveVideoTaskResponse = adminVideoTasksResolveVideoTaskResponses[keyof adminVideoTasksResolveVideoTaskResponses];
+
 export type paymentWebhooksReceiveAppleIapCallbackData = {
     body: PaymentCallbackRequest;
     path?: never;
@@ -4517,6 +5098,22 @@ export type paymentWebhooksReceiveGooglePlayCallbackResponses = {
 };
 
 export type paymentWebhooksReceiveGooglePlayCallbackResponse = paymentWebhooksReceiveGooglePlayCallbackResponses[keyof paymentWebhooksReceiveGooglePlayCallbackResponses];
+
+export type paypalWebhooksPaypalWebhookData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/webhooks/payments/paypal';
+};
+
+export type paypalWebhooksPaypalWebhookResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type paypalWebhooksPaypalWebhookResponse = paypalWebhooksPaypalWebhookResponses[keyof paypalWebhooksPaypalWebhookResponses];
 
 export type replicateWebhooksReceiveReplicateWebhookData = {
     body?: never;

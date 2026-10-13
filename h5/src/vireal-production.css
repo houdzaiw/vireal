@@ -25,3 +25,11 @@
 .confirm-detail { display: grid; gap: 7px; margin-top: 14px; padding: 12px; border-radius: 13px; background: rgba(255,255,255,.04); color: #b8c6ca; font-size: 10px; }
 .inline-error { margin-top: 10px; color: var(--danger); font-size: 10px; line-height: 1.5; }
 @media (min-width: 761px) { .nav-dock { border-radius: 0 0 34px 34px; } }
+/* Server-priced PayPal packages keep the existing dark wallet presentation. */
+.recharge-products { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:18px 0; }
+.recharge-product { display:flex;flex-direction:column;gap:8px;border:1px solid #33434a;border-radius:14px;padding:16px 6px;background:#151a1d;color:#f7fbfc;cursor:pointer; }
+.recharge-product.selected { border-color:#71d8ed;background:#172b32; }
+.recharge-product span { font-size:11px;color:#b3c6cd; }
+.recharge-product:disabled { opacity:.6;cursor:not-allowed; }
+.screen-copy a { color:#71d8ed;text-decoration:underline; }
+paypal-button { display:block;min-height:44px; }

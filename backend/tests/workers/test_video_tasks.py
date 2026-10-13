@@ -163,9 +163,10 @@ def test_worker_retries_persistence_without_creating_a_prediction(
     db.expire_all()
     failed = db.get(AppVideoTask, task.id)
     assert failed is not None
-    assert failed.status == "failed"
+    assert failed.status == "saving"
     assert failed.worker_attempts == 2
-    assert "R2 unavailable" in (failed.error or "")
+    assert "manual review" in (failed.error or "")
+    assert failed.coin_refunded_at is None and failed.next_attempt_at
     assert failed.provider_task_id == task.provider_task_id
 
 

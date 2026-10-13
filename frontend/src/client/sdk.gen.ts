@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, adminEffectCatalogAdjustUserCoinsData, adminEffectCatalogAdjustUserCoinsErrors, adminEffectCatalogAdjustUserCoinsResponses, adminEffectCatalogCreateCategoryData, adminEffectCatalogCreateCategoryErrors, adminEffectCatalogCreateCategoryResponses, adminEffectCatalogCreateEffectData, adminEffectCatalogCreateEffectErrors, adminEffectCatalogCreateEffectResponses, adminEffectCatalogCreateVariantData, adminEffectCatalogCreateVariantErrors, adminEffectCatalogCreateVariantResponses, adminEffectCatalogDeleteCategoryData, adminEffectCatalogDeleteCategoryErrors, adminEffectCatalogDeleteCategoryResponses, adminEffectCatalogDeleteEffectData, adminEffectCatalogDeleteEffectErrors, adminEffectCatalogDeleteEffectResponses, adminEffectCatalogDeleteMediaAssetData, adminEffectCatalogDeleteMediaAssetErrors, adminEffectCatalogDeleteMediaAssetResponses, adminEffectCatalogDeleteVariantData, adminEffectCatalogDeleteVariantErrors, adminEffectCatalogDeleteVariantResponses, adminEffectCatalogListCategoriesData, adminEffectCatalogListCategoriesResponses, adminEffectCatalogListEffectsData, adminEffectCatalogListEffectsErrors, adminEffectCatalogListEffectsResponses, adminEffectCatalogPublishEffectData, adminEffectCatalogPublishEffectErrors, adminEffectCatalogPublishEffectResponses, adminEffectCatalogReadEffectData, adminEffectCatalogReadEffectErrors, adminEffectCatalogReadEffectResponses, adminEffectCatalogUpdateCategoryData, adminEffectCatalogUpdateCategoryErrors, adminEffectCatalogUpdateCategoryResponses, adminEffectCatalogUpdateEffectData, adminEffectCatalogUpdateEffectErrors, adminEffectCatalogUpdateEffectResponses, adminEffectCatalogUpdateVariantData, adminEffectCatalogUpdateVariantErrors, adminEffectCatalogUpdateVariantResponses, adminEffectCatalogUploadMediaAssetData, adminEffectCatalogUploadMediaAssetErrors, adminEffectCatalogUploadMediaAssetResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthInitializeClerkSessionData, appAuthInitializeClerkSessionResponses, appAuthLogoutClerkSessionData, appAuthLogoutClerkSessionResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appEffectCatalogReadEffectCatalogData, appEffectCatalogReadEffectCatalogResponses, appEffectCatalogReadEffectData, appEffectCatalogReadEffectErrors, appEffectCatalogReadEffectResponses, appEffectCatalogReadMediaAssetData, appEffectCatalogReadMediaAssetErrors, appEffectCatalogReadMediaAssetResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, appVideoTasksCreateVideoTaskData, appVideoTasksCreateVideoTaskErrors, appVideoTasksCreateVideoTaskResponses, appVideoTasksDeleteVideoTaskData, appVideoTasksDeleteVideoTaskErrors, appVideoTasksDeleteVideoTaskResponses, appVideoTasksReadVideoTaskData, appVideoTasksReadVideoTaskErrors, appVideoTasksReadVideoTaskResponses, appVideoTasksReadVideoTasksData, appVideoTasksReadVideoTasksErrors, appVideoTasksReadVideoTasksResponses, appWalletReadWalletData, appWalletReadWalletResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginAdminLoginAccessTokenData, loginAdminLoginAccessTokenErrors, loginAdminLoginAccessTokenResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, replicateWebhooksReceiveReplicateWebhookData, replicateWebhooksReceiveReplicateWebhookErrors, replicateWebhooksReceiveReplicateWebhookResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
+import type { adminAppCreateAppConfigData, adminAppCreateAppConfigErrors, adminAppCreateAppConfigResponses, adminAppDeleteAppContentData, adminAppDeleteAppContentErrors, adminAppDeleteAppContentResponses, adminAppDeleteAppGenerationData, adminAppDeleteAppGenerationErrors, adminAppDeleteAppGenerationResponses, adminAppDeleteAppUserData, adminAppDeleteAppUserErrors, adminAppDeleteAppUserResponses, adminAppReadAppAdminOperationLogsData, adminAppReadAppAdminOperationLogsErrors, adminAppReadAppAdminOperationLogsResponses, adminAppReadAppConfigData, adminAppReadAppConfigErrors, adminAppReadAppConfigResponses, adminAppReadAppConfigsData, adminAppReadAppConfigsErrors, adminAppReadAppConfigsResponses, adminAppReadAppContentsData, adminAppReadAppContentsErrors, adminAppReadAppContentsResponses, adminAppReadAppGenerationData, adminAppReadAppGenerationErrors, adminAppReadAppGenerationResponses, adminAppReadAppGenerationsData, adminAppReadAppGenerationsErrors, adminAppReadAppGenerationsResponses, adminAppReadAppOrderData, adminAppReadAppOrderErrors, adminAppReadAppOrderEventsData, adminAppReadAppOrderEventsErrors, adminAppReadAppOrderEventsResponses, adminAppReadAppOrderResponses, adminAppReadAppOrdersData, adminAppReadAppOrdersErrors, adminAppReadAppOrdersResponses, adminAppReadAppUsersData, adminAppReadAppUsersErrors, adminAppReadAppUsersResponses, adminAppReadPaymentCasesData, adminAppReadPaymentCasesErrors, adminAppReadPaymentCasesResponses, adminAppResolvePaymentCaseData, adminAppResolvePaymentCaseErrors, adminAppResolvePaymentCaseResponses, adminAppUpdateAppConfigData, adminAppUpdateAppConfigErrors, adminAppUpdateAppConfigResponses, adminAppUpdateAppUserStatusData, adminAppUpdateAppUserStatusErrors, adminAppUpdateAppUserStatusResponses, adminEffectCatalogAdjustUserCoinsData, adminEffectCatalogAdjustUserCoinsErrors, adminEffectCatalogAdjustUserCoinsResponses, adminEffectCatalogCreateCategoryData, adminEffectCatalogCreateCategoryErrors, adminEffectCatalogCreateCategoryResponses, adminEffectCatalogCreateEffectData, adminEffectCatalogCreateEffectErrors, adminEffectCatalogCreateEffectResponses, adminEffectCatalogCreateVariantData, adminEffectCatalogCreateVariantErrors, adminEffectCatalogCreateVariantResponses, adminEffectCatalogDeleteCategoryData, adminEffectCatalogDeleteCategoryErrors, adminEffectCatalogDeleteCategoryResponses, adminEffectCatalogDeleteEffectData, adminEffectCatalogDeleteEffectErrors, adminEffectCatalogDeleteEffectResponses, adminEffectCatalogDeleteMediaAssetData, adminEffectCatalogDeleteMediaAssetErrors, adminEffectCatalogDeleteMediaAssetResponses, adminEffectCatalogDeleteVariantData, adminEffectCatalogDeleteVariantErrors, adminEffectCatalogDeleteVariantResponses, adminEffectCatalogListCategoriesData, adminEffectCatalogListCategoriesResponses, adminEffectCatalogListEffectsData, adminEffectCatalogListEffectsErrors, adminEffectCatalogListEffectsResponses, adminEffectCatalogPublishEffectData, adminEffectCatalogPublishEffectErrors, adminEffectCatalogPublishEffectResponses, adminEffectCatalogReadEffectData, adminEffectCatalogReadEffectErrors, adminEffectCatalogReadEffectResponses, adminEffectCatalogUpdateCategoryData, adminEffectCatalogUpdateCategoryErrors, adminEffectCatalogUpdateCategoryResponses, adminEffectCatalogUpdateEffectData, adminEffectCatalogUpdateEffectErrors, adminEffectCatalogUpdateEffectResponses, adminEffectCatalogUpdateVariantData, adminEffectCatalogUpdateVariantErrors, adminEffectCatalogUpdateVariantResponses, adminEffectCatalogUploadMediaAssetData, adminEffectCatalogUploadMediaAssetErrors, adminEffectCatalogUploadMediaAssetResponses, adminVideoTasksReadVideoTaskData, adminVideoTasksReadVideoTaskErrors, adminVideoTasksReadVideoTaskResponses, adminVideoTasksReadVideoTasksData, adminVideoTasksReadVideoTasksErrors, adminVideoTasksReadVideoTasksResponses, adminVideoTasksReconcileVideoTaskData, adminVideoTasksReconcileVideoTaskErrors, adminVideoTasksReconcileVideoTaskResponses, adminVideoTasksResolveVideoTaskData, adminVideoTasksResolveVideoTaskErrors, adminVideoTasksResolveVideoTaskResponses, appAuthDeviceLoginData, appAuthDeviceLoginErrors, appAuthDeviceLoginResponses, appAuthInitializeClerkSessionData, appAuthInitializeClerkSessionResponses, appAuthLogoutClerkSessionData, appAuthLogoutClerkSessionResponses, appAuthTestAppTokenData, appAuthTestAppTokenResponses, appConfigsReadAppConfigsData, appConfigsReadAppConfigsResponses, appContentsCreateContentData, appContentsCreateContentErrors, appContentsCreateContentResponses, appContentsReadContentData, appContentsReadContentErrors, appContentsReadContentFeedData, appContentsReadContentFeedErrors, appContentsReadContentFeedResponses, appContentsReadContentResponses, appEffectCatalogReadEffectCatalogData, appEffectCatalogReadEffectCatalogResponses, appEffectCatalogReadEffectData, appEffectCatalogReadEffectErrors, appEffectCatalogReadEffectResponses, appEffectCatalogReadMediaAssetData, appEffectCatalogReadMediaAssetErrors, appEffectCatalogReadMediaAssetResponses, appGenerationsCreateGenerationData, appGenerationsCreateGenerationErrors, appGenerationsCreateGenerationResponses, appGenerationsDeleteGenerationData, appGenerationsDeleteGenerationErrors, appGenerationsDeleteGenerationResponses, appGenerationsReadGenerationData, appGenerationsReadGenerationErrors, appGenerationsReadGenerationQuotaData, appGenerationsReadGenerationQuotaResponses, appGenerationsReadGenerationResponses, appGenerationsReadGenerationsData, appGenerationsReadGenerationsErrors, appGenerationsReadGenerationsResponses, appOrdersCreateOrderData, appOrdersCreateOrderErrors, appOrdersCreateOrderResponses, appOrdersReadOrderData, appOrdersReadOrderErrors, appOrdersReadOrderResponses, appOrdersReadOrdersData, appOrdersReadOrdersErrors, appOrdersReadOrdersResponses, appPaypalCapturePaypalOrderData, appPaypalCapturePaypalOrderErrors, appPaypalCapturePaypalOrderResponses, appPaypalCreatePaypalOrderData, appPaypalCreatePaypalOrderErrors, appPaypalCreatePaypalOrderResponses, appPaypalPaymentConfigData, appPaypalPaymentConfigResponses, appUploadsUploadAppImageData, appUploadsUploadAppImageErrors, appUploadsUploadAppImageResponses, appUsersReadAppUserMeData, appUsersReadAppUserMeResponses, appUsersUpdateAppUserMeData, appUsersUpdateAppUserMeErrors, appUsersUpdateAppUserMeResponses, appVideoTasksCreateVideoTaskData, appVideoTasksCreateVideoTaskErrors, appVideoTasksCreateVideoTaskResponses, appVideoTasksDeleteVideoTaskData, appVideoTasksDeleteVideoTaskErrors, appVideoTasksDeleteVideoTaskResponses, appVideoTasksDownloadVideoTaskData, appVideoTasksDownloadVideoTaskErrors, appVideoTasksDownloadVideoTaskResponses, appVideoTasksReadVideoTaskData, appVideoTasksReadVideoTaskErrors, appVideoTasksReadVideoTaskResponses, appVideoTasksReadVideoTasksData, appVideoTasksReadVideoTasksErrors, appVideoTasksReadVideoTasksResponses, appWalletReadWalletData, appWalletReadWalletResponses, itemsCreateItemData, itemsCreateItemErrors, itemsCreateItemResponses, itemsDeleteItemData, itemsDeleteItemErrors, itemsDeleteItemResponses, itemsReadItemData, itemsReadItemErrors, itemsReadItemResponses, itemsReadItemsData, itemsReadItemsErrors, itemsReadItemsResponses, itemsUpdateItemData, itemsUpdateItemErrors, itemsUpdateItemResponses, loginAdminLoginAccessTokenData, loginAdminLoginAccessTokenErrors, loginAdminLoginAccessTokenResponses, loginLoginAccessTokenData, loginLoginAccessTokenErrors, loginLoginAccessTokenResponses, loginRecoverPasswordData, loginRecoverPasswordErrors, loginRecoverPasswordHtmlContentData, loginRecoverPasswordHtmlContentErrors, loginRecoverPasswordHtmlContentResponses, loginRecoverPasswordResponses, loginResetPasswordData, loginResetPasswordErrors, loginResetPasswordResponses, loginTestTokenData, loginTestTokenResponses, paymentWebhooksReceiveAppleIapCallbackData, paymentWebhooksReceiveAppleIapCallbackErrors, paymentWebhooksReceiveAppleIapCallbackResponses, paymentWebhooksReceiveGooglePlayCallbackData, paymentWebhooksReceiveGooglePlayCallbackErrors, paymentWebhooksReceiveGooglePlayCallbackResponses, paypalWebhooksPaypalWebhookData, paypalWebhooksPaypalWebhookResponses, privateCreateUserData, privateCreateUserErrors, privateCreateUserResponses, replicateWebhooksReceiveReplicateWebhookData, replicateWebhooksReceiveReplicateWebhookErrors, replicateWebhooksReceiveReplicateWebhookResponses, usersCreateUserData, usersCreateUserErrors, usersCreateUserResponses, usersDeleteUserData, usersDeleteUserErrors, usersDeleteUserMeData, usersDeleteUserMeResponses, usersDeleteUserResponses, usersReadUserByIdData, usersReadUserByIdErrors, usersReadUserByIdResponses, usersReadUserMeData, usersReadUserMeResponses, usersReadUsersData, usersReadUsersErrors, usersReadUsersResponses, usersRegisterUserData, usersRegisterUserErrors, usersRegisterUserResponses, usersUpdatePasswordMeData, usersUpdatePasswordMeErrors, usersUpdatePasswordMeResponses, usersUpdateUserData, usersUpdateUserErrors, usersUpdateUserMeData, usersUpdateUserMeErrors, usersUpdateUserMeResponses, usersUpdateUserResponses, utilsHealthCheckData, utilsHealthCheckResponses, utilsTestEmailData, utilsTestEmailErrors, utilsTestEmailResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -725,6 +725,47 @@ export class AppOrdersService {
     }
 }
 
+export class AppPaypalService {
+    /**
+     * Payment Config
+     */
+    public static paymentConfig<ThrowOnError extends boolean = true>(options?: Options<appPaypalPaymentConfigData, ThrowOnError>) {
+        return (options?.client ?? client).get<appPaypalPaymentConfigResponses, unknown, ThrowOnError>({
+            responseType: 'json',
+            url: '/api/v1/app/paypal/config',
+            ...options
+        });
+    }
+
+    /**
+     * Create Paypal Order
+     */
+    public static createPaypalOrder<ThrowOnError extends boolean = true>(options: Options<appPaypalCreatePaypalOrderData, ThrowOnError>) {
+        return (options.client ?? client).post<appPaypalCreatePaypalOrderResponses, appPaypalCreatePaypalOrderErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/paypal/orders',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Capture Paypal Order
+     */
+    public static capturePaypalOrder<ThrowOnError extends boolean = true>(options: Options<appPaypalCapturePaypalOrderData, ThrowOnError>) {
+        return (options.client ?? client).post<appPaypalCapturePaypalOrderResponses, appPaypalCapturePaypalOrderErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/paypal/orders/{order_id}/capture',
+            ...options
+        });
+    }
+}
+
 export class AppVideoTasksService {
     /**
      * Read Video Tasks
@@ -774,6 +815,17 @@ export class AppVideoTasksService {
             responseType: 'json',
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/app/video-tasks/{task_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Download Video Task
+     */
+    public static downloadVideoTask<ThrowOnError extends boolean = true>(options: Options<appVideoTasksDownloadVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).get<appVideoTasksDownloadVideoTaskResponses, appVideoTasksDownloadVideoTaskErrors, ThrowOnError>({
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/app/video-tasks/{task_id}/download',
             ...options
         });
     }
@@ -949,6 +1001,34 @@ export class AdminAppService {
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/api/v1/admin/app/orders/{order_id}/events',
             ...options
+        });
+    }
+
+    /**
+     * Read Payment Cases
+     */
+    public static readPaymentCases<ThrowOnError extends boolean = true>(options: Options<adminAppReadPaymentCasesData, ThrowOnError>) {
+        return (options.client ?? client).get<adminAppReadPaymentCasesResponses, adminAppReadPaymentCasesErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/orders/{order_id}/payment-cases',
+            ...options
+        });
+    }
+
+    /**
+     * Resolve Payment Case
+     */
+    public static resolvePaymentCase<ThrowOnError extends boolean = true>(options: Options<adminAppResolvePaymentCaseData, ThrowOnError>) {
+        return (options.client ?? client).post<adminAppResolvePaymentCaseResponses, adminAppResolvePaymentCaseErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/payment-cases/{case_id}/resolve',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
 
@@ -1258,6 +1338,64 @@ export class AdminEffectCatalogService {
     }
 }
 
+export class AdminVideoTasksService {
+    /**
+     * Read Video Tasks
+     */
+    public static readVideoTasks<ThrowOnError extends boolean = true>(options?: Options<adminVideoTasksReadVideoTasksData, ThrowOnError>) {
+        return (options?.client ?? client).get<adminVideoTasksReadVideoTasksResponses, adminVideoTasksReadVideoTasksErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/video-tasks',
+            ...options
+        });
+    }
+
+    /**
+     * Read Video Task
+     */
+    public static readVideoTask<ThrowOnError extends boolean = true>(options: Options<adminVideoTasksReadVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).get<adminVideoTasksReadVideoTaskResponses, adminVideoTasksReadVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/video-tasks/{task_id}',
+            ...options
+        });
+    }
+
+    /**
+     * Reconcile Video Task
+     */
+    public static reconcileVideoTask<ThrowOnError extends boolean = true>(options: Options<adminVideoTasksReconcileVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).post<adminVideoTasksReconcileVideoTaskResponses, adminVideoTasksReconcileVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/video-tasks/{task_id}/reconcile',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
+    /**
+     * Resolve Video Task
+     */
+    public static resolveVideoTask<ThrowOnError extends boolean = true>(options: Options<adminVideoTasksResolveVideoTaskData, ThrowOnError>) {
+        return (options.client ?? client).post<adminVideoTasksResolveVideoTaskResponses, adminVideoTasksResolveVideoTaskErrors, ThrowOnError>({
+            responseType: 'json',
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/api/v1/admin/app/video-tasks/{task_id}/resolve',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+}
+
 export class PaymentWebhooksService {
     /**
      * Receive Apple Iap Callback
@@ -1291,6 +1429,15 @@ export class PaymentWebhooksService {
                 ...options.headers
             }
         });
+    }
+}
+
+export class PaypalWebhooksService {
+    /**
+     * Paypal Webhook
+     */
+    public static paypalWebhook<ThrowOnError extends boolean = true>(options?: Options<paypalWebhooksPaypalWebhookData, ThrowOnError>) {
+        return (options?.client ?? client).post<paypalWebhooksPaypalWebhookResponses, unknown, ThrowOnError>({ url: '/api/v1/webhooks/payments/paypal', ...options });
     }
 }
 

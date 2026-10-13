@@ -2,6 +2,12 @@
 
 This runbook deploys the v1.2 dynamic effect catalog, real coin wallet, FastAPI task API, and PostgreSQL worker without rewriting them for Cloudflare Workers.
 
+For the selected public release, the authoritative commerce/readiness/acceptance
+and rollback gates are in [deployment-paypal.md](deployment-paypal.md), including
+schema head `b4c5d6e7f8a9`, closed Live preparation, exact Clerk acceptance subjects
+and the two-effect catalog. Historical v1.2 setup below is not permission to publish
+all 18 effects or restore a source revision missing the PayPal/task-recovery APIs.
+
 ## Resource map
 
 | Component | Provider | Production address |
@@ -220,6 +226,8 @@ The production release is an all-traffic switch, not a percentage rollout.
    ```bash
    H5_URL=https://app.usevireal.com \
    API_URL=https://api.usevireal.com \
+   EXPECTED_RELEASE_COMMIT="$(git rev-parse HEAD)" \
+   RELEASE_CHECK_MODE=closed \
    R2_PRIVATE_OBJECT_URL=https://example-private-object \
    bash scripts/verify-production.sh
    ```

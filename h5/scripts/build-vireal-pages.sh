@@ -10,6 +10,16 @@ fallback_file="$prototype_dir/prototype_v1.1.html"
 output_dir="$workspace_dir/dist/vireal-pages"
 api_base_url="${VIREAL_API_BASE_URL:-}"
 clerk_publishable_key="${VITE_CLERK_PUBLISHABLE_KEY:-}"
+# Optional explicit installed compiler for hosts where the local binary cannot run.
+# CI and deployment continue to use the lockfile's compiler by default.
+esbuild_bin="${VIREAL_ESBUILD_BIN:-$workspace_dir/node_modules/.bin/esbuild}"
+tailwind_bin="${VIREAL_TAILWIND_BIN:-$workspace_dir/node_modules/.bin/tailwindcss}"
+release_commit="${VIREAL_RELEASE_COMMIT:-$(git -C "$workspace_dir" rev-parse HEAD 2>/dev/null || true)}"
+
+if [[ ! "$release_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "VIREAL_RELEASE_COMMIT must identify the reviewed 40-character Git commit" >&2
+  exit 1
+fi
 
 if [[ -z "$api_base_url" ]]; then
   echo "VIREAL_API_BASE_URL is required, for example https://api.example.com" >&2
@@ -46,6 +56,7 @@ sed \
   -e "s|__VIREAL_API_BASE_URL__|$escaped_api_base_url|g" \
   -e "s|__VIREAL_BACKEND_MODE__|1|g" \
   -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
+  -e "s|__VIREAL_RELEASE_COMMIT__|$release_commit|g" \
   "$source_file" > "$output_dir/index.html"
 
 sed \
@@ -54,14 +65,14 @@ sed \
   -e "s|__VIREAL_CLERK_PUBLISHABLE_KEY__|$escaped_clerk_publishable_key|g" \
   "$fallback_file" > "$output_dir/fallback/v1.1/index.html"
 
-bunx esbuild "$prototype_dir/vireal-auth.js" \
+"$esbuild_bin" "$prototype_dir/vireal-auth.js" \
   --bundle \
   --format=iife \
   --platform=browser \
   --minify \
   --outfile="$output_dir/assets/vireal-auth.js"
 
-bunx esbuild "$source_dir/vireal-app.js" \
+"$esbuild_bin" "$source_dir/vireal-app.js" \
   --bundle \
   --format=iife \
   --platform=browser \
@@ -71,11 +82,11 @@ bunx esbuild "$source_dir/vireal-app.js" \
 awk '/<style>/{capture=1;next}/<\/style>/{capture=0}capture' \
   "$prototype_dir/prototype_v1.2.html" > "$output_dir/assets/vireal-v1.2.css"
 
-bunx esbuild "$source_dir/vireal-production.css" \
+"$esbuild_bin" "$source_dir/vireal-production.css" \
   --minify \
   --outfile="$output_dir/assets/vireal-production.css"
 
-bunx tailwindcss \
+"$tailwind_bin" \
   --input "$workspace_dir/styles/vireal.css" \
   --output "$output_dir/assets/vireal.css" \
   --minify
@@ -83,7 +94,7 @@ bunx tailwindcss \
 cp "$prototype_dir/_headers" "$output_dir/_headers"
 printf 'User-agent: *\nDisallow: /\n' > "$output_dir/robots.txt"
 
-if grep -Eq '__VIREAL_API_BASE_URL__|__VIREAL_BACKEND_MODE__|__VIREAL_CLERK_PUBLISHABLE_KEY__' "$output_dir/index.html"; then
+if grep -Eq '__VIREAL_API_BASE_URL__|__VIREAL_BACKEND_MODE__|__VIREAL_CLERK_PUBLISHABLE_KEY__|__VIREAL_RELEASE_COMMIT__' "$output_dir/index.html"; then
   echo "Cloudflare Pages placeholders were not fully replaced" >&2
   exit 1
 fi
