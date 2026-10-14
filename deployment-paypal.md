@@ -94,9 +94,15 @@ file matched the archived provider output SHA-256
 fully and contained 720x1280 H.264 video plus AAC audio. The browser automation's
 download event timed out; completion was verified independently through the
 native Chrome download UI and actual file, not inferred from the click.
-Physical iPhone offline recovery and distinct save-entry results are requested
-without another payment/generation. Actual Sandbox PENDING and provider capture-
-response-loss evidence remain open; mock coverage is not relabeled as provider
+On **2026-10-14**, after the PR #20 closed rollout, the owner reported that all
+four requested real **iPhone/Safari** staging checks succeeded: playback,
+**Download MP4**, **system save/share**, and **offline/online recovery**. This is
+owner-assisted physical-device acceptance, not an agent-instrumented recording.
+The report does not establish measured startup latency or its root cause, Android
+behavior, or recovery after actual media expiry. No further payment/generation or
+production gate change was performed for recording this result.
+Actual Sandbox PENDING and provider capture-response-loss evidence remain open;
+mock coverage is not relabeled as provider
 acceptance. Public opening and controlled Live acceptance remain blocked by the
 missing eligible independent buyer and their separate readiness/authorization gates.
 
@@ -130,8 +136,10 @@ custom domains; runtime checks found all four opening flags still false, old
 submission lock/count **1/1**, and no database/reconciliation errors in sampled
 logs. Do not publish the locally generated dummy-key/API browser-test build.
 
-The owner reports real iPhone/Safari **playback and saving passed**. Physical
-offline/online recovery remains unreported. The browser MP4 download and system
+At this PR #19 checkpoint, the owner reported real iPhone/Safari **playback and
+saving passed**, but physical offline/online recovery was still unreported. The
+later PR #20 section records the owner's successful report for all four checks.
+The browser MP4 download and system
 save/share retrieve the same authenticated MP4: the latter uses supported file
 sharing and otherwise falls back to browser download. Both wait for the file to
 download first. One Mac-route sample measured production HTML at 1.42s and the
@@ -234,9 +242,10 @@ retry without another generation. Restoring **No throttling** cleared the warnin
 restored completed state and real 5-second player playback, with balance **566**.
 DevTools was closed and normal network restored. This is actual staged transport
 failure, not a physical phone radio-network test or proof of the new fix online.
-`browser-network-recovery-evidence.json` records the scoped result. The owner has
-reported successful iPhone/Safari playback and saving. Physical offline recovery
-remains pending; the report does not distinguish which save entry was exercised.
+`browser-network-recovery-evidence.json` records the scoped desktop result. The
+earlier phone report covered playback/saving but not offline recovery or separate
+save entries. The dated PR #20 section records the subsequent physical-device
+report covering playback, both save entries and offline recovery.
 
 At 10:22:05 UTC, an official Sandbox
 [negative-testing header](https://developer.paypal.com/negative-testing/request-headers/)
@@ -1074,12 +1083,15 @@ or future monitor is authorized or implemented by this preparation note.
    private outputs, real authenticated downloads with matching hashes, and decoded
    MP4 validation. Four authorized predictions are consumed (estimated USD 3),
    with only the production 5s prediction reserved inside the total USD 10 cap.
-5. **Real phone delivery: playback/save reported successful; offline recovery pending.**
-   Existing staging outputs expire at their recorded October 14 times. Complete
-   physical offline/online recovery and clarify the save entry without another
-   generation or payment; do not disguise geography. Slow-loading causes still
-   need real device/network measurements; the reviewed wallet lifecycle fix is
-   now deployed and its real SDK component counts are verified, not phone latency.
+5. **Real phone delivery: all four iPhone/Safari checks passed by owner report.**
+   On October 14 after the closed PR #20 rollout, the owner explicitly confirmed
+   playback, Download MP4, system save/share and physical offline/online recovery.
+   This closes those owner-assisted delivery checks, not actual-expiry recovery,
+   Android certification or a latency benchmark. Existing staging outputs retain
+   their recorded October 14 expiry times; no extension or new generation was
+   performed. Slow-loading causes still need real device/network measurements;
+   the reviewed wallet lifecycle fix's real SDK component counts are verified,
+   not phone startup latency. Public and controlled Live gates remain closed.
 6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
    identity/rules for controlled acceptance only; final public terms and separately
    authorized opening remain gates. No eligible independent overseas buyer is
