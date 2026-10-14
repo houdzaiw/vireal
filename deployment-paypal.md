@@ -33,6 +33,73 @@ Synthetic concept covers are not genuine video previews; never publish the
 earlier internally authorized real-person inputs/results. Public opening remains
 separately authorized after all acceptance gates pass.
 
+## Wallet lifecycle closed release — 2026-10-14
+
+The owner explicitly authorized PR [#20](https://github.com/houdzaiw/vireal/pull/20)
+to merge after fresh backup/restore verification, with public registration and
+recharge still closed. It merged at **02:19:26 UTC** to
+`a1c42cbfd7cd9adf8bec209e033ff5b9c4bcdaf3`. This is the latest deployed source;
+the earlier release/version tables below remain historical checkpoints.
+No backend/schema migration was introduced. The clean merged H5 source is
+identical to the reviewed PR head `d6e8010`.
+
+Before the merge, `production-20261014-101812-pre-pr20-wallet.dump` in
+`/Users/huili/Documents/vireal-backups/` restored successfully in an isolated,
+socket-only PostgreSQL instance; **all 25 table fingerprints matched**.
+SHA-256: `8117c1203304681591c43ce0bd64440e8cf966bfeec29288c19ad97123d8286f`.
+The verification JSON is alongside the dump, both 0600. The restore server was
+stopped. `APP_LIVE_ACCEPTANCE_ENABLED` is absent in both production services and
+the deployed Settings default is **false**; this was recorded explicitly rather
+than changing configuration. PayPal, public registration and terms approval are
+explicitly false on both services. The region policy, UTC 30/5/1 limits, 10-second
+maximum and old cumulative submission lock/count **1/1** were preserved.
+
+| Target | Successful PR #20 deployment/version |
+| --- | --- |
+| Production API / bundled admin | `ce2c7732-c195-4d1a-b10f-e0daea8894da` |
+| Production existing worker | `bbeb087c-22fd-4042-bfda-b98d3e0d3074` |
+| Production H5 Pages | `4de6caca-3fe6-4b98-ab79-c7bbe9fc92e3` |
+| Staging API / bundled admin | `0ee6b19f-b7f6-4edc-9916-f2495f4e967f` |
+| Staging existing worker | `e9cd4d07-26f4-4b9a-bd19-8cb16bad5213` |
+| Staging H5 Pages | `0e064494-15a3-46c1-af7c-43bdc5390b48` |
+
+All six targets use the exact merge commit. Signed-region Worker code/configuration
+was unchanged. Production H5 was rebuilt with its actual public Clerk key and API,
+not the local mock build. `verify-production.sh` passed the closed observable
+contract on the custom domains. Production wallet UI shows recharge unavailable,
+three disabled packages and no PayPal button. Five financial tables match the
+fresh verified backup; total tasks remain **6**, counted submissions remain **1**.
+No new Live/Sandbox payment, refund, financial adjustment or paid prediction was
+performed. Runtime/financial JSON records are under the backup directory.
+
+Both reviewed-head and merged-main CI passed. Main H5 run `38500426842` passed
+**41 Chromium / 41 macOS WebKit cases**; backend run `38500426989` passed
+**396 tests with 91% aggregate coverage**. Existing admin Playwright path filters
+skip unchanged admin tests; their aggregate success is not a fresh admin E2E run.
+
+Real signed-in staging Chrome exercised **7 wallet refreshes, 3 package changes
+and 4 home/wallet round trips** without starting checkout. Across **20 DOM
+samples**, every wallet sample had one checkout root/button, two SDK scripts and
+two PayPal iframes; leaving removed the root/button and session iframe, retaining
+only one shared SDK iframe. PayPal accessibility containers remained six on the
+wallet and zero after leaving, rather than growing. Balance stayed **666**;
+read-only provider/ledger verification confirmed the existing USD 5.99 capture
+still has one +100 credit and four existing video tasks. These are real SDK
+lifecycle observations, not a heap profile, a phone benchmark or a new payment.
+
+The existing romance 5-second work still loaded without a player error and its
+authenticated MP4 download completed in Chrome. The downloaded 3,627,473-byte
+file matched the archived provider output SHA-256
+`f5d56e70feb495c9a311c500f38c9cc582dec8b877751f1e92a54be360f3d52e`, decoded
+fully and contained 720x1280 H.264 video plus AAC audio. The browser automation's
+download event timed out; completion was verified independently through the
+native Chrome download UI and actual file, not inferred from the click.
+Physical iPhone offline recovery and distinct save-entry results are requested
+without another payment/generation. Actual Sandbox PENDING and provider capture-
+response-loss evidence remain open; mock coverage is not relabeled as provider
+acceptance. Public opening and controlled Live acceptance remain blocked by the
+missing eligible independent buyer and their separate readiness/authorization gates.
+
 ## Delivery-recovery follow-up — 2026-10-13
 
 ### Closed recovery deployment completed at `ad329d1`
@@ -97,7 +164,7 @@ virtual-buyer login was on the real `www.paypal.com` sign-in page, not Sandbox;
 it did not establish test-account expiry. No account was regenerated and no
 password, Live configuration or payment was changed during this cleanup.
 
-### Wallet SDK lifecycle follow-up (not deployed)
+### Wallet SDK lifecycle implementation checkpoint (before PR #20 release)
 
 Real staging Chrome accumulated over 1,400 PayPal container nodes and reported
 about 804 MB tab memory after repeated wallet polling. Source inspection found
@@ -112,14 +179,15 @@ the [PayPal v6 session lifecycle API](https://github.com/paypal/paypal-js/blob/m
 Six new lifecycle cases passed on both engines. Full local acceptance passed
 **82 Chromium/WebKit cases**, 40 H5 contracts, a mock-config build and targeted
 pre-commit checks. These regressions are isolated mocks, not an additional Sandbox
-payment. This follow-up requires its own review/CI and deployment authorization.
+payment. At this checkpoint the follow-up still required review/CI and separate
+deployment authorization; the subsequently authorized PR #20 release is above.
 On **2026-10-14**, the owner authorized pushing only
 `codex/paypal-wallet-lifecycle` and creating its review PR after excluding that
 exact branch from automatic public previews. The staging Pages exclusion list
 was verified as `codex/paypal-public-registration` plus
 `codex/paypal-wallet-lifecycle`; other source settings, build configuration,
 `main` production branch and the `*` preview inclusion were preserved. Production
-H5 remains a direct-upload project. This authorization does not permit merging,
+H5 remains a direct-upload project. That branch-push authorization did not permit merging,
 deploying, paying or enabling public commerce. No unrelated draft was applied.
 An additional Mac-route compressed transfer sample measured the public Clerk
 auth bundle at **1,199,802 transferred bytes / 4.89s**, versus the app bundle at
@@ -987,13 +1055,13 @@ or future monitor is authorized or implemented by this preparation note.
    installed through real admin sessions in staging and closed production. Titles,
    descriptions, prompt/model evidence and eight managed media routes were
    verified. Old internal real-person inputs/results remain unpublished.
-2. **Reviewed source: PR #19 recovery release completed; wallet lifecycle pending.**
-   The latest reviewed closed deployment is `ad329d1`; both dated version tables
-   and database restore evidence are retained above. Railway/staging Pages follow
-   `main`. Preserve CI and exact preview exclusions. A newly named wallet branch
-   must be excluded before pushing with owner authorization; do not publish its
-   preview or deploy it without fresh review/checks and authorization. Do not
-   apply unrelated configuration drafts.
+2. **Reviewed source: PR #20 closed wallet-lifecycle release completed.**
+   The latest reviewed closed deployment is `a1c42cb`; historical version tables
+   and fresh database restore evidence are retained above. Real SDK component
+   counts stayed stable across refresh/package/navigation checks. Railway/staging
+   Pages follow `main`. Preserve CI and exact preview exclusions; exclude any
+   newly named branch with scoped authorization before pushing. Do not publish
+   previews, apply unrelated drafts or infer permission for another deployment.
 3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
    cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
    500 client handling and approved-payment browser-capture request interruption
@@ -1010,7 +1078,8 @@ or future monitor is authorized or implemented by this preparation note.
    Existing staging outputs expire at their recorded October 14 times. Complete
    physical offline/online recovery and clarify the save entry without another
    generation or payment; do not disguise geography. Slow-loading causes still
-   need real device/network measurements and the reviewed wallet lifecycle fix.
+   need real device/network measurements; the reviewed wallet lifecycle fix is
+   now deployed and its real SDK component counts are verified, not phone latency.
 6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
    identity/rules for controlled acceptance only; final public terms and separately
    authorized opening remain gates. No eligible independent overseas buyer is
