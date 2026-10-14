@@ -90,8 +90,12 @@ Although Payment Review was enabled and reload-verified beforehand, PayPal
 returned **COMPLETED**, not an actual PENDING capture. That gate remains open;
 do not relabel the APPROVED period as PENDING. This test proves a blocked browser
 capture-request recovery, not loss of a server capture response after provider
-completion. The temporary Review switch was set off, but the Developer session
-expired during refresh; persistence must be verified after reauthentication.
+completion. On **2026-10-14**, the owner reauthenticated with the real merchant.
+The same virtual buyer remained **Verified**. Payment Review was set off and its
+persisted off state was confirmed after a full page reload. The owner's failed
+virtual-buyer login was on the real `www.paypal.com` sign-in page, not Sandbox;
+it did not establish test-account expiry. No account was regenerated and no
+password, Live configuration or payment was changed during this cleanup.
 
 ### Wallet SDK lifecycle follow-up (not deployed)
 
@@ -109,6 +113,14 @@ Six new lifecycle cases passed on both engines. Full local acceptance passed
 **82 Chromium/WebKit cases**, 40 H5 contracts, a mock-config build and targeted
 pre-commit checks. These regressions are isolated mocks, not an additional Sandbox
 payment. This follow-up requires its own review/CI and deployment authorization.
+On **2026-10-14**, the owner authorized pushing only
+`codex/paypal-wallet-lifecycle` and creating its review PR after excluding that
+exact branch from automatic public previews. The staging Pages exclusion list
+was verified as `codex/paypal-public-registration` plus
+`codex/paypal-wallet-lifecycle`; other source settings, build configuration,
+`main` production branch and the `*` preview inclusion were preserved. Production
+H5 remains a direct-upload project. This authorization does not permit merging,
+deploying, paying or enabling public commerce. No unrelated draft was applied.
 An additional Mac-route compressed transfer sample measured the public Clerk
 auth bundle at **1,199,802 transferred bytes / 4.89s**, versus the app bundle at
 15,903 bytes / 0.98s. This identifies an initial-load cost worth profiling; it
