@@ -12,8 +12,9 @@
   <title>Vireal · AI 动态效果</title>
   <link rel="stylesheet" href="/assets/vireal-v1.2.css" />
   <link rel="stylesheet" href="/assets/vireal-production.css" />
-  <script defer src="/assets/vireal-auth.js"></script>
+  <!-- Public browsing must not wait for the larger authentication bundle. -->
   <script defer src="/assets/vireal-app.js"></script>
+  <script defer src="/assets/vireal-auth.js"></script>
 </head>
 <body>
   <div id="app" class="stage" aria-live="polite">

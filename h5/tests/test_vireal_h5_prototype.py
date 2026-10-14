@@ -355,6 +355,12 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn('import { Clerk } from "@clerk/clerk-js"', self.auth_entry)
         self.assertIn("await clerk.load({ ui })", self.auth_entry)
 
+    def test_public_app_runs_before_the_larger_auth_bundle(self) -> None:
+        self.assertLess(
+            self.html.index('<script defer src="/assets/vireal-app.js"'),
+            self.html.index('<script defer src="/assets/vireal-auth.js"'),
+        )
+
     def test_catalog_is_dynamic(self) -> None:
         self.assertIn("/api/v1/app/effect-catalog", self.app)
         self.assertIn("state.catalog.categories", self.app)
