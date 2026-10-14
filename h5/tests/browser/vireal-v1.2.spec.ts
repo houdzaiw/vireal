@@ -110,6 +110,180 @@ const paymentConfig = {
   ],
 }
 
+async function mockPayPalLifecycle(page: Page, failFirst = false) {
+  await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement {
+      connectedCallback() { this.textContent = 'PayPal checkout (UI mock)'; this.style.display = 'block'; this.style.padding = '12px'; }
+    }); window.paypal = { createInstance: async () => {
+      document.body.dataset.sdkInstances = String(Number(document.body.dataset.sdkInstances || 0) + 1);
+      if (${failFirst} && document.body.dataset.sdkInstances === '1') throw new Error('Temporary SDK initialization failure');
+      return {
+        findEligibleMethods: async () => ({isEligible: () => true}),
+        createPayPalOneTimePaymentSession: callbacks => {
+          const owned = document.createElement('div'); owned.dataset.sdkSession = 'true'; document.body.append(owned);
+          return {
+            start: async (_, orderPromise) => { const order = await orderPromise; await callbacks.onApprove({orderId: order.orderId}); },
+            destroy: () => { owned.remove(); document.body.dataset.sdkDestroyed = String(Number(document.body.dataset.sdkDestroyed || 0) + 1); },
+          };
+        },
+      };
+    }};`,
+  }))
+}
+
+test("wallet refresh and scheduled payment polling reuse the SDK and checkout", async ({ page }) => {
+  await page.clock.install()
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  let balance = 500
+  let queries = 0
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance, payment_hold: false, ledger: [] } }))
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => {
+    queries++
+    return route.fulfill({ json: { data: [{ id: "qa-pending", provider: "paypal", status: "capture_pending", coin_quantity: 100, amount: 599 }] } })
+  })
+  await mockPayPalLifecycle(page)
+  await page.goto("/#wallet")
+  await page.clock.runFor(100)
+  await expect(page.locator("paypal-button")).toHaveCount(1)
+  for (let i = 0; i < 4; i++) {
+    balance++
+    await page.getByRole("button", { name: "Refresh balance & orders", exact: true }).click()
+    await expect(page.locator(".wallet-card strong")).toHaveText(`${balance} ✦`)
+    await page.clock.runFor(100)
+    await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+    await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+  }
+  const previousQueries = queries
+  balance = 750
+  await page.clock.runFor(10100)
+  await expect.poll(() => queries).toBeGreaterThan(previousQueries)
+  await expect(page.locator(".wallet-card strong")).toHaveText("750 ✦")
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+})
+
+test("changing package or leaving the wallet releases the old checkout", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await mockPayPalLifecycle(page)
+  let product: string | undefined
+  await page.route("https://api.example.com/api/v1/app/paypal/orders", async route => {
+    product = route.request().postDataJSON().product_id
+    await route.fulfill({ json: { id: "qa-new-package", provider_order_id: "QA-NEW-PACKAGE", status: "created" } })
+  })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-new-package/capture", route => route.fulfill({ json: { status: "capture_pending" } }))
+  await page.goto("/#wallet")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+  await page.getByRole("button", { name: "220 ✦ $11.99 USD", exact: true }).click()
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-destroyed", "1")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+  await page.getByRole("button", { name: "发现", exact: true }).click()
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(0)
+  await page.getByRole("button", { name: "查看金币余额", exact: true }).click()
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await page.locator("paypal-button").click()
+  await expect.poll(() => product).toBe("coins_220")
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+})
+
+test("leaving during SDK initialization does not create an orphan checkout", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await mockPayPalLifecycle(page)
+  let release: () => void = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+  let requested = false
+  await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", async route => {
+    requested = true
+    await gate
+    await route.fallback()
+  })
+  await page.goto("/#wallet")
+  await expect.poll(() => requested).toBe(true)
+  await page.getByRole("button", { name: "发现", exact: true }).click()
+  release()
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(0)
+  await page.getByRole("button", { name: "查看金币余额", exact: true }).click()
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+})
+
+test("an SDK initialization failure can recover without a payment retry", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  await mockPayPalLifecycle(page, true)
+  let orders = 0
+  page.on("request", request => { if (request.method() === "POST" && request.url().includes("/paypal/orders")) orders++ })
+  await page.goto("/#wallet")
+  await expect(page.getByText("Checkout could not load; please refresh later", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "Refresh balance & orders", exact: true }).click()
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "2")
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(1)
+  expect(orders).toBe(0)
+})
+
+test("a payment hold releases checkout resources and disables new payments", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  let held = false
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance: 500, payment_hold: held, ledger: [] } }))
+  await mockPayPalLifecycle(page)
+  await page.goto("/#wallet")
+  await expect(page.locator("paypal-button")).toBeVisible()
+  held = true
+  await page.getByRole("button", { name: "Refresh balance & orders", exact: true }).click()
+  await expect(page.locator("[data-sdk-session]")).toHaveCount(0)
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "100 ✦ $5.99 USD", exact: true })).toBeDisabled()
+  await expect(page.locator("body")).toHaveAttribute("data-sdk-destroyed", "1")
+})
+
+test("leaving an open checkout does not leave the wallet permanently busy", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: paymentConfig }))
+  let orders = 0
+  let captures = 0
+  await page.route("https://api.example.com/api/v1/app/paypal/orders", route => {
+    orders++
+    return route.fulfill({ json: { id: "qa-open-checkout", status: "created", provider_order_id: "QA-OPEN-CHECKOUT" } })
+  })
+  page.on("request", request => { if (request.url().endsWith("/capture")) captures++ })
+  await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement {
+      connectedCallback() { this.textContent = 'PayPal checkout (UI mock)'; this.style.display = 'block'; this.style.padding = '12px'; }
+    }); window.paypal = { createInstance: async () => ({
+      findEligibleMethods: async () => ({isEligible: () => true}),
+      createPayPalOneTimePaymentSession: () => {
+        let stop;
+        return {
+          start: async (_, orderPromise) => { await orderPromise; await new Promise(resolve => { stop = resolve }); },
+          destroy: () => { stop?.(); },
+        };
+      },
+    }) };`,
+  }))
+  await page.goto("/#wallet")
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await page.locator("paypal-button").click()
+  await expect.poll(() => orders).toBe(1)
+  await page.getByRole("button", { name: "Refresh balance & orders", exact: true }).click()
+  await page.locator("paypal-button").click()
+  expect(orders).toBe(1)
+  await page.getByRole("button", { name: "发现", exact: true }).click()
+  await page.getByRole("button", { name: "查看金币余额", exact: true }).click()
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await page.locator("paypal-button").click()
+  await expect.poll(() => orders).toBe(2)
+  expect(captures).toBe(0)
+})
+
 // UI contract mocks only; these do not constitute PayPal sandbox acceptance.
 for (const outcome of ["cancel", "pending", "error", "completed"] as const) {
 test(`PayPal wallet: ${outcome} never grants unverified credits`, async ({ page }, testInfo) => {

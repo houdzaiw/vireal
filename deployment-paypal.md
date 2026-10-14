@@ -35,6 +35,97 @@ separately authorized after all acceptance gates pass.
 
 ## Delivery-recovery follow-up — 2026-10-13
 
+### Closed recovery deployment completed at `ad329d1`
+
+The owner explicitly authorized the PR #19 merge and closed update. PR
+[#19](https://github.com/houdzaiw/vireal/pull/19) merged at **11:49:39 UTC** to
+`ad329d184bf1280ed98a61a434989e643140e2ae`. Head and merged-main H5/backend/
+admin/Playwright checks passed. Main H5 run `38392913906` and backend run
+`38392914012` are successful. The production backup
+`production-20261013-194226-pre-pr19-h5.dump` restored into an isolated local
+database; all **25 tables** matched its exported snapshot. SHA-256:
+`a7c717dc4e84c4aadc1b6e6e19d5d7611f4bb60e2ac14a3e690c1c98533d811d`.
+The ephemeral restore server was stopped. No migration was introduced by PR #19.
+
+| Target | Successful PR #19 deployment/version |
+| --- | --- |
+| Production API / bundled admin | `343992cf-e669-4adb-96f7-bdd6fdc678ea` |
+| Production existing worker | `93e4b078-220d-44c7-b620-1bb74b9d960e` |
+| Production H5 Pages | `f55846e7.vireal-h5-houdzaiw.pages.dev` |
+| Staging API / bundled admin | `8050e9ce-727b-41f4-b04a-b04213c8f1df` |
+| Staging existing worker | `25e14829-ecbd-4c1c-b805-8c6e6f08a387` |
+| Staging H5 | Served release marker is the same `ad329d1` commit |
+
+Railway auto-deployments and the production H5 build use this reviewed merge
+commit. The unchanged signed-region Workers retain their prior versions.
+`verify-production.sh` passed the **closed** observable contract on the production
+custom domains; runtime checks found all four opening flags still false, old
+submission lock/count **1/1**, and no database/reconciliation errors in sampled
+logs. Do not publish the locally generated dummy-key/API browser-test build.
+
+The owner reports real iPhone/Safari **playback and saving passed**. Physical
+offline/online recovery remains unreported. The browser MP4 download and system
+save/share retrieve the same authenticated MP4: the latter uses supported file
+sharing and otherwise falls back to browser download. Both wait for the file to
+download first. One Mac-route sample measured production HTML at 1.42s and the
+catalog API at 2.08s; this is not a phone measurement or an overseas comparison,
+and does not prove mainland routing is the cause of slow loading.
+
+### One Sandbox browser-capture interruption recovered
+
+The owner authorized one virtual USD 5.99 payment and temporarily enabling the
+existing US virtual buyer's Payment Review setting. The existing order
+`d738ab18-932a-406c-800c-c366059395e7` / PayPal `7P10083839205330T` was reused.
+Chrome blocked **only** its browser capture POST (`blocked:devtools`, one affected
+request). At 12:05:23 UTC the order was APPROVED, with no capture or credit and
+balance **566**. Normal verified callbacks/existing-worker reconciliation issued
+exactly one capture `5A068862TA1628948`, completing at 12:06:22 UTC, and exactly
+one **+100** ledger entry. H5 reached **666**, including after page reload;
+generation task count stayed **4**. The temporary rule was removed, Keep log
+restored off, No throttling retained and DevTools closed. No Live payment,
+refund, manual financial database update or paid prediction was involved.
+`sandbox-blocked-capture-recovery-evidence.json` records the scoped result.
+
+Although Payment Review was enabled and reload-verified beforehand, PayPal
+returned **COMPLETED**, not an actual PENDING capture. That gate remains open;
+do not relabel the APPROVED period as PENDING. This test proves a blocked browser
+capture-request recovery, not loss of a server capture response after provider
+completion. On **2026-10-14**, the owner reauthenticated with the real merchant.
+The same virtual buyer remained **Verified**. Payment Review was set off and its
+persisted off state was confirmed after a full page reload. The owner's failed
+virtual-buyer login was on the real `www.paypal.com` sign-in page, not Sandbox;
+it did not establish test-account expiry. No account was regenerated and no
+password, Live configuration or payment was changed during this cleanup.
+
+### Wallet SDK lifecycle follow-up (not deployed)
+
+Real staging Chrome accumulated over 1,400 PayPal container nodes and reported
+about 804 MB tab memory after repeated wallet polling. Source inspection found
+each wallet redraw created a new SDK instance/payment session without releasing
+the previous session. This is a concrete lifecycle defect, not proof that it
+caused all reported phone latency. The follow-up caches SDK initialization for
+the same public client/environment, preserves a same-identity/package checkout
+during balance/order redraws, and calls session `destroy()` when changing
+package, leaving, freezing or invalidating the wallet. It guards late async
+mounts and retries failed initialization without retrying a payment. This uses
+the [PayPal v6 session lifecycle API](https://github.com/paypal/paypal-js/blob/main/packages/paypal-js/types/v6/components/base-component.d.ts).
+Six new lifecycle cases passed on both engines. Full local acceptance passed
+**82 Chromium/WebKit cases**, 40 H5 contracts, a mock-config build and targeted
+pre-commit checks. These regressions are isolated mocks, not an additional Sandbox
+payment. This follow-up requires its own review/CI and deployment authorization.
+On **2026-10-14**, the owner authorized pushing only
+`codex/paypal-wallet-lifecycle` and creating its review PR after excluding that
+exact branch from automatic public previews. The staging Pages exclusion list
+was verified as `codex/paypal-public-registration` plus
+`codex/paypal-wallet-lifecycle`; other source settings, build configuration,
+`main` production branch and the `*` preview inclusion were preserved. Production
+H5 remains a direct-upload project. This authorization does not permit merging,
+deploying, paying or enabling public commerce. No unrelated draft was applied.
+An additional Mac-route compressed transfer sample measured the public Clerk
+auth bundle at **1,199,802 transferred bytes / 4.89s**, versus the app bundle at
+15,903 bytes / 0.98s. This identifies an initial-load cost worth profiling; it
+does not measure physical-phone bandwidth, CPU parse time or overseas performance.
+
 The owner still has no eligible independent overseas Live buyer. Do not manufacture
 an overseas account, misstate residence, bypass region checks, or use merchant
 self-payment. Recruit the first real overseas customer for an explicitly disclosed,
@@ -55,8 +146,8 @@ or payment. Four new mocked cases cover transient address refresh, re-arming,
 leaving the page and canceled system sharing. Local acceptance passed **70 tests
 across Chromium/WebKit**, 40 H5 contracts, and targeted pre-commit checks. These
 are browser-engine/synthetic tests, not physical iPhone save certification. The
-fix requires fresh PR review/CI before a closed H5 update; the deployed source at
-this checkpoint remains `9afed5b`.
+fix's reviewed PR #19 and closed deployment are recorded above; the earlier base
+checkpoint below remains historical `9afed5b` evidence.
 
 The first follow-up CI run `38383181453` passed 64/70 checks but stalled on six
 Linux WebKit cases (click stability and query/timer progress), unlike the full
@@ -76,8 +167,8 @@ restored completed state and real 5-second player playback, with balance **566**
 DevTools was closed and normal network restored. This is actual staged transport
 failure, not a physical phone radio-network test or proof of the new fix online.
 `browser-network-recovery-evidence.json` records the scoped result. The owner has
-offered an iPhone/Safari check of these existing works; its playback, real system
-save and offline recovery results remain pending.
+reported successful iPhone/Safari playback and saving. Physical offline recovery
+remains pending; the report does not distinguish which save entry was exercised.
 
 At 10:22:05 UTC, an official Sandbox
 [negative-testing header](https://developer.paypal.com/negative-testing/request-headers/)
@@ -88,8 +179,9 @@ unapproved-state guards were verified before the request. No buyer approved it,
 no capture/credit occurred, and the financial snapshot remained unchanged at
 566 coins. `paypal-official-negative-evidence.json` records it. This does **not**
 certify an actual pending capture or browser loss of an approved payment response;
-both remain separate acceptance items. No Live request or additional paid
-prediction was sent.
+actual pending capture remains separate. The subsequently approved browser-
+capture interruption test is recorded above and is not a server-response-loss
+test. No Live request or additional paid prediction was sent.
 
 ## Closed selected release checkpoint — 2026-10-13
 
@@ -895,29 +987,30 @@ or future monitor is authorized or implemented by this preparation note.
    installed through real admin sessions in staging and closed production. Titles,
    descriptions, prompt/model evidence and eight managed media routes were
    verified. Old internal real-person inputs/results remain unpublished.
-2. **Reviewed source: base release completed; recovery follow-up pending.** PR #17
-   merged after green CI at `9afed5b`; the version table above records all closed
-   deployments and database restore/migration evidence. Railway staging and Pages
-   production now follow `main`. Before pushing the follow-up, the exact existing
-   `codex/paypal-public-registration` Pages preview exclusion was read back;
-   other previews still include `*`. Reuse that branch, preserve CI, and require
-   fresh review/checks before any follow-up closed deployment. Do not apply
-   unrelated configuration drafts.
+2. **Reviewed source: PR #19 recovery release completed; wallet lifecycle pending.**
+   The latest reviewed closed deployment is `ad329d1`; both dated version tables
+   and database restore evidence are retained above. Railway/staging Pages follow
+   `main`. Preserve CI and exact preview exclusions. A newly named wallet branch
+   must be excluded before pushing with owner authorization; do not publish its
+   preview or deploy it without fresh review/checks and authorization. Do not
+   apply unrelated configuration drafts.
 3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
    cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
-   500 client handling have dated evidence. Actual pending capture and approved-
-   payment response-loss recovery remain unverified; isolated mock coverage is
-   not a substitute. Dispute/reversal/insufficient balance remain isolated tests;
+   500 client handling and approved-payment browser-capture request interruption
+   with unique 100-coin recovery have dated evidence. Actual pending capture and
+   server capture-response loss remain unverified; isolated mock coverage is not
+   a substitute. Dispute/reversal/insufficient balance remain isolated tests;
    never manufacture a Live dispute or chargeback.
 4. **Four effect-duration combinations: completed.** Dance/romance each 5/10s
    have genuine Wan 2.7 task/prompt/input-count evidence, one debit each, saved
    private outputs, real authenticated downloads with matching hashes, and decoded
    MP4 validation. Four authorized predictions are consumed (estimated USD 3),
    with only the production 5s prediction reserved inside the total USD 10 cap.
-5. **Real phone delivery: pending owner iPhone/Safari feedback.** Existing staging
-   outputs are available until their recorded October 14 expiry. Check actual
-   playback, system-save/download and physical offline/online recovery without
-   another generation or payment; do not disguise geography.
+5. **Real phone delivery: playback/save reported successful; offline recovery pending.**
+   Existing staging outputs expire at their recorded October 14 times. Complete
+   physical offline/online recovery and clarify the save entry without another
+   generation or payment; do not disguise geography. Slow-loading causes still
+   need real device/network measurements and the reviewed wallet lifecycle fix.
 6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
    identity/rules for controlled acceptance only; final public terms and separately
    authorized opening remain gates. No eligible independent overseas buyer is
