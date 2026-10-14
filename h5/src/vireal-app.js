@@ -277,7 +277,16 @@
         finally { starting = false }
       })
       message(paymentText("由 PayPal 安全收款，后端确认后到账", "Secure PayPal checkout; credits are issued after server verification"))
-    } catch (_) { releasePayPal(root); message(paymentText("支付组件加载失败，请稍后刷新", "Checkout could not load; please refresh later")); root.dataset.mounted = "" }
+    } catch (_) {
+      if (!current()) return
+      releasePayPal(root)
+      // Preserve the failed UI across passive redraws; only an explicit refresh
+      // retries SDK initialization. No order/payment is retried here.
+      mount.checkout = null
+      paypalMounts.set(root, mount)
+      root.dataset.mounted = "failed"
+      message(paymentText("支付组件加载失败，请稍后刷新", "Checkout could not load; please refresh later"))
+    }
   }
 
   async function syncSession() {
@@ -759,7 +768,12 @@
       render()
       return
     }
-    if (event.target.closest("[data-refresh-payments]")) { void refreshPayments(); return }
+    if (event.target.closest("[data-refresh-payments]")) {
+      const checkout = document.getElementById("paypalCheckout")
+      if (checkout?.dataset.mounted === "failed") { releasePayPal(checkout); checkout.dataset.mounted = "" }
+      void refreshPayments()
+      return
+    }
     const routeButton = event.target.closest("[data-route]")
     if (routeButton) {
       const target = routeButton.dataset.route

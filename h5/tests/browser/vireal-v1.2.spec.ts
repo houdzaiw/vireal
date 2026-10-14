@@ -81,7 +81,7 @@ async function mockSignedInApi(page: Page) {
       body: `window.VirealClerk = {
         session: {id: 'qa-session', getToken: async () => 'qa-session-token'},
         user: {id: 'qa-user'}, addListener() {},
-      }`,
+      }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
     })
   })
   await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
@@ -221,6 +221,14 @@ test("an SDK initialization failure can recover without a payment retry", async 
   page.on("request", request => { if (request.method() === "POST" && request.url().includes("/paypal/orders")) orders++ })
   await page.goto("/#wallet")
   await expect(page.getByText("Checkout could not load; please refresh later", { exact: true })).toBeVisible()
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+    await expect(page.getByText("Checkout could not load; please refresh later", { exact: true })).toBeVisible()
+    await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "1")
+    await expect(page.locator("[data-sdk-session]")).toHaveCount(0)
+    expect(orders).toBe(0)
+  }
   await page.getByRole("button", { name: "Refresh balance & orders", exact: true }).click()
   await expect(page.locator("paypal-button")).toBeVisible()
   await expect(page.locator("body")).toHaveAttribute("data-sdk-instances", "2")
@@ -389,7 +397,7 @@ for (const locale of ["en-US", "zh-CN"]) {
 test("region denied does not mount Clerk signup while public browsing works", async ({ page }) => {
   await mockPublicApi(page)
   await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: { ...paymentConfig, region_allowed: false, registration_enabled: false, recharge_enabled: false } }))
-  await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: "window.VirealClerk = {session:null,user:null,addListener() {}, mountSignUp() {throw new Error('Must not mount')}, mountSignIn() {throw new Error('Must not mount')} }" }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: "window.VirealClerk = {session:null,user:null,addListener() {}, mountSignUp() {throw new Error('Must not mount')}, mountSignIn() {throw new Error('Must not mount')} }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))" }))
   await page.goto("/#register")
   await expect(page.getByText("Service unavailable in this region", { exact: true })).toBeVisible()
   await expect(page.locator("#clerkSignIn")).toHaveCount(0)
@@ -405,7 +413,7 @@ test("Clerk's slash-suffixed signup link respects the closed registration gate",
       session:null, user:null, addListener() {},
       mountSignIn(root) { root.innerHTML='<a href="#register/">Sign up</a>' },
       unmountSignIn() {}, mountSignUp() {throw new Error('Closed signup must not mount')},
-    }`,
+    }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
   }))
   await page.goto("/#login")
   await page.getByRole("link", { name: "Sign up", exact: true }).click()
@@ -430,7 +438,7 @@ test("slash-suffixed auth routes switch Clerk components and preserve verificati
           location.hash='/verify-email-address';
         };
       },
-    }`,
+    }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
   }))
   await page.goto("/#login/")
   await page.getByRole("link", { name: "Sign up", exact: true }).click()
@@ -468,7 +476,7 @@ test("open signup preserves verification state and returns to a zero-credit wall
           };
         };
       }, unmountSignUp() {},
-    }`,
+    }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
   }))
   await page.goto("/#register")
   await page.getByRole("textbox", { name: "Signup email" }).fill("verified@example.com")
@@ -491,7 +499,7 @@ test("signing out clears the previous account's cached generation details", asyn
         session: {id: 'session-a', getToken: async () => 'qa-token-a'},
         user: {id: 'user-a'},
         addListener(listener) { window.qaClerkNotify = listener },
-      }`,
+      }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
     })
   })
   let account = "a"
@@ -893,6 +901,59 @@ test(`${entry}: signed-out Clerk notifications preserve the in-progress login fo
 })
 }
 
+test("public browsing starts while the Clerk bundle is still downloading", async ({ page }) => {
+  await mockPublicApi(page)
+  let releaseAuth!: () => void
+  const authDownload = new Promise<void>(resolve => { releaseAuth = resolve })
+  let authDelivered = false
+  let authRequests = 0
+  await page.route("**/assets/vireal-auth.js", async route => {
+    await authDownload
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.VirealClerk = {
+        session: null, user: null,
+        addListener(listener) { listener() },
+        mountSignIn(root) { root.innerHTML = '<input aria-label="Slow-bundle QA email">' },
+      }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
+    })
+    authDelivered = true
+  })
+  await page.route("https://api.example.com/api/v1/app/auth/session", async route => {
+    authRequests++
+    await route.fulfill({ status: 401, json: { detail: "Not authenticated" } })
+  })
+  try {
+    await page.goto("/#home", { waitUntil: "commit" })
+    await expect(page.locator(".effect-card")).toHaveCount(4)
+    expect(authDelivered).toBe(false)
+    expect(authRequests).toBe(0)
+    await page.getByRole("button", { name: "账户", exact: true }).click()
+    await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+    releaseAuth()
+    await expect(page.getByRole("textbox", { name: "Slow-bundle QA email" })).toBeVisible()
+    expect(authRequests).toBe(0)
+  } finally {
+    releaseAuth()
+  }
+})
+
+test("an unavailable Clerk bundle keeps public browsing usable without a business session", async ({ page }) => {
+  await mockPublicApi(page)
+  await page.route("**/assets/vireal-auth.js", route => route.abort())
+  let restrictedRequests = 0
+  await page.route("https://api.example.com/api/v1/app/auth/session", async route => {
+    restrictedRequests++
+    await route.fulfill({ status: 401, json: { detail: "Not authenticated" } })
+  })
+  await page.goto("/#home")
+  await expect(page.locator(".effect-card")).toHaveCount(4)
+  await page.getByRole("button", { name: "账户", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "登录后继续创作" })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toBeEmpty()
+  expect(restrictedRequests).toBe(0)
+})
+
 test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }) => {
   await mockPublicApi(page)
   await page.route("**/assets/vireal-auth.js", async (route) => {
@@ -918,10 +979,8 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
 for (const returnToAccount of [false, true]) {
   test(`already-loaded Clerk observes sign-in${returnToAccount ? " when the return hash is unchanged" : " from the home page"}`, async ({ page }) => {
     await mockPublicApi(page)
-    await page.route("**/assets/vireal-auth.js", async (route) => {
-      await route.fulfill({
-        contentType: "application/javascript",
-        body: `(() => {
+    // Exercise the already-ready path independently of HTML script order.
+    await page.addInitScript(`(() => {
         const listeners = []
         window.VirealClerk = {
           session: null, user: null,
@@ -932,9 +991,10 @@ for (const returnToAccount of [false, true]) {
           window.VirealClerk.user = {id: 'qa-clerk-user'}
           listeners.forEach(listener => listener())
         }
-      })()`,
-      })
-    })
+      })()`)
+    await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+      contentType: "application/javascript", body: "/* Clerk is already initialized by this fixture. */",
+    }))
     await page.route("https://api.example.com/api/v1/app/auth/session", async (route) => {
       await route.fulfill({ json: { app_user: { id: "qa-app-user", nickname: "QA User" } } })
     })

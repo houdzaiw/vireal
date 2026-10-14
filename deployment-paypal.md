@@ -33,6 +33,101 @@ Synthetic concept covers are not genuine video previews; never publish the
 earlier internally authorized real-person inputs/results. Public opening remains
 separately authorized after all acceptance gates pass.
 
+## Additional prelaunch convergence — 2026-10-14
+
+Scope: non-spending readiness work while PayPal reviews the existing Sandbox
+capture. No new payment, refund, prediction, production deployment, opening flag
+or ledger change was made. Deployed source remains `a1c42cb`; the local correction
+is on `codex/h5-public-first-load` and is not yet merged or deployed.
+
+### Startup and payment-widget recovery
+
+Three anonymous Mac-route samples measured the auth bundle at **1,199,802
+compressed bytes**, versus 16,197 for the deployed app. Auth download took
+2.44–2.83s in production / 2.26–3.27s in staging; catalog requests took
+3.03–5.26s / 1.99–2.64s respectively. These include network and edge/origin time,
+not backend-only latency or iPhone performance. The auth response is `no-store`;
+that cache policy was not changed because assets do not yet have hashed names.
+
+The deployed HTML executes deferred auth before the app. Deferred scripts execute
+in document order ([MDN script reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script#defer)).
+A held-download regression proved the catalog remained invisible until auth
+download completed. The local fix runs the app first, preserving Clerk ready
+events, session validation and fail-closed region/registration gates. It does not
+defer authentication for uploads, payments or generation.
+
+Reordering exposed a wallet race: passive redraws replaced an SDK initialization
+error and retried SDK creation. The fix preserves a failed checkout placeholder
+for the same context; explicit wallet refresh releases it and retries **SDK
+initialization only**, never a payment. Stale async mounts cannot overwrite the
+current view. Fixtures now emit the real wrapper's ready event; the already-ready
+path is independently exercised before either HTML script.
+
+Local checks passed: **43 Chromium + 43 WebKit cases**, **30 targeted repeated
+cases** (three cases on both engines, five repetitions), **49 H5/PRD checks**, three
+edge checks and a mock-config build. Both defects were reproduced before their
+corrections. These browser fixtures are not new Sandbox/Live payments. Backend
+source/schema are unchanged; the earlier 396-test/91% backend CI result is retained
+as that source's evidence, not a new backend run. New CI/review and separate
+merge/closed-deployment approval remain required. Never deploy the local
+`api.example.com` / dummy Clerk-key test build.
+
+The owner reports **iPhone 16 Pro / iOS 26.5 / Safari**, VPN off, staging catalog
+visible/clickable in approximately **2s Wi-Fi / 3s cellular**. This is a useful
+owner-estimated baseline on the deployed version, not an instrumented benchmark,
+a measurement of the local fix or proof of the earlier slow-loading cause.
+`prelaunch-performance-evidence.json` retains the samples and their scope.
+
+### Natural media expiry and operational readiness
+
+At **14:43 Beijing**, read-only inspection found all four staging works succeeded
+with results present and exactly **86,400 seconds** from persistence to expiry.
+The owner could access all four before expiry: expected, not a post-expiry pass.
+Both workers explicitly use private R2, 24-hour retention and 60-second cleanup,
+with legacy generation and admin public signup disabled.
+
+| Existing work | October 14 expiry, Beijing time |
+| --- | --- |
+| dance-1 / 5s | 16:02:27 |
+| dance-1 / 10s | 16:23:07 |
+| romance-1 / 5s | 17:01:48 |
+| romance-1 / 10s | 17:15:13 |
+
+After 16:10, refresh the first work: no new playback link/download after expiry,
+no false coin-refund claim, and not-yet-expired works remain usable. Subsequent
+read-only database/object checks must verify natural cleanup without changing
+expiry or rerunning generation. An MP4 already saved on the phone is not revoked.
+`prelaunch-media-retention-check.json` records deadlines; actual expiry/cleanup
+acceptance remains open.
+
+Production read-only audit at **14:46 Beijing** found **zero active/unknown tasks,
+zero unfinished approved/pending/review payments, zero paid-but-unfulfilled orders
+and zero open payment cases**. All six historical tasks are expired; five have no
+coin debit and the existing real test has one debit/no expiry refund. No balance
+was adjusted. All four opening flags and five financial-table fingerprints are
+unchanged against the restore-verified PR #20 backup.
+`prelaunch-production-exception-check.json` records this snapshot, not Live
+acceptance or a promise of future zero backlog.
+
+Production still exposes only dance/romance, both 5/10s with managed media.
+Staging's 18 effects are its documented legacy QA arrangement under the controlled
+Clerk allowlist, not a new production defect or a public promotional endpoint.
+No extra catalogue/account mutation was inferred from this request.
+
+The owner authorized only excluding `codex/h5-public-first-load` from automatic
+Pages previews, pushing it and creating a PR. Preserve existing exclusions,
+production `main`, build settings and CI. No merge, deployment or public opening
+is authorized. Remaining gates are consolidated in the existing evidence ledger
+below, not a separate operation manual.
+
+Before pushing, read-only Railway trigger inspection confirmed PR deployments
+are off and all four API/worker targets follow `main`. The staging Pages project
+`vireal-h5-staging` now excludes exactly the three existing/new authorized branches:
+`codex/paypal-public-registration`, `codex/paypal-wallet-lifecycle`, and
+`codex/h5-public-first-load`. The complete source config, `main` production branch
+and build config were verified unchanged except that one appended exclusion.
+Production Pages remains direct-upload; no unrelated draft was applied.
+
 ## Wallet lifecycle closed release — 2026-10-14
 
 The owner explicitly authorized PR [#20](https://github.com/houdzaiw/vireal/pull/20)
@@ -1164,6 +1259,9 @@ or future monitor is authorized or implemented by this preparation note.
    Pages follow `main`. Preserve CI and exact preview exclusions; exclude any
    newly named branch with scoped authorization before pushing. Do not publish
    previews, apply unrelated drafts or infer permission for another deployment.
+   The additional startup/failure-state correction is local on
+   `codex/h5-public-first-load`: local checks pass and PR creation is authorized,
+   but its CI/review, merge and closed rollout are not yet completed.
 3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
    cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
    500 client handling and approved-payment browser-capture request interruption
@@ -1186,7 +1284,10 @@ or future monitor is authorized or implemented by this preparation note.
    This closes those owner-assisted delivery checks, not actual-expiry recovery,
    Android certification or a latency benchmark. Existing staging outputs retain
    their recorded October 14 expiry times; no extension or new generation was
-   performed. Slow-loading causes still need real device/network measurements;
+   performed. The owner now reports iPhone 16 Pro / iOS 26.5 and approximately
+   2s Wi-Fi / 3s cellular to a usable staging catalog, a pre-fix estimate rather
+   than a root-cause diagnosis. Natural expiry checks remain open at the precise
+   deadlines above; instrumented device/network measurements remain separate;
    the reviewed wallet lifecycle fix's real SDK component counts are verified,
    not phone startup latency. Public and controlled Live gates remain closed.
 6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
@@ -1197,6 +1298,24 @@ or future monitor is authorized or implemented by this preparation note.
    public opening. `REPLICATE_POC_MAX_SUBMISSIONS=1` and all production opening
    flags remain unchanged. Removing the cumulative test lock happens only at the
    authorized production acceptance stage, not to bypass the missing buyer.
+
+### Next actionable acceptance gates
+
+| Gate | Current state | Next action / owner |
+| --- | --- | --- |
+| Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
+| Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
+| H5 correction release | Local checks passed, not deployed | Agent creates the authorized preview-excluded PR; review/green CI first, then separate merge/closed-deployment approval and fresh backup verification. |
+| Public notices and support | Identity/rules approved for controlled acceptance only | Owner reviews existing Terms/Privacy/Recharge pages for public operation, confirms a reachable support inbox and manual-service capacity. Clarify the PayPal profile-contact issue with PayPal if required; do not call it verified optional or silently approve the terms flag. |
+| Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
+| Public opening / first 72h | Not authorized | After all gates, request explicit opening approval; open H5 registration/recharge together, never admin signup. Owner checks 09:00/15:00/21:00 Beijing and preserves callbacks/ledger during pauses. |
+
+Completed public materials, four real combinations and normal iPhone delivery do
+not need new paid tests. Full alert/notification acceptance, Android real-device
+certification, instrumented overseas cold/warm timing and hashed-asset caching are
+**before expansion** quality/operations work. The Sandbox heartbeat does not
+monitor production. Eighteen public effects, 15s, extra models and automatic cash
+refunds remain deferred.
 
 ### Restricted acceptance and public-opening sequence
 
