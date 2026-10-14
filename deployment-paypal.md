@@ -101,10 +101,103 @@ owner-assisted physical-device acceptance, not an agent-instrumented recording.
 The report does not establish measured startup latency or its root cause, Android
 behavior, or recovery after actual media expiry. No further payment/generation or
 production gate change was performed for recording this result.
-Actual Sandbox PENDING and provider capture-response-loss evidence remain open;
-mock coverage is not relabeled as provider
-acceptance. Public opening and controlled Live acceptance remain blocked by the
+At that delivery checkpoint, actual Sandbox PENDING and provider capture-response
+loss still lacked real evidence. The subsequently authorized checks are recorded
+below, with their online-versus-isolated scope kept explicit. Public opening and
+controlled Live acceptance remain blocked by the
 missing eligible independent buyer and their separate readiness/authorization gates.
+
+## Sandbox payment fault acceptance — 2026-10-14
+
+The owner authorized **at most two USD 5.99 Sandbox virtual payments**, temporary
+Payment Review on the matching virtual merchant, and its restoration afterward.
+The owner separately accepted the existing site terms **only for these Sandbox
+checks**, not public trading or Live payment. Two orders were created; no third
+payment, refund, prediction, new account or production gate change is authorized
+by this acceptance. All backend source matches deployed `a1c42cb`.
+
+### Genuine PENDING capture, no premature credit, H5 recovery
+
+The matching Sandbox **Business** merchant's Payment Review was originally off.
+It was enabled and full-reload verified; Negative Testing and the virtual buyer's
+review setting remained off. After the normal H5 checkout, order
+`652ecf22-d25a-4ff5-9b37-149826d590b9` / PayPal `4G189190CR137044V` had capture
+`1BD94467D9865150B` with actual **PENDING / PENDING_REVIEW**. The provider's overall
+order status is COMPLETED; this does **not** make the pending capture fulfilled.
+The [Orders v2 capture-state definition](https://developer.paypal.com/api/orders/v2/definitions/purchase_unit)
+identifies this reason as manual review. Local status remained `capture_pending`,
+`fulfilled_at` remained null, credit count remained zero and wallet remained
+**666**. Verified event `WH-2YK58627L2029435H-3K295475JM191015A` was processed as
+`PAYMENT.CAPTURE.PENDING`. Manual wallet refresh and a full page reload retained
+the pending label and unchanged balance; existing video-task count remained four.
+
+The merchant's Payment Review was subsequently restored **off** and persistence
+verified by another full reload; Negative Testing remained off. The captured
+payment still required provider review as of **03:21:43 UTC**. Turning the switch
+off is not proof of releasing an existing transaction. The real pending/no-credit/
+refresh checks pass; **PENDING -> COMPLETED -> unique 100-credit recovery remains
+open until the provider genuinely releases this transaction**. Do not recapture,
+change database payment state/balance or fabricate a webhook. The owner signed
+in to the existing virtual merchant and the exact capture/invoice were
+matched on its transaction-detail page. The status is pending, the displayed
+release date is **October 15 (Beijing)** and the page warns review may take up to
+three business days. Its More actions menu offers tracking and print operations,
+not an approve/release action. No shipping/tracking information, refund or denial
+was submitted to force an outcome; the displayed date is not a release guarantee.
+`sandbox-pending-review-evidence.json` retains the provider/ledger/UI
+checkpoint and webhook identity.
+
+The owner authorized an **hourly, read-only follow-up in the current chat**.
+Heartbeat `sandbox` is active and checks only this order, its real Sandbox capture
+and its associated coin ledger. The durable `sandbox-pending-readonly-check.py`
+uses a READ ONLY database transaction and provider GET (OAuth POST only for
+authentication), never a capture/refund or other financial mutation. Unchanged
+pending state is quiet; meaningful changes, completion, anomalies or required
+owner action are reported. Genuine completion plus exactly one +100 credit is
+required to pass. The follow-up stops after completion or a noncontinuable terminal
+outcome; it cannot open production or replace the outstanding Live acceptance.
+Local scheduled checks require the Mac and desktop app to remain running.
+
+An initial click reused a prior fulfilled order's recovery key, causing checkout
+to close and clear that key without creating or paying a new order. Database
+inspection confirmed no new order or credit; only after following the UI refresh
+instruction was the new pending-test order created. No old capture was replayed.
+
+### Real capture response discarded, isolated backend recovers exactly once
+
+The second order used the same reviewed backend code and real Sandbox API, with
+a freshly migrated, **socket-only private local PostgreSQL ledger**. No online
+wallet/region configuration, Clerk access or production service was changed.
+The isolated order `54e23370-7460-41f2-a05d-3b23bce016be` / PayPal
+`0VF69465D1120113K` was genuinely approved by the same US virtual buyer. At
+**03:08:27 UTC** the backend sent exactly one idempotency-keyed capture POST.
+PayPal returned **HTTP 201 / COMPLETED**, capture `9CV71315VW073932U` for USD 5.99.
+Only after validating that real response, ownership/merchant/price and the still-
+empty local ledger did the test transport discard the response and raise an
+`httpx.ReadTimeout`. The real PayPal client mapped it to `PayPalError`; unchanged
+`confirm_order` queried the provider rather than replaying capture and recovered
+`paid`, one +100 ledger entry, a 100 balance and the same capture ID.
+
+Four further concurrent query-only confirmations left **one** credit, balance
+100 and the same capture ID; they sent no capture POST. The local server was
+stopped after verification, retaining its private test data and sanitized evidence.
+`sandbox-real-capture-response-loss-evidence.json` records the real HTTP/capture
+boundary and result. This passes **real-provider/isolated-backend response-loss
+integration**; it is not an on-Railway fault injection, an H5 outage or a mock
+provider response. The online staging wallet was not credited for this isolated
+order. Its genuine Sandbox callbacks may remain unassociated online because the
+business order exists only in the local test ledger; preserve and identify these
+test events rather than modifying the online wallet to hide them. The two
+observed unassociated event IDs are `WH-3HN92418AG2274701-18468457Y60935135`
+(approval) and `WH-3C778979K41526020-7X1396859S376212S` (completed capture).
+Online staging balance still remained **666** at the final read-only checkpoint.
+
+Production API/worker gates and all five financial-table fingerprints were
+rechecked against the verified PR #20 backup and remain unchanged. No app source,
+production deployment, Live payment, cash refund or video generation was changed
+by this acceptance. The tools remain outside the repository at
+`/tmp/vireal-sandbox-acceptance.xcbsfi`; evidence JSONs (0600) are under
+`/Users/huili/project/new-chat/output/imagegen/vireal-launch-20261013/`.
 
 ## Delivery-recovery follow-up — 2026-10-13
 
@@ -1074,10 +1167,14 @@ or future monitor is authorized or implemented by this preparation note.
 3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
    cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
    500 client handling and approved-payment browser-capture request interruption
-   with unique 100-coin recovery have dated evidence. Actual pending capture and
-   server capture-response loss remain unverified; isolated mock coverage is not
-   a substitute. Dispute/reversal/insufficient balance remain isolated tests;
-   never manufacture a Live dispute or chargeback.
+   with unique 100-coin recovery have dated evidence. October 14 additionally
+   verified real PENDING capture/no premature credit/H5 reload and real-provider
+   capture-response-loss recovery in an isolated same-source local ledger, with
+   concurrent confirmations producing one credit. Provider release of the pending
+   payment and its PENDING-to-paid unique credit remain open. Preserve the scoped
+   distinction from on-Railway faults; mock coverage alone is not the evidence.
+   Dispute/reversal/insufficient balance remain isolated tests; never manufacture
+   a Live dispute or chargeback.
 4. **Four effect-duration combinations: completed.** Dance/romance each 5/10s
    have genuine Wan 2.7 task/prompt/input-count evidence, one debit each, saved
    private outputs, real authenticated downloads with matching hashes, and decoded
