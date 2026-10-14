@@ -114,10 +114,12 @@ and cumulative test lock **1**. Only natural worker retention changes occurred;
 there was no manual balance/state change, new payment, refund, prediction, push,
 merge or deployment in this follow-up.
 
-**Server and actual H5 natural-retention acceptance is passed.** A final iPhone
-refresh at the exact first task URL **after** 16:02:27, plus an unexpired dance/10s
-playback check, has been requested to finish the dated physical-device confirmation.
-Do not relabel the earlier phone report as that later check. The post-expiry GET
+**Natural-retention acceptance is passed, including the dated iPhone check.**
+After the real 16:02:27 deadline and the agent's specific task-link request, the
+owner explicitly reconfirmed on iPhone/Safari: expired target has no playback,
+download/share or false refund, while unexpired dance/10s still plays. This later
+confirmation, not the initial pre-deadline report, closes the physical-device gate.
+The post-expiry GET
 download 410 remains source/isolated-CI evidence, not a directly exercised real
 HTTP download in this follow-up (the expired UI offers no download control).
 
@@ -1439,7 +1441,8 @@ or future monitor is authorized or implemented by this preparation note.
    performed. The owner now reports iPhone 16 Pro / iOS 26.5 and approximately
    2s Wi-Fi / 3s cellular to a usable staging catalog, a pre-fix estimate rather
    than a root-cause diagnosis. Natural server/H5 expiry has now passed at the
-   first recorded deadline; the dated post-deadline iPhone recheck remains open.
+   first recorded deadline; the owner also confirmed the dated post-deadline
+   iPhone expired-view and unexpired-work playback recheck.
    The other works retain their later deadlines; instrumented measurements remain separate;
    the reviewed wallet lifecycle fix's real SDK component counts are verified,
    not phone startup latency. Public and controlled Live gates remain closed.
@@ -1459,7 +1462,7 @@ or future monitor is authorized or implemented by this preparation note.
 | Gate | Current state | Next action / owner |
 | --- | --- | --- |
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
-| Natural 24h expiry | Server + actual H5 passed after the real deadline: first video/input objects absent, one debit/no refund, other three outputs unexpired and present; dated iPhone recheck pending | Owner refreshes exact first task after 16:02:27 and checks no playback/download/share/false refund; confirm unexpired dance/10s still plays. No deadline change, manual cleanup or new generation. |
+| Natural 24h expiry | Completed after the real deadline: server/R2 cleanup, H5 and dated iPhone checks pass; first video/input objects absent, one debit/no refund, other three outputs unexpired and present | No repeat paid test or deadline change needed. Keep the other works' later expiry times; locally saved MP4s are not remotely revoked. |
 | H5 correction release | Completed: PR #21 merged, fresh 25-table backup/restore checked; API/worker/H5 report reviewed `743bb61`; served hashes and real SDK refresh/return regression pass | Keep production closed. The previous 2s/3s phone baseline is not a post-fix speed measurement; no new paid test is needed for this H5-only change. |
 | Public notices and support | Owner approved unchanged public-trial notices and verified external email receipt on October 14 | Keep the runtime terms flag off until the separately authorized acceptance/opening stage. Preserve the manual-support schedule and PayPal profile-contact follow-up; email receipt is not proof of 24/7 support or legal clearance. Renew review if copy/rules change. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
