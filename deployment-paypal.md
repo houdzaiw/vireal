@@ -12,7 +12,7 @@ Verification and migration-rehearsal JSON records sit alongside the dump (0600).
 The completed closed deployment is recorded below; this authorization is not a
 public-opening approval.
 
-The owner confirms Li Qihui (李启辉), brand Vireal, support
+The owner initially confirmed Li Qihui (李启辉), brand Vireal, support
 `li522903183@gmail.com`, prices, limits, 24-hour retention and manual-refund rules
 **for controlled Live acceptance**. H5 now states that identity and the separate
 upload/result retention start times. PayPal telephone advice (owner reported)
@@ -21,6 +21,23 @@ after receipt; this is not independent legal/compliance clearance. The PayPal
 contact-settings search fails for the owner as well; keep the site's support
 email accessible and treat the PayPal profile issue as an open follow-up, not a
 verified optional requirement.
+
+**2026-10-14 owner readiness confirmation (recorded 15:06 Beijing):** the owner
+reports that `li522903183@gmail.com` successfully received an external self-test
+email. The owner also explicitly approves the current `#terms`, `#privacy` and
+`#refunds` notices for **small-scale public operation**, not only controlled
+acceptance: the stated operator/brand, three USD packages, UTC 5/1/30 limits,
+24-hour media retention, manual refunds and non-transferable/non-withdrawable
+credits. These two owner-assisted readiness checks are now complete for that
+unchanged copy. This is an owner confirmation, not independent legal/compliance
+clearance, proof of round-the-clock support or resolution of the PayPal profile
+contact issue.
+
+The answer explicitly keeps production closed. It authorizes recording consent
+only: `APP_COMMERCE_TERMS_APPROVED`, registration, PayPal and Live acceptance
+remain disabled. It does not authorize PR #21 merge/deployment, a Live payment,
+new generation, submission-lock removal or general public opening. If the public
+copy or business rules change, obtain renewed review of the changes.
 
 Maximum newly authorized paid predictions: **four staging combinations plus one
 production 5-second acceptance, five total and combined model spend <= USD 10**.
@@ -1295,10 +1312,12 @@ or future monitor is authorized or implemented by this preparation note.
    deadlines above; instrumented device/network measurements remain separate;
    the reviewed wallet lifecycle fix's real SDK component counts are verified,
    not phone startup latency. Public and controlled Live gates remain closed.
-6. **Owner readiness and controlled Live acceptance: pending.** Owner confirmed
-   identity/rules for controlled acceptance only; final public terms and separately
-   authorized opening remain gates. No eligible independent overseas buyer is
-   available. Recruit a genuine first customer for restricted acceptance, verify
+6. **Public notices/support confirmed; controlled Live acceptance: pending.**
+   On October 14 the owner approved the current public notices for a small public
+   trial and reported successful external support-email receipt. Runtime terms
+   approval and public opening still require their separately authorized stage;
+   no gate was changed by recording consent. No eligible independent overseas buyer
+   is available. Recruit a genuine first customer for restricted acceptance, verify
    USD 5.99 receipt, unique 100 coins, one production 5s debit/play/save, then decide
    public opening. `REPLICATE_POC_MAX_SUBMISSIONS=1` and all production opening
    flags remain unchanged. Removing the cumulative test lock happens only at the
@@ -1311,7 +1330,7 @@ or future monitor is authorized or implemented by this preparation note.
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
 | Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
 | H5 correction release | Local checks passed, PR #21 open, not deployed | Validate PR #21's exact current-head review/green CI first, then request separate merge/closed-deployment approval and fresh backup verification. |
-| Public notices and support | Identity/rules approved for controlled acceptance only | Owner reviews existing Terms/Privacy/Recharge pages for public operation, confirms a reachable support inbox and manual-service capacity. Clarify the PayPal profile-contact issue with PayPal if required; do not call it verified optional or silently approve the terms flag. |
+| Public notices and support | Owner approved unchanged public-trial notices and verified external email receipt on October 14 | Keep the runtime terms flag off until the separately authorized acceptance/opening stage. Preserve the manual-support schedule and PayPal profile-contact follow-up; email receipt is not proof of 24/7 support or legal clearance. Renew review if copy/rules change. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
 | Public opening / first 72h | Not authorized | After all gates, request explicit opening approval; open H5 registration/recharge together, never admin signup. Owner checks 09:00/15:00/21:00 Beijing and preserves callbacks/ledger during pauses. |
 
