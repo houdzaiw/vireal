@@ -75,6 +75,61 @@ and `pr21-wallet-readonly-regression.png` in the existing launch-evidence direct
 This release record is a local documentation-only follow-up, not an additional
 deployment or automatic main push. Remaining paid-opening gates are below.
 
+### Natural retention acceptance — October 14, 16:05 Beijing
+
+The owner initially reported the first dance/5s work expired with no playback,
+download or false refund. Read-only server checks at 15:52/15:55 and actual Chrome
+at the exact task URL still found that work valid until **16:02:27**. The owner
+confirmed the intended staging account/work and explicitly asked to wait for
+the real deadline. Preserve the early feedback, but do not treat it as a dated
+post-deadline iPhone pass or assume a device/cache cause.
+
+After that natural deadline, the existing staging worker changed task
+`ac12ee92-4226-4085-9c7a-e1971cb6b279` to **expired** at **16:03:13**, about
+46 seconds later. The row retains its original 24-hour expiry, has no result
+key/provider URL and `deleted_at` remains null: this was normal retention cleanup,
+not a manual delete. Private R2 **HEAD of the exact original object** (recorded
+before the row's key was cleared) confirms it no longer exists. No manual cleanup,
+deadline extension or provider resubmission was invoked.
+
+The first input upload expired at **15:59:09** and was deleted by the normal worker
+at **16:00:08** (about 59.5 seconds later); its original R2 object is also absent.
+Input/result retention clocks are separate: deleting that expired input did not
+prematurely expire the still-valid finished video. Input creation/expiry timestamps
+differ from exactly 86,400 seconds by less than a millisecond; the prior integer
+inspection rounded that down and did not establish a one-second policy defect.
+
+Actual H5 refresh after the deadline shows **work expired/deleted**, explicitly
+states that retention expiry does not mean a refund, and has **zero video,
+Download MP4 or system-save/share elements**. The list contains one expired work
+and three completed works. The dance/10s detail remains available with its 16:23
+expiry, video and enabled save/download controls. Read-only R2/DB checks confirm
+all three not-yet-expired outputs still exist. This is not a promise to retain
+them beyond their respective later deadlines.
+
+The first task still has **one -28 generation debit, zero generation refunds**,
+`coin_refunded_at` null; the other three still each have one debit/no refund.
+Production API and worker independently retain all four opening gates **false**
+and cumulative test lock **1**. Only natural worker retention changes occurred;
+there was no manual balance/state change, new payment, refund, prediction, push,
+merge or deployment in this follow-up.
+
+**Server and actual H5 natural-retention acceptance is passed.** A final iPhone
+refresh at the exact first task URL **after** 16:02:27, plus an unexpired dance/10s
+playback check, has been requested to finish the dated physical-device confirmation.
+Do not relabel the earlier phone report as that later check. The post-expiry GET
+download 410 remains source/isolated-CI evidence, not a directly exercised real
+HTTP download in this follow-up (the expired UI offers no download control).
+
+Evidence: `natural-retention-acceptance-evidence.json`,
+`natural-retention-readonly-observation.json` and `first-work-natural-expiry-ui.png`
+in the existing launch-evidence directory. Verified original object identifiers
+are private mode-0600 local acceptance data, not credentials or public URLs.
+The Sandbox capture was still **PENDING/PENDING_REVIEW** in the 15:52 read-only
+observation, with no associated credit/balance 666; the existing hourly heartbeat
+continues to wait for genuine release and one credit. Restricted Live acceptance
+still requires a real independent overseas buyer and separate stage authorization.
+
 **2026-10-13 authorization update:** the owner now authorizes merging PR #17
 after review/green CI and deploying the selected release in the **closed** state.
 A fresh backup `production-20261013-153609-pre-selected-release.dump` in
@@ -188,8 +243,8 @@ After 16:10, refresh the first work: no new playback link/download after expiry,
 no false coin-refund claim, and not-yet-expired works remain usable. Subsequent
 read-only database/object checks must verify natural cleanup without changing
 expiry or rerunning generation. An MP4 already saved on the phone is not revoked.
-`prelaunch-media-retention-check.json` records deadlines; actual expiry/cleanup
-acceptance remains open.
+`prelaunch-media-retention-check.json` records the pre-expiry deadlines; the later
+natural server/H5 cleanup pass and dated phone follow-up are recorded above.
 
 Production read-only audit at **14:46 Beijing** found **zero active/unknown tasks,
 zero unfinished approved/pending/review payments, zero paid-but-unfulfilled orders
@@ -1383,8 +1438,9 @@ or future monitor is authorized or implemented by this preparation note.
    their recorded October 14 expiry times; no extension or new generation was
    performed. The owner now reports iPhone 16 Pro / iOS 26.5 and approximately
    2s Wi-Fi / 3s cellular to a usable staging catalog, a pre-fix estimate rather
-   than a root-cause diagnosis. Natural expiry checks remain open at the precise
-   deadlines above; instrumented device/network measurements remain separate;
+   than a root-cause diagnosis. Natural server/H5 expiry has now passed at the
+   first recorded deadline; the dated post-deadline iPhone recheck remains open.
+   The other works retain their later deadlines; instrumented measurements remain separate;
    the reviewed wallet lifecycle fix's real SDK component counts are verified,
    not phone startup latency. Public and controlled Live gates remain closed.
 6. **Public notices/support confirmed; controlled Live acceptance: pending.**
@@ -1403,7 +1459,7 @@ or future monitor is authorized or implemented by this preparation note.
 | Gate | Current state | Next action / owner |
 | --- | --- | --- |
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
-| Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
+| Natural 24h expiry | Server + actual H5 passed after the real deadline: first video/input objects absent, one debit/no refund, other three outputs unexpired and present; dated iPhone recheck pending | Owner refreshes exact first task after 16:02:27 and checks no playback/download/share/false refund; confirm unexpired dance/10s still plays. No deadline change, manual cleanup or new generation. |
 | H5 correction release | Completed: PR #21 merged, fresh 25-table backup/restore checked; API/worker/H5 report reviewed `743bb61`; served hashes and real SDK refresh/return regression pass | Keep production closed. The previous 2s/3s phone baseline is not a post-fix speed measurement; no new paid test is needed for this H5-only change. |
 | Public notices and support | Owner approved unchanged public-trial notices and verified external email receipt on October 14 | Keep the runtime terms flag off until the separately authorized acceptance/opening stage. Preserve the manual-support schedule and PayPal profile-contact follow-up; email receipt is not proof of 24/7 support or legal clearance. Renew review if copy/rules change. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
