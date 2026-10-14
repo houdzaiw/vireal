@@ -2,6 +2,79 @@
 
 ## Release state
 
+### Latest closed update — October 14, 15:45 Beijing
+
+After the explicit next-step proposal, the owner replied **continue execution**,
+authorizing PR [#21](https://github.com/houdzaiw/vireal/pull/21) merge, a fresh
+restore-verified production backup and **closed-state deployment only**. The
+reviewed head `e220d4be5cdbab2760b563e4b3df10fedf5b9b5a` passed the latest
+applicable CI: 396 backend tests / 91% coverage, H5 Chromium and WebKit (43 each),
+pre-commit, Docker Compose and zizmor. Unchanged admin Playwright jobs were
+intentionally skipped and are not a fresh admin E2E pass.
+
+Before merging, `production-20261014-153143-pre-pr21-h5.dump` in the existing
+private backup directory restored successfully to a fresh Unix-socket-only local
+database. All **25 public tables** matched the exported production snapshot;
+dump SHA-256 is `eda6c37bc58baef9e613603a431e32ba5ba21e3614323f38350990a617158e65`.
+The dump and verification JSON are mode 0600, the socket directory 0700, and the
+verification database has stopped. No restoration was applied to production.
+
+PR #21 merged at **15:34:47 Beijing** as
+`743bb61b9302274877b8532eec06069ca71ac121`. Production/staging API and existing
+workers, plus both H5 deployments, now report this source and successful status:
+
+| Target | Verified deployment ID |
+| --- | --- |
+| Production API | `b0873d7d-7b42-498f-adac-63c70cd60028` |
+| Production existing Worker | `1ac3d6b2-21fe-4ab3-9467-92cdca4c9889` |
+| Staging API | `891872d8-9a0b-424d-97f7-edf4f0050f86` |
+| Staging existing Worker | `c245a717-7466-4ff8-8816-44c63495a95f` |
+| Production H5 | `d9ffdba1-af9e-489f-9859-3416c29df114` |
+| Staging H5 | `6fad07ab-634c-428b-8004-744083c17819` |
+
+Production H5 was freshly built from the clean reviewed merge with its existing
+real API origin/Clerk publishable key, then uploaded to its existing direct-upload
+Pages project. Staging followed `main`; the three branch preview exclusions were
+preserved. No region Worker/admin/backend code or schema changed in this H5-only
+release, so no unrelated edge/admin redeployment or migration was introduced.
+
+Both served app/auth bundle hashes match the reviewed build, and actual HTML now
+executes the public app before auth. Health, selected catalogue, closed commerce,
+anonymous wallet/download denial and malformed-unsigned receiver checks pass.
+The limited startup-log samples contain no observed reconciliation/database error;
+INFO startup markers were not present, so their absence is not a health proof.
+Read-only observation of the existing staging order at 15:45:37 found its
+reconciliation timestamp advanced to 15:45:22, after this deployment, with the
+next check at 15:46:22. This is scoped evidence of the existing reconciliation
+path, not a long-term uptime or notification-service guarantee.
+
+Production API **and** worker independently retain PayPal, public registration,
+terms approval and Live acceptance **false** (unset acceptance retains its false
+default). Regions, 5/1/30 limits, 5/10s and the old cumulative lock **1** are
+unchanged. Five financial-table fingerprints match the fresh backup, revision
+remains `b4c5d6e7f8a9`, and the same six tasks / one counted submission remain.
+No payment, refund, generation, new service or unrelated configuration draft was
+applied. Owner approval of public notices remains recorded consent, not an open
+runtime terms flag.
+
+Browser reads resumed after an ordinary page refresh. Actual staging SDK/UI
+regression checked **three wallet refreshes and a catalogue-to-wallet return**:
+one visible PayPal button, unchanged SDK custom-element counts, balance 666, and
+the existing 100-coin order still shown as **payment pending**, not credited.
+No PayPal button was clicked. Subsequent read-only inspection still found the
+same five user orders, no associated credit, and genuine capture
+`1BD94467D9865150B` **PENDING/PENDING_REVIEW** despite overall order COMPLETED;
+amount, merchant and ownership matched. The hourly read-only heartbeat remains
+active. This is a real SDK lifecycle check, not a new payment, injected SDK
+failure, final PENDING-to-paid pass or device-speed benchmark.
+
+Evidence: `pr21-closed-release-ci-evidence.json`, `pr21-deployed-h5-evidence.json`
+and `pr21-wallet-readonly-regression.png` in the existing launch-evidence directory;
+`production-20261014-pr21-financial-verification.json` and
+`production-20261014-pr21-runtime-evidence.json` sit beside the private backup.
+This release record is a local documentation-only follow-up, not an additional
+deployment or automatic main push. Remaining paid-opening gates are below.
+
 **2026-10-13 authorization update:** the owner now authorizes merging PR #17
 after review/green CI and deploying the selected release in the **closed** state.
 A fresh backup `production-20261013-153609-pre-selected-release.dump` in
@@ -52,10 +125,11 @@ separately authorized after all acceptance gates pass.
 
 ## Additional prelaunch convergence — 2026-10-14
 
-Scope: non-spending readiness work while PayPal reviews the existing Sandbox
-capture. No new payment, refund, prediction, production deployment, opening flag
-or ledger change was made. Deployed source remains `a1c42cb`; the local correction
-is on `codex/h5-public-first-load` and is not yet merged or deployed.
+Historical pre-merge checkpoint: non-spending readiness work while PayPal reviewed
+the existing Sandbox capture. No new payment, refund, prediction, production
+deployment, opening flag or ledger change was made at that checkpoint. Deployed
+source was `a1c42cb`; the local correction was on `codex/h5-public-first-load`,
+not yet merged or deployed. The later closed PR #21 release is recorded above.
 
 ### Startup and payment-widget recovery
 
@@ -66,7 +140,7 @@ compressed bytes**, versus 16,197 for the deployed app. Auth download took
 not backend-only latency or iPhone performance. The auth response is `no-store`;
 that cache policy was not changed because assets do not yet have hashed names.
 
-The deployed HTML executes deferred auth before the app. Deferred scripts execute
+The pre-fix deployed HTML executed deferred auth before the app. Deferred scripts execute
 in document order ([MDN script reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script#defer)).
 A held-download regression proved the catalog remained invisible until auth
 download completed. The local fix runs the app first, preserving Clerk ready
@@ -84,9 +158,9 @@ Local checks passed: **43 Chromium + 43 WebKit cases**, **30 targeted repeated
 cases** (three cases on both engines, five repetitions), **49 H5/PRD checks**, three
 edge checks and a mock-config build. Both defects were reproduced before their
 corrections. These browser fixtures are not new Sandbox/Live payments. Backend
-source/schema are unchanged; the earlier 396-test/91% backend CI result is retained
-as that source's evidence, not a new backend run. New CI/review and separate
-merge/closed-deployment approval remain required. Never deploy the local
+source/schema are unchanged. The later exact-head CI reran 396 backend tests with
+91% coverage, and the separately authorized closed rollout is recorded above.
+Never deploy the local
 `api.example.com` / dummy Clerk-key test build.
 
 The owner reports **iPhone 16 Pro / iOS 26.5 / Safari**, VPN off, staging catalog
@@ -131,10 +205,11 @@ Staging's 18 effects are its documented legacy QA arrangement under the controll
 Clerk allowlist, not a new production defect or a public promotional endpoint.
 No extra catalogue/account mutation was inferred from this request.
 
-The owner authorized only excluding `codex/h5-public-first-load` from automatic
+The initial owner authorization covered only excluding `codex/h5-public-first-load` from automatic
 Pages previews, pushing it and creating a PR. Preserve existing exclusions,
-production `main`, build settings and CI. No merge, deployment or public opening
-is authorized. Remaining gates are consolidated in the existing evidence ledger
+production `main`, build settings and CI. The later merge/closed-deployment
+authorization and result are recorded above; public opening remains unauthorized.
+Remaining gates are consolidated in the existing evidence ledger
 below, not a separate operation manual.
 
 Before pushing, read-only Railway trigger inspection confirmed PR deployments
@@ -145,10 +220,10 @@ are off and all four API/worker targets follow `main`. The staging Pages project
 and build config were verified unchanged except that one appended exclusion.
 Production Pages remains direct-upload; no unrelated draft was applied.
 
-PR [#21](https://github.com/houdzaiw/vireal/pull/21) is open for this branch and
-attached to the current chat. Use its exact head's check results in the PR card;
+PR [#21](https://github.com/houdzaiw/vireal/pull/21) is now merged and attached to
+the current chat. Use its exact reviewed head's check results in the PR card;
 do not mistake skipped unchanged-admin checks for new admin E2E evidence. This
-records review preparation, not merge, closed rollout or public-opening approval.
+records the reviewed closed rollout, not public-opening approval.
 
 ## Wallet lifecycle closed release — 2026-10-14
 
@@ -1329,7 +1404,7 @@ or future monitor is authorized or implemented by this preparation note.
 | --- | --- | --- |
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
 | Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
-| H5 correction release | Local checks passed, PR #21 open, not deployed | Validate PR #21's exact current-head review/green CI first, then request separate merge/closed-deployment approval and fresh backup verification. |
+| H5 correction release | Completed: PR #21 merged, fresh 25-table backup/restore checked; API/worker/H5 report reviewed `743bb61`; served hashes and real SDK refresh/return regression pass | Keep production closed. The previous 2s/3s phone baseline is not a post-fix speed measurement; no new paid test is needed for this H5-only change. |
 | Public notices and support | Owner approved unchanged public-trial notices and verified external email receipt on October 14 | Keep the runtime terms flag off until the separately authorized acceptance/opening stage. Preserve the manual-support schedule and PayPal profile-contact follow-up; email receipt is not proof of 24/7 support or legal clearance. Renew review if copy/rules change. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
 | Public opening / first 72h | Not authorized | After all gates, request explicit opening approval; open H5 registration/recharge together, never admin signup. Owner checks 09:00/15:00/21:00 Beijing and preserves callbacks/ledger during pauses. |
