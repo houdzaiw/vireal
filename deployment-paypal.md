@@ -128,6 +128,11 @@ are off and all four API/worker targets follow `main`. The staging Pages project
 and build config were verified unchanged except that one appended exclusion.
 Production Pages remains direct-upload; no unrelated draft was applied.
 
+PR [#21](https://github.com/houdzaiw/vireal/pull/21) is open for this branch and
+attached to the current chat. Use its exact head's check results in the PR card;
+do not mistake skipped unchanged-admin checks for new admin E2E evidence. This
+records review preparation, not merge, closed rollout or public-opening approval.
+
 ## Wallet lifecycle closed release — 2026-10-14
 
 The owner explicitly authorized PR [#20](https://github.com/houdzaiw/vireal/pull/20)
@@ -1260,8 +1265,8 @@ or future monitor is authorized or implemented by this preparation note.
    newly named branch with scoped authorization before pushing. Do not publish
    previews, apply unrelated drafts or infer permission for another deployment.
    The additional startup/failure-state correction is local on
-   `codex/h5-public-first-load`: local checks pass and PR creation is authorized,
-   but its CI/review, merge and closed rollout are not yet completed.
+   `codex/h5-public-first-load`: local checks pass and PR #21 is open; validate its
+   current head's CI/review before separately authorizing merge and closed rollout.
 3. **Sandbox exceptions: partial.** Three packages, full refund, actual window
    cancellation/refresh, partial refund/freeze/audited 19-coin recovery and official
    500 client handling and approved-payment browser-capture request interruption
@@ -1305,7 +1310,7 @@ or future monitor is authorized or implemented by this preparation note.
 | --- | --- | --- |
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
 | Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
-| H5 correction release | Local checks passed, not deployed | Agent creates the authorized preview-excluded PR; review/green CI first, then separate merge/closed-deployment approval and fresh backup verification. |
+| H5 correction release | Local checks passed, PR #21 open, not deployed | Validate PR #21's exact current-head review/green CI first, then request separate merge/closed-deployment approval and fresh backup verification. |
 | Public notices and support | Identity/rules approved for controlled acceptance only | Owner reviews existing Terms/Privacy/Recharge pages for public operation, confirms a reachable support inbox and manual-service capacity. Clarify the PayPal profile-contact issue with PayPal if required; do not call it verified optional or silently approve the terms flag. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
 | Public opening / first 72h | Not authorized | After all gates, request explicit opening approval; open H5 registration/recharge together, never admin signup. Owner checks 09:00/15:00/21:00 Beijing and preserves callbacks/ledger during pauses. |
