@@ -1720,3 +1720,38 @@ disabled immediately to stop further initialization without deleting the account
 Any later Live acceptance/public opening still needs its separate authorization
 and eligible independent real buyer. Revoke an unused invitation only if asked;
 do not silently recreate, extend or forward it to another email.
+
+## Existing-account mainland internal acceptance (not Live payment)
+
+`APP_INTERNAL_ACCEPTANCE_ENABLED=false` is the default. A separately authorized
+internal QA window may set it true with **one exact existing production Clerk
+subject** in `APP_INTERNAL_ACCEPTANCE_SUBJECT` on API and worker. Do not commit
+the subject/email, issue credits, create an identity, or change a password as part
+of this configuration. The selected identity must be active, email-verified,
+non-deleted, have an unrevoked local session and no payment hold. Unknown or
+invalid edge proofs remain blocked; only genuine signed `CN` gains this narrow
+upload/priced-generation exception. Other users retain their region checks.
+
+Keep public registration, PayPal, Live acceptance, runtime commerce terms and
+administrator public signup false, region enforcement true, and demo/unpriced
+legacy generation false. Invalid combinations fail startup. The ordinary
+registration and payment region checks, PayPal payer-country validation, ledger,
+quotas and cumulative submission lock are unchanged. No financial migration is
+required. This exception does **not** certify mainland public service eligibility
+or PayPal acceptance and must not be used as proof of an independent Live buyer.
+
+The private login entry is `/?internal_acceptance=1#login`; it is not advertised
+on the public site. It may mount sign-in only when the API confirms internal
+sign-in availability for the signed region. The URL/anonymous availability flag
+does not authorize any account. The session response and upload/task APIs check
+the real subject and existing identity. Signup remains blocked. A zero wallet
+still cannot generate, and this change grants no model-fee authorization.
+
+Before any rollout require isolated backend tests/90% coverage, Chromium/WebKit
+and contract tests, static checks, reviewed CI-passing source, fresh production
+backup/restore verification and explicit rollout authorization. Compare the exact
+account's wallet, ledger, order and task snapshots before/after. No payment,
+capture, refund, balance adjustment, generation or submission-lock release is a
+deployment smoke test. Disable the internal flag to roll back the exception;
+keep callbacks/reconciliation and existing deliveries intact. Disable this mode
+before separately enabling controlled Live acceptance or public commerce.

@@ -13,6 +13,7 @@ from app.services.commercial_access import (
     acceptance_request_allowed,
     controlled_registration_enabled,
     edge_country,
+    internal_acceptance_enabled,
     lock_commercial_user,
     region_allowed,
     require_new_commerce_user,
@@ -53,6 +54,10 @@ def payment_config(
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        # Only lets a private login landing page mount sign-in, never signup.
+        # This is not an entitlement; upload/generation authenticate again.
+        "internal_sign_in_enabled": internal_acceptance_enabled()
+        and edge_country(request) == "CN",
         "registration_enabled": (
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )

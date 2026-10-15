@@ -1,3 +1,4 @@
+import re
 import warnings
 from typing import Literal, Self
 
@@ -93,6 +94,9 @@ class Settings(BaseSettings):
     # A single verified email may initialize an account without enabling commerce.
     APP_CONTROLLED_REGISTRATION_ENABLED: bool = False
     APP_CONTROLLED_REGISTRATION_EMAIL: EmailStr | None = None
+    # Existing identity only: signed CN upload/generation, never payment/signup.
+    APP_INTERNAL_ACCEPTANCE_ENABLED: bool = False
+    APP_INTERNAL_ACCEPTANCE_SUBJECT: str | None = None
     APP_LIVE_ACCEPTANCE_ENABLED: bool = False
     APP_LIVE_ACCEPTANCE_SUBJECTS: list[str] = []
     # Only these catalogue slugs can be browsed/submitted in production.
@@ -246,6 +250,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if self.APP_INTERNAL_ACCEPTANCE_ENABLED and (
+            self.ENVIRONMENT != "production"
+            or self.APP_AUTH_MODE != "clerk"
+            or not self.APP_INTERNAL_ACCEPTANCE_SUBJECT
+            or not re.fullmatch(
+                r"user_[A-Za-z0-9_-]+", self.APP_INTERNAL_ACCEPTANCE_SUBJECT
+            )
+            or not self.APP_REGION_ENFORCEMENT_ENABLED
+            or self.APP_PUBLIC_REGISTRATION_ENABLED
+            or self.PAYPAL_ENABLED
+            or self.APP_LIVE_ACCEPTANCE_ENABLED
+            or self.APP_COMMERCE_TERMS_APPROVED
+            or self.ADMIN_PUBLIC_SIGNUP_ENABLED
+            or self.LOCAL_DEMO_ENABLED
+            or self.APP_LEGACY_VIDEO_TASKS_ENABLED
+        ):
+            raise ValueError(
+                "Internal acceptance requires production Clerk, one exact subject, signed regions, real priced generation and closed registration, payments, Live acceptance, terms and administrator signup"
+            )
         if self.APP_CONTROLLED_REGISTRATION_ENABLED and (
             self.ENVIRONMENT != "production"
             or self.APP_AUTH_MODE != "clerk"
