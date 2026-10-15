@@ -1681,3 +1681,42 @@ remove secrets, truncate ledgers or downgrade the financial migration.
 The migration intentionally refuses destructive downgrade; feature flags are the
 rollback mechanism. Restore a backup only as a separately approved incident action
 that accounts for all subsequent payments, not a routine deployment rollback.
+
+## Single-account controlled registration (2026-10-15)
+
+Account setup can be authorized separately from Live payment acceptance. The
+default remains `APP_CONTROLLED_REGISTRATION_ENABLED=false`; when enabled in
+production, configure exactly one `APP_CONTROLLED_REGISTRATION_EMAIL` in Railway
+API and worker. Never commit the selected email or any invitation ticket/URL.
+This mode requires Clerk authentication and signed region enforcement, with
+public registration, PayPal, Live acceptance, runtime terms approval and admin
+public signup all **false**. Startup rejects unsafe combinations.
+
+Create at most one Clerk application invitation for that email with redirect
+`https://app.usevireal.com/?controlled_registration=1`, retaining Clerk's restricted
+mode. The private landing page requires a ticket and server-reported availability;
+it does not add a public signup link or enable `#register`. Mainland/unknown
+regions must not mount signup or initialize a business identity. Do not use the
+hosted portal, a proxy or forged region headers to bypass this restriction.
+
+The human verifies their email and personally enters/submits the password. The
+backend checks the authoritative verified primary email and production issuer,
+then serializes first initialization by email/issuer; a second subject cannot
+replace an existing, disabled or deleted account. Initial wallet balance is zero
+and no recharge ledger entry is created. An invitation sent or Clerk identity
+created is **not** proof that H5 business initialization has completed.
+
+Before releasing this change, require isolated backend/90% coverage, H5 browser
+and contract tests, static checks, reviewed CI-passing Git source and a fresh
+restore-verified production backup. No financial schema migration is needed.
+Read back both services' global closed gates, verify normal signup/recharge stay
+closed and compare production wallet/ledger/order/task snapshots before handing
+off the invitation. Do not test by creating a payment or generation.
+
+After successful human signup, verify the exact issuer/subject, verified email,
+active identity and zero wallet without reading passwords or impersonating the
+user. Disable controlled registration after this one-account setup; it can be
+disabled immediately to stop further initialization without deleting the account.
+Any later Live acceptance/public opening still needs its separate authorization
+and eligible independent real buyer. Revoke an unused invitation only if asked;
+do not silently recreate, extend or forward it to another email.
