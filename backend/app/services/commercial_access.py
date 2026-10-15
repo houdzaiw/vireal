@@ -6,10 +6,10 @@ import re
 import time
 
 from fastapi import HTTPException, Request
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.config import settings
-from app.models import AppUser
+from app.models import AppUser, AppUserIdentity
 from app.services.clerk_auth import (
     ClerkAuthenticationError,
     ClerkSessionClaims,
@@ -121,6 +121,70 @@ def require_region(request: Request) -> None:
         raise HTTPException(
             403, "Service is unavailable in this region / 当前地区暂未开放服务"
         )
+
+
+def internal_acceptance_enabled() -> bool:
+    """Fail closed even if runtime settings are changed without validation."""
+    subject = settings.APP_INTERNAL_ACCEPTANCE_SUBJECT
+    return bool(
+        settings.APP_INTERNAL_ACCEPTANCE_ENABLED
+        and settings.ENVIRONMENT == "production"
+        and settings.APP_AUTH_MODE == "clerk"
+        and settings.CLERK_ISSUER_URL
+        and subject
+        and re.fullmatch(r"user_[A-Za-z0-9_-]+", subject)
+        and settings.APP_REGION_ENFORCEMENT_ENABLED
+        and not settings.APP_PUBLIC_REGISTRATION_ENABLED
+        and not settings.PAYPAL_ENABLED
+        and not settings.APP_LIVE_ACCEPTANCE_ENABLED
+        and not settings.APP_COMMERCE_TERMS_APPROVED
+        and not settings.ADMIN_PUBLIC_SIGNUP_ENABLED
+        and not settings.LOCAL_DEMO_ENABLED
+        and not settings.APP_LEGACY_VIDEO_TASKS_ENABLED
+    )
+
+
+def internal_generation_allowed(
+    request: Request,
+    session: Session,
+    user: AppUser,
+    *,
+    claims: ClerkSessionClaims | None = None,
+) -> bool:
+    # Callers must authenticate an existing, unrevoked local session first.
+    # Never look at email, query strings or identity headers supplied by clients.
+    claims = claims or getattr(request.state, "clerk_claims", None)
+    if (
+        not internal_acceptance_enabled()
+        or edge_country(request) != "CN"
+        or not isinstance(claims, ClerkSessionClaims)
+        or claims.subject != settings.APP_INTERNAL_ACCEPTANCE_SUBJECT
+        or claims.issuer.rstrip("/") != str(settings.CLERK_ISSUER_URL).rstrip("/")
+        or user.account_type != "clerk"
+        or user.status != "active"
+        or user.deleted_at is not None
+        or user.payment_hold
+    ):
+        return False
+    identity = session.exec(
+        select(AppUserIdentity).where(
+            AppUserIdentity.app_user_id == user.id,
+            AppUserIdentity.subject == claims.subject,
+            AppUserIdentity.issuer == claims.issuer,
+            col(AppUserIdentity.email_verified).is_(True),
+        )
+    ).first()
+    return identity is not None
+
+
+def require_generation_region(
+    request: Request, session: Session, user: AppUser
+) -> None:
+    """Narrow exception for upload/task creation; financial guards stay separate."""
+    if not region_allowed(request) and not internal_generation_allowed(
+        request, session, user
+    ):
+        require_region(request)
 
 
 def lock_commercial_user(session: Session, user: AppUser) -> AppUser:

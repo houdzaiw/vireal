@@ -110,6 +110,66 @@ const paymentConfig = {
   ],
 }
 
+test("internal CN landing only mounts sign-in; signup and checkout stay closed", async ({ page }, testInfo) => {
+  await mockControlledRegistration(page, false, false)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
+    ...paymentConfig, region_allowed: false, internal_sign_in_enabled: true,
+    registration_enabled: false, recharge_enabled: false, controlled_registration_enabled: false,
+  } }))
+  await page.goto("/?internal_acceptance=1#login")
+  await expect(page.getByRole("heading", { name: "Internal acceptance sign-in" })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await expect(page.locator("[data-route='register']")).toHaveCount(0)
+  await page.evaluate(() => { location.hash = "/factor-one" })
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.screenshot({ path: testInfo.outputPath("internal-sign-in.png"), fullPage: true, animations: "disabled" })
+  await page.evaluate(() => { location.hash = "register" })
+  await expect(page.getByText("Service unavailable in this region", { exact: true })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+})
+
+for (const scenario of ["no-private-landing", "gate-off", "unknown-region", "config-unavailable"]) {
+  test(`internal sign-in stays closed for ${scenario}`, async ({ page }) => {
+    await mockControlledRegistration(page, false, false)
+    await page.route("https://api.example.com/api/v1/app/paypal/config", route => scenario === "config-unavailable"
+      ? route.fulfill({ status: 503, json: { detail: "Unavailable" } })
+      : route.fulfill({ json: { region_allowed: false, internal_sign_in_enabled: scenario === "no-private-landing", registration_enabled: false, recharge_enabled: false } }))
+    await page.goto(scenario === "no-private-landing" ? "/#login" : "/?internal_acceptance=1#login")
+    if (scenario === "config-unavailable") await expect(page.locator("#clerkSignIn")).toBeEmpty()
+    else await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+    await expect(page.getByText("Clerk login (UI mock)")).toHaveCount(0)
+    await expect(page.getByText("Controlled Clerk signup (UI mock)")).toHaveCount(0)
+  })
+}
+
+test("authenticated internal notice is server supplied, with zero wallet and no checkout", async ({ page }, testInfo) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/auth/session", route => route.fulfill({ json: {
+    app_user: { id: "qa-app-user", nickname: "Internal QA" }, internal_generation_allowed: true,
+  } }))
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
+    ...paymentConfig, region_allowed: false, internal_sign_in_enabled: true,
+    registration_enabled: false, recharge_enabled: false,
+  } }))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance: 0, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } }))
+  const payments: string[] = []
+  page.on("request", request => { if (request.url().includes("/paypal/orders") || request.url().includes("/web-sdk/v6")) payments.push(request.url()) })
+  await page.goto("/?internal_acceptance=1#wallet")
+  await expect(page.locator("[data-internal-acceptance]")).toContainText("not Live payment verification")
+  await expect(page.locator(".wallet-card > strong")).toHaveText("0 ✦")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await expect(page.locator("[data-route='register']")).toHaveCount(0)
+  expect(payments).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("internal-wallet.png"), fullPage: true, animations: "disabled" })
+})
+
+test("private URL alone never grants an internal account notice", async ({ page }) => {
+  await mockSignedInApi(page)
+  await page.goto("/?internal_acceptance=1#wallet")
+  await expect(page.locator(".wallet-card > strong")).toBeVisible()
+  await expect(page.locator("[data-internal-acceptance]")).toHaveCount(0)
+})
+
 async function mockControlledRegistration(page: Page, regionAllowed = true, enabled = true) {
   await mockPublicApi(page)
   await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {

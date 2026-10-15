@@ -34,8 +34,8 @@ from app.services.coin_wallet import (
 from app.services.commercial_access import (
     launch_effect_allowed,
     lock_commercial_user,
+    require_generation_region,
     require_new_commerce_user,
-    require_region,
 )
 from app.services.effect_validation import (
     execution_type_for_model,
@@ -275,7 +275,7 @@ async def create_video_task(
     body: AppVideoTaskCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> AppVideoTaskPublic:
-    require_region(request)
+    require_generation_region(request, session, current_app_user)
     require_new_commerce_user(request)
     if not settings.REPLICATE_ENABLED and not settings.LOCAL_DEMO_ENABLED:
         raise HTTPException(status_code=503, detail="Replicate integration is disabled")

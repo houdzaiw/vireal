@@ -629,6 +629,10 @@ export type AppAuthSessionResponse = {
      * Is New User
      */
     is_new_user: boolean;
+    /**
+     * Internal Generation Allowed
+     */
+    internal_generation_allowed?: boolean;
 };
 
 /**

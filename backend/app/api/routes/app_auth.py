@@ -25,6 +25,7 @@ from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
 from app.services.commercial_access import (
     acceptance_subject_allowed,
     controlled_registration_profile_allowed,
+    internal_generation_allowed,
     require_region,
 )
 
@@ -259,6 +260,9 @@ def initialize_clerk_session(
     return AppAuthSessionResponse(
         app_user=serialize_app_user(app_user, identity),
         is_new_user=is_new_user,
+        internal_generation_allowed=internal_generation_allowed(
+            request, session, app_user, claims=clerk_session
+        ),
     )
 
 

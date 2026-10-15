@@ -7,6 +7,7 @@
   const terminalStatuses = new Set(["succeeded", "failed", "canceled", "expired"])
   const invitationLanding = new URLSearchParams(location.search).get("controlled_registration") === "1"
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
+  const internalAcceptanceLanding = new URLSearchParams(location.search).get("internal_acceptance") === "1"
   const signupRoutes = ["register", "controlled-register"]
   const icons = {
     home: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 10.8 12 4l8.5 6.8V20H15v-5.3H9V20H3.5v-9.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
@@ -26,6 +27,7 @@
     wallet: null,
     tasks: [],
     appUser: null,
+    internalGenerationAllowed: false,
     authReady: false,
     authSyncedSessionId: "",
     uploads: [],
@@ -300,6 +302,7 @@
       // redraw on an auth transition; remounting would reset email/OTP state.
       const authChanged = !state.authReady || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
       state.appUser = null
+      state.internalGenerationAllowed = false
       state.wallet = null
       state.tasks = []
       state.rechargeOrders = []
@@ -334,6 +337,7 @@
         stopTaskPolling()
       }
       state.appUser = payload.app_user
+      state.internalGenerationAllowed = payload.internal_generation_allowed === true
       state.authSyncedSessionId = clerk.session.id
       state.authReady = true
       await Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders(), loadCommerce(false)])
@@ -384,6 +388,15 @@
   function categoryFor(effect) { return categories().find((category) => category.id === effect?.category_id) }
   function selectedVariant(effect) {
     return effect?.variants.find((variant) => variant.id === state.selectedVariants[effect.id]) || effect?.variants.find((variant) => variant.is_default) || effect?.variants[0]
+  }
+
+  function internalAcceptanceNotice() {
+    return state.internalGenerationAllowed ? `<p class="screen-copy" data-internal-acceptance>${paymentText("仅限本账号内部验收，不代表 Live 收款通过。充值未开放，余额、费用和生成限额照常校验；请勿在未获费用授权时提交生成。", "Internal acceptance for this account only, not Live payment verification. Recharge remains closed; normal credit, cost and quota checks apply. Do not generate without cost authorization.")}</p>` : ""
+  }
+
+  function signInRegionAllowed() {
+    return Boolean(state.commerce && (state.commerce.region_allowed === true
+      || (internalAcceptanceLanding && state.commerce.internal_sign_in_enabled === true)))
   }
 
   function surface(effect, category, index = 0) {
@@ -502,11 +515,13 @@
   function loginPage() {
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
-    if (state.commerce?.region_allowed === false) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
+    const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
+    if (state.commerce?.region_allowed === false && (signup || !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && (!invitationPresent || !state.commerce?.controlled_registration_enabled)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
+    if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
 
@@ -517,7 +532,7 @@
     const loginRoot = document.getElementById("clerkSignIn")
     const showsLogin = ["login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
     const signupAvailable = current.name === "controlled-register" ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled
-    if (loginRoot && (state.commerce?.region_allowed === false || (signupRoutes.includes(current.name) && !signupAvailable) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
+    if (loginRoot && ((!signInRegionAllowed() || (signupRoutes.includes(current.name) && state.commerce?.region_allowed === false)) || (signupRoutes.includes(current.name) && !signupAvailable) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
       window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
       loginRoot.remove()
     }
@@ -542,6 +557,7 @@
       && paypalMounts.get(checkoutRoot)?.context === paymentContext()
     if (!keepCheckout) releasePayPal(checkoutRoot)
     app().innerHTML = (pages[current.name] || homePage)()
+    if (state.appUser && ["generate", "wallet", "account"].includes(current.name)) app().querySelector(".page")?.insertAdjacentHTML("afterbegin", internalAcceptanceNotice())
     // Balance/order polling must not reinitialize the SDK or payment session.
     if (keepCheckout) document.getElementById("paypalCheckout")?.replaceWith(checkoutRoot)
     document.querySelectorAll("video[autoplay], .effect-card video").forEach((video) => video.play?.().catch(() => {}))
@@ -550,14 +566,16 @@
   function mountSignIn() {
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
-    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !state.commerce || state.commerce.region_allowed === false) return
+    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !signInRegionAllowed()) return
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
+    if (signup && state.commerce?.region_allowed === false) return
     if (signup && !(controlled ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled)) return
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
       state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
-      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      const internalQuery = internalAcceptanceLanding ? "?internal_acceptance=1" : ""
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
       const status = document.getElementById("clerkStatus")
