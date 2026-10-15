@@ -110,6 +110,63 @@ const paymentConfig = {
   ],
 }
 
+async function mockControlledRegistration(page: Page, regionAllowed = true, enabled = true) {
+  await mockPublicApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
+    region_allowed: regionAllowed, registration_enabled: false, recharge_enabled: false,
+    controlled_registration_enabled: enabled, products: [], global_real_remaining: 30,
+  } }))
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.VirealClerk = {addListener() {},
+      mountSignUp(root) { root.innerHTML = '<p>Controlled Clerk signup (UI mock)</p>'; document.body.dataset.signupMounts = String(Number(document.body.dataset.signupMounts || 0) + 1); },
+      mountSignIn(root) { root.innerHTML = '<p>Clerk login (UI mock)</p>'; },
+      unmountSignUp(root) { root.innerHTML = ''; }, unmountSignIn(root) { root.innerHTML = ''; },
+    }; window.dispatchEvent(new CustomEvent('vireal:clerk-ready', {detail: window.VirealClerk}))`,
+  }))
+}
+
+test("controlled invitation preserves the signup component through Clerk hash steps", async ({ page }) => {
+  await mockControlledRegistration(page)
+  await page.goto("/?controlled_registration=1&__clerk_ticket=isolated-ui-ticket")
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.getByText(/Public signup and recharge remain closed/)).toBeVisible()
+  await page.evaluate(() => { location.hash = "/verify-email-address" })
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.locator("body")).toHaveAttribute("data-signup-mounts", "1")
+  await page.reload()
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "New here? Register", exact: true })).toHaveCount(0)
+  await page.goto("/#register")
+  await expect(page.getByRole("heading", { name: "Registration is not yet open" })).toBeVisible()
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
+})
+
+for (const scenario of ["blocked-region", "disabled-gate", "no-ticket", "bare-route"]) {
+  test(`controlled signup fails closed for ${scenario}`, async ({ page }) => {
+    await mockControlledRegistration(page, scenario !== "blocked-region", scenario !== "disabled-gate")
+    const url = scenario === "bare-route" ? "/#controlled-register" : "/?controlled_registration=1" + (scenario === "no-ticket" ? "" : "&__clerk_ticket=isolated-ui-ticket")
+    await page.goto(url)
+    const heading = scenario === "blocked-region" ? "Service unavailable in this region" : "A valid controlled invitation is required"
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible()
+    await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+  })
+}
+
+test("refreshing an invitation after the controlled gate closes cannot mount signup", async ({ page }) => {
+  await mockControlledRegistration(page)
+  await page.goto("/?controlled_registration=1&__clerk_ticket=isolated-ui-ticket")
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
+    region_allowed: true, registration_enabled: false, recharge_enabled: false, controlled_registration_enabled: false,
+  } }))
+  // A reload fetches the current server gate, never trusts the invitation alone.
+  await page.reload()
+  await expect(page.getByRole("heading", { name: "A valid controlled invitation is required" })).toBeVisible()
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
+})
+
 async function mockPayPalLifecycle(page: Page, failFirst = false) {
   await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
     contentType: "application/javascript",

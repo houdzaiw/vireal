@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models import AppOrder, AppOrderPublic, AppPayPalOrderCreate
 from app.services.commercial_access import (
     acceptance_request_allowed,
+    controlled_registration_enabled,
     edge_country,
     lock_commercial_user,
     region_allowed,
@@ -55,6 +56,10 @@ def payment_config(
         "registration_enabled": (
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )
+        and allowed,
+        # This advertises only a private invitation landing page, not signup.
+        # The verified primary email is checked again by the session endpoint.
+        "controlled_registration_enabled": controlled_registration_enabled()
         and allowed,
         "recharge_enabled": settings.PAYPAL_ENABLED
         and paypal_configured()

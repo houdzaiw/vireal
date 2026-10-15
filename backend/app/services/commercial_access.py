@@ -13,6 +13,7 @@ from app.models import AppUser
 from app.services.clerk_auth import (
     ClerkAuthenticationError,
     ClerkSessionClaims,
+    ClerkUserProfile,
     get_clerk_auth_service,
 )
 
@@ -32,6 +33,36 @@ def acceptance_subject_allowed(*, subject: str, issuer: str) -> bool:
         and settings.CLERK_ISSUER_URL
         and issuer.rstrip("/") == str(settings.CLERK_ISSUER_URL).rstrip("/")
         and subject in settings.APP_LIVE_ACCEPTANCE_SUBJECTS
+    )
+
+
+def controlled_registration_enabled() -> bool:
+    """Account setup only; never an entitlement to payment or generation."""
+    return bool(
+        settings.APP_CONTROLLED_REGISTRATION_ENABLED
+        and settings.ENVIRONMENT == "production"
+        and settings.APP_AUTH_MODE == "clerk"
+        and settings.CLERK_ISSUER_URL
+        and settings.APP_CONTROLLED_REGISTRATION_EMAIL
+        and settings.APP_REGION_ENFORCEMENT_ENABLED
+        and not settings.APP_PUBLIC_REGISTRATION_ENABLED
+        and not settings.PAYPAL_ENABLED
+        and not settings.APP_LIVE_ACCEPTANCE_ENABLED
+        and not settings.APP_COMMERCE_TERMS_APPROVED
+        and not settings.ADMIN_PUBLIC_SIGNUP_ENABLED
+    )
+
+
+def controlled_registration_profile_allowed(
+    *, profile: ClerkUserProfile, issuer: str
+) -> bool:
+    # Only the authoritative Clerk profile is used, not a client email/header.
+    return bool(
+        controlled_registration_enabled()
+        and issuer.rstrip("/") == str(settings.CLERK_ISSUER_URL).rstrip("/")
+        and profile.email_verified
+        and profile.primary_email.casefold()
+        == str(settings.APP_CONTROLLED_REGISTRATION_EMAIL).casefold()
     )
 
 

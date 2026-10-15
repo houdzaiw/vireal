@@ -5,6 +5,9 @@
   const API = apiOrigin.startsWith("__VIREAL_") ? "http://localhost:8000" : apiOrigin
   const POLL_MS = 3500
   const terminalStatuses = new Set(["succeeded", "failed", "canceled", "expired"])
+  const invitationLanding = new URLSearchParams(location.search).get("controlled_registration") === "1"
+  const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
+  const signupRoutes = ["register", "controlled-register"]
   const icons = {
     home: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 10.8 12 4l8.5 6.8V20H15v-5.3H9V20H3.5v-9.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
     works: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5h16v12H4zM8 3.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="m10 10 5 2.5-5 2.5v-5Z" fill="currentColor"/></svg>',
@@ -41,7 +44,7 @@
     savingTaskId: null,
     commerce: null,
     commerceError: "",
-    authView: "login",
+    authView: invitationLanding ? "controlled-register" : "login",
     rechargeOrders: [],
     rechargeProduct: "coins_100",
     paymentPolling: null,
@@ -65,6 +68,7 @@
   const statusText = (status) => ({ submitting: "正在提交", pending: "排队中", running: "生成中", rendering_demo: "生成中", saving: "保存中", succeeded: "已完成", failed: "生成失败", canceled: "已取消", submission_unknown: "服务商确认中", expired: "作品已过期/删除" })[status] || status
 
   function route() {
+    if (!location.hash && invitationLanding) return { name: "controlled-register", params: new URLSearchParams() }
     const raw = location.hash.slice(1) || "home"
     // Clerk's supported hash router owns slash-prefixed paths such as
     // #/factor-one. They must stay inside the mounted login component.
@@ -496,12 +500,14 @@
   }
 
   function loginPage() {
-    const signup = route().name === "register"
+    const controlled = route().name === "controlled-register"
+    const signup = signupRoutes.includes(route().name)
     if (state.commerce?.region_allowed === false) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
-    if (signup && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
+    if (controlled && (!invitationPresent || !state.commerce?.controlled_registration_enabled)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
+    if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
-    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
+    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
 
   function shell(content) { return `<main class="phone-shell">${content}</main>` }
@@ -509,8 +515,9 @@
   function render() {
     const current = route()
     const loginRoot = document.getElementById("clerkSignIn")
-    const showsLogin = ["login", "register"].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
-    if (loginRoot && (state.commerce?.region_allowed === false || loginRoot.dataset.clerkKind !== (current.name === "register" ? "register" : "login"))) {
+    const showsLogin = ["login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
+    const signupAvailable = current.name === "controlled-register" ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled
+    if (loginRoot && (state.commerce?.region_allowed === false || (signupRoutes.includes(current.name) && !signupAvailable) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
       window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
       loginRoot.remove()
     }
@@ -525,6 +532,7 @@
       account: accountPage,
       login: loginPage,
       register: loginPage,
+      "controlled-register": loginPage,
       terms: () => legalPage("terms"),
       privacy: () => legalPage("privacy"),
       refunds: () => legalPage("refunds"),
@@ -543,12 +551,13 @@
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
     if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !state.commerce || state.commerce.region_allowed === false) return
-    const signup = route().name === "register"
-    if (signup && !state.commerce?.registration_enabled) return
+    const controlled = route().name === "controlled-register"
+    const signup = signupRoutes.includes(route().name)
+    if (signup && !(controlled ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled)) return
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
-      state.authView = signup ? "register" : "login"
-      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/#login`, signUpUrl: `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
       const status = document.getElementById("clerkStatus")
@@ -857,7 +866,7 @@
     stopTaskPolling()
     clearTimeout(state.playbackTimer)
     const current = route()
-    if (["login", "register"].includes(current.name)) state.authView = current.name
+    if (["login", ...signupRoutes].includes(current.name)) state.authView = current.name
     if (current.name !== "wallet") clearTimeout(state.paymentPolling)
     if (current.name === "works") void loadTasks(false).then(render)
     else if (current.name === "wallet") void refreshPayments()
