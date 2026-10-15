@@ -2,6 +2,136 @@
 
 ## Release state
 
+### Latest closed update — October 14, 15:45 Beijing
+
+After the explicit next-step proposal, the owner replied **continue execution**,
+authorizing PR [#21](https://github.com/houdzaiw/vireal/pull/21) merge, a fresh
+restore-verified production backup and **closed-state deployment only**. The
+reviewed head `e220d4be5cdbab2760b563e4b3df10fedf5b9b5a` passed the latest
+applicable CI: 396 backend tests / 91% coverage, H5 Chromium and WebKit (43 each),
+pre-commit, Docker Compose and zizmor. Unchanged admin Playwright jobs were
+intentionally skipped and are not a fresh admin E2E pass.
+
+Before merging, `production-20261014-153143-pre-pr21-h5.dump` in the existing
+private backup directory restored successfully to a fresh Unix-socket-only local
+database. All **25 public tables** matched the exported production snapshot;
+dump SHA-256 is `eda6c37bc58baef9e613603a431e32ba5ba21e3614323f38350990a617158e65`.
+The dump and verification JSON are mode 0600, the socket directory 0700, and the
+verification database has stopped. No restoration was applied to production.
+
+PR #21 merged at **15:34:47 Beijing** as
+`743bb61b9302274877b8532eec06069ca71ac121`. Production/staging API and existing
+workers, plus both H5 deployments, now report this source and successful status:
+
+| Target | Verified deployment ID |
+| --- | --- |
+| Production API | `b0873d7d-7b42-498f-adac-63c70cd60028` |
+| Production existing Worker | `1ac3d6b2-21fe-4ab3-9467-92cdca4c9889` |
+| Staging API | `891872d8-9a0b-424d-97f7-edf4f0050f86` |
+| Staging existing Worker | `c245a717-7466-4ff8-8816-44c63495a95f` |
+| Production H5 | `d9ffdba1-af9e-489f-9859-3416c29df114` |
+| Staging H5 | `6fad07ab-634c-428b-8004-744083c17819` |
+
+Production H5 was freshly built from the clean reviewed merge with its existing
+real API origin/Clerk publishable key, then uploaded to its existing direct-upload
+Pages project. Staging followed `main`; the three branch preview exclusions were
+preserved. No region Worker/admin/backend code or schema changed in this H5-only
+release, so no unrelated edge/admin redeployment or migration was introduced.
+
+Both served app/auth bundle hashes match the reviewed build, and actual HTML now
+executes the public app before auth. Health, selected catalogue, closed commerce,
+anonymous wallet/download denial and malformed-unsigned receiver checks pass.
+The limited startup-log samples contain no observed reconciliation/database error;
+INFO startup markers were not present, so their absence is not a health proof.
+Read-only observation of the existing staging order at 15:45:37 found its
+reconciliation timestamp advanced to 15:45:22, after this deployment, with the
+next check at 15:46:22. This is scoped evidence of the existing reconciliation
+path, not a long-term uptime or notification-service guarantee.
+
+Production API **and** worker independently retain PayPal, public registration,
+terms approval and Live acceptance **false** (unset acceptance retains its false
+default). Regions, 5/1/30 limits, 5/10s and the old cumulative lock **1** are
+unchanged. Five financial-table fingerprints match the fresh backup, revision
+remains `b4c5d6e7f8a9`, and the same six tasks / one counted submission remain.
+No payment, refund, generation, new service or unrelated configuration draft was
+applied. Owner approval of public notices remains recorded consent, not an open
+runtime terms flag.
+
+Browser reads resumed after an ordinary page refresh. Actual staging SDK/UI
+regression checked **three wallet refreshes and a catalogue-to-wallet return**:
+one visible PayPal button, unchanged SDK custom-element counts, balance 666, and
+the existing 100-coin order still shown as **payment pending**, not credited.
+No PayPal button was clicked. Subsequent read-only inspection still found the
+same five user orders, no associated credit, and genuine capture
+`1BD94467D9865150B` **PENDING/PENDING_REVIEW** despite overall order COMPLETED;
+amount, merchant and ownership matched. The hourly read-only heartbeat remains
+active. This is a real SDK lifecycle check, not a new payment, injected SDK
+failure, final PENDING-to-paid pass or device-speed benchmark.
+
+Evidence: `pr21-closed-release-ci-evidence.json`, `pr21-deployed-h5-evidence.json`
+and `pr21-wallet-readonly-regression.png` in the existing launch-evidence directory;
+`production-20261014-pr21-financial-verification.json` and
+`production-20261014-pr21-runtime-evidence.json` sit beside the private backup.
+This release record is a local documentation-only follow-up, not an additional
+deployment or automatic main push. Remaining paid-opening gates are below.
+
+### Natural retention acceptance — October 14, 16:05 Beijing
+
+The owner initially reported the first dance/5s work expired with no playback,
+download or false refund. Read-only server checks at 15:52/15:55 and actual Chrome
+at the exact task URL still found that work valid until **16:02:27**. The owner
+confirmed the intended staging account/work and explicitly asked to wait for
+the real deadline. Preserve the early feedback, but do not treat it as a dated
+post-deadline iPhone pass or assume a device/cache cause.
+
+After that natural deadline, the existing staging worker changed task
+`ac12ee92-4226-4085-9c7a-e1971cb6b279` to **expired** at **16:03:13**, about
+46 seconds later. The row retains its original 24-hour expiry, has no result
+key/provider URL and `deleted_at` remains null: this was normal retention cleanup,
+not a manual delete. Private R2 **HEAD of the exact original object** (recorded
+before the row's key was cleared) confirms it no longer exists. No manual cleanup,
+deadline extension or provider resubmission was invoked.
+
+The first input upload expired at **15:59:09** and was deleted by the normal worker
+at **16:00:08** (about 59.5 seconds later); its original R2 object is also absent.
+Input/result retention clocks are separate: deleting that expired input did not
+prematurely expire the still-valid finished video. Input creation/expiry timestamps
+differ from exactly 86,400 seconds by less than a millisecond; the prior integer
+inspection rounded that down and did not establish a one-second policy defect.
+
+Actual H5 refresh after the deadline shows **work expired/deleted**, explicitly
+states that retention expiry does not mean a refund, and has **zero video,
+Download MP4 or system-save/share elements**. The list contains one expired work
+and three completed works. The dance/10s detail remains available with its 16:23
+expiry, video and enabled save/download controls. Read-only R2/DB checks confirm
+all three not-yet-expired outputs still exist. This is not a promise to retain
+them beyond their respective later deadlines.
+
+The first task still has **one -28 generation debit, zero generation refunds**,
+`coin_refunded_at` null; the other three still each have one debit/no refund.
+Production API and worker independently retain all four opening gates **false**
+and cumulative test lock **1**. Only natural worker retention changes occurred;
+there was no manual balance/state change, new payment, refund, prediction, push,
+merge or deployment in this follow-up.
+
+**Natural-retention acceptance is passed, including the dated iPhone check.**
+After the real 16:02:27 deadline and the agent's specific task-link request, the
+owner explicitly reconfirmed on iPhone/Safari: expired target has no playback,
+download/share or false refund, while unexpired dance/10s still plays. This later
+confirmation, not the initial pre-deadline report, closes the physical-device gate.
+The post-expiry GET
+download 410 remains source/isolated-CI evidence, not a directly exercised real
+HTTP download in this follow-up (the expired UI offers no download control).
+
+Evidence: `natural-retention-acceptance-evidence.json`,
+`natural-retention-readonly-observation.json` and `first-work-natural-expiry-ui.png`
+in the existing launch-evidence directory. Verified original object identifiers
+are private mode-0600 local acceptance data, not credentials or public URLs.
+The Sandbox capture was still **PENDING/PENDING_REVIEW** in the 15:52 read-only
+observation, with no associated credit/balance 666; the existing hourly heartbeat
+continues to wait for genuine release and one credit. Restricted Live acceptance
+still requires a real independent overseas buyer and separate stage authorization.
+
 **2026-10-13 authorization update:** the owner now authorizes merging PR #17
 after review/green CI and deploying the selected release in the **closed** state.
 A fresh backup `production-20261013-153609-pre-selected-release.dump` in
@@ -52,10 +182,11 @@ separately authorized after all acceptance gates pass.
 
 ## Additional prelaunch convergence — 2026-10-14
 
-Scope: non-spending readiness work while PayPal reviews the existing Sandbox
-capture. No new payment, refund, prediction, production deployment, opening flag
-or ledger change was made. Deployed source remains `a1c42cb`; the local correction
-is on `codex/h5-public-first-load` and is not yet merged or deployed.
+Historical pre-merge checkpoint: non-spending readiness work while PayPal reviewed
+the existing Sandbox capture. No new payment, refund, prediction, production
+deployment, opening flag or ledger change was made at that checkpoint. Deployed
+source was `a1c42cb`; the local correction was on `codex/h5-public-first-load`,
+not yet merged or deployed. The later closed PR #21 release is recorded above.
 
 ### Startup and payment-widget recovery
 
@@ -66,7 +197,7 @@ compressed bytes**, versus 16,197 for the deployed app. Auth download took
 not backend-only latency or iPhone performance. The auth response is `no-store`;
 that cache policy was not changed because assets do not yet have hashed names.
 
-The deployed HTML executes deferred auth before the app. Deferred scripts execute
+The pre-fix deployed HTML executed deferred auth before the app. Deferred scripts execute
 in document order ([MDN script reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script#defer)).
 A held-download regression proved the catalog remained invisible until auth
 download completed. The local fix runs the app first, preserving Clerk ready
@@ -84,9 +215,9 @@ Local checks passed: **43 Chromium + 43 WebKit cases**, **30 targeted repeated
 cases** (three cases on both engines, five repetitions), **49 H5/PRD checks**, three
 edge checks and a mock-config build. Both defects were reproduced before their
 corrections. These browser fixtures are not new Sandbox/Live payments. Backend
-source/schema are unchanged; the earlier 396-test/91% backend CI result is retained
-as that source's evidence, not a new backend run. New CI/review and separate
-merge/closed-deployment approval remain required. Never deploy the local
+source/schema are unchanged. The later exact-head CI reran 396 backend tests with
+91% coverage, and the separately authorized closed rollout is recorded above.
+Never deploy the local
 `api.example.com` / dummy Clerk-key test build.
 
 The owner reports **iPhone 16 Pro / iOS 26.5 / Safari**, VPN off, staging catalog
@@ -114,8 +245,8 @@ After 16:10, refresh the first work: no new playback link/download after expiry,
 no false coin-refund claim, and not-yet-expired works remain usable. Subsequent
 read-only database/object checks must verify natural cleanup without changing
 expiry or rerunning generation. An MP4 already saved on the phone is not revoked.
-`prelaunch-media-retention-check.json` records deadlines; actual expiry/cleanup
-acceptance remains open.
+`prelaunch-media-retention-check.json` records the pre-expiry deadlines; the later
+natural server/H5 cleanup pass and dated phone follow-up are recorded above.
 
 Production read-only audit at **14:46 Beijing** found **zero active/unknown tasks,
 zero unfinished approved/pending/review payments, zero paid-but-unfulfilled orders
@@ -131,10 +262,11 @@ Staging's 18 effects are its documented legacy QA arrangement under the controll
 Clerk allowlist, not a new production defect or a public promotional endpoint.
 No extra catalogue/account mutation was inferred from this request.
 
-The owner authorized only excluding `codex/h5-public-first-load` from automatic
+The initial owner authorization covered only excluding `codex/h5-public-first-load` from automatic
 Pages previews, pushing it and creating a PR. Preserve existing exclusions,
-production `main`, build settings and CI. No merge, deployment or public opening
-is authorized. Remaining gates are consolidated in the existing evidence ledger
+production `main`, build settings and CI. The later merge/closed-deployment
+authorization and result are recorded above; public opening remains unauthorized.
+Remaining gates are consolidated in the existing evidence ledger
 below, not a separate operation manual.
 
 Before pushing, read-only Railway trigger inspection confirmed PR deployments
@@ -145,10 +277,10 @@ are off and all four API/worker targets follow `main`. The staging Pages project
 and build config were verified unchanged except that one appended exclusion.
 Production Pages remains direct-upload; no unrelated draft was applied.
 
-PR [#21](https://github.com/houdzaiw/vireal/pull/21) is open for this branch and
-attached to the current chat. Use its exact head's check results in the PR card;
+PR [#21](https://github.com/houdzaiw/vireal/pull/21) is now merged and attached to
+the current chat. Use its exact reviewed head's check results in the PR card;
 do not mistake skipped unchanged-admin checks for new admin E2E evidence. This
-records review preparation, not merge, closed rollout or public-opening approval.
+records the reviewed closed rollout, not public-opening approval.
 
 ## Wallet lifecycle closed release — 2026-10-14
 
@@ -1308,8 +1440,10 @@ or future monitor is authorized or implemented by this preparation note.
    their recorded October 14 expiry times; no extension or new generation was
    performed. The owner now reports iPhone 16 Pro / iOS 26.5 and approximately
    2s Wi-Fi / 3s cellular to a usable staging catalog, a pre-fix estimate rather
-   than a root-cause diagnosis. Natural expiry checks remain open at the precise
-   deadlines above; instrumented device/network measurements remain separate;
+   than a root-cause diagnosis. Natural server/H5 expiry has now passed at the
+   first recorded deadline; the owner also confirmed the dated post-deadline
+   iPhone expired-view and unexpired-work playback recheck.
+   The other works retain their later deadlines; instrumented measurements remain separate;
    the reviewed wallet lifecycle fix's real SDK component counts are verified,
    not phone startup latency. Public and controlled Live gates remain closed.
 6. **Public notices/support confirmed; controlled Live acceptance: pending.**
@@ -1328,8 +1462,8 @@ or future monitor is authorized or implemented by this preparation note.
 | Gate | Current state | Next action / owner |
 | --- | --- | --- |
 | Sandbox review recovery | PENDING/no early credit/reload passed; final release-to-credit pending | Existing hourly read-only heartbeat waits for real PayPal completion and exactly one +100 credit; no third virtual payment. |
-| Natural 24h expiry | Clock/config/fixture checks passed; actual cleanup and expired-phone view pending | Owner checks the first work after 16:10 Beijing; agent subsequently inspects cleanup and no new URL/false refund, read-only. No new generation. |
-| H5 correction release | Local checks passed, PR #21 open, not deployed | Validate PR #21's exact current-head review/green CI first, then request separate merge/closed-deployment approval and fresh backup verification. |
+| Natural 24h expiry | Completed after the real deadline: server/R2 cleanup, H5 and dated iPhone checks pass; first video/input objects absent, one debit/no refund, other three outputs unexpired and present | No repeat paid test or deadline change needed. Keep the other works' later expiry times; locally saved MP4s are not remotely revoked. |
+| H5 correction release | Completed: PR #21 merged, fresh 25-table backup/restore checked; API/worker/H5 report reviewed `743bb61`; served hashes and real SDK refresh/return regression pass | Keep production closed. The previous 2s/3s phone baseline is not a post-fix speed measurement; no new paid test is needed for this H5-only change. |
 | Public notices and support | Owner approved unchanged public-trial notices and verified external email receipt on October 14 | Keep the runtime terms flag off until the separately authorized acceptance/opening stage. Preserve the manual-support schedule and PayPal profile-contact follow-up; email receipt is not proof of 24/7 support or legal clearance. Renew review if copy/rules change. |
 | Restricted real Live journey | No eligible independent overseas buyer; not passed | Owner recruits a real non-mainland buyer and confirms actual country/independence/email; agent verifies the exact Clerk subject and prepares only the approved restricted flow. Buyer manually pays $5.99; verify merchant receipt and one +100 credit, then action-time-authorized 5s generation, one debit and play/save. Preserve the five-prediction/$10 model cap; four are consumed. |
 | Public opening / first 72h | Not authorized | After all gates, request explicit opening approval; open H5 registration/recharge together, never admin signup. Owner checks 09:00/15:00/21:00 Beijing and preserves callbacks/ledger during pauses. |
@@ -1547,3 +1681,42 @@ remove secrets, truncate ledgers or downgrade the financial migration.
 The migration intentionally refuses destructive downgrade; feature flags are the
 rollback mechanism. Restore a backup only as a separately approved incident action
 that accounts for all subsequent payments, not a routine deployment rollback.
+
+## Single-account controlled registration (2026-10-15)
+
+Account setup can be authorized separately from Live payment acceptance. The
+default remains `APP_CONTROLLED_REGISTRATION_ENABLED=false`; when enabled in
+production, configure exactly one `APP_CONTROLLED_REGISTRATION_EMAIL` in Railway
+API and worker. Never commit the selected email or any invitation ticket/URL.
+This mode requires Clerk authentication and signed region enforcement, with
+public registration, PayPal, Live acceptance, runtime terms approval and admin
+public signup all **false**. Startup rejects unsafe combinations.
+
+Create at most one Clerk application invitation for that email with redirect
+`https://app.usevireal.com/?controlled_registration=1`, retaining Clerk's restricted
+mode. The private landing page requires a ticket and server-reported availability;
+it does not add a public signup link or enable `#register`. Mainland/unknown
+regions must not mount signup or initialize a business identity. Do not use the
+hosted portal, a proxy or forged region headers to bypass this restriction.
+
+The human verifies their email and personally enters/submits the password. The
+backend checks the authoritative verified primary email and production issuer,
+then serializes first initialization by email/issuer; a second subject cannot
+replace an existing, disabled or deleted account. Initial wallet balance is zero
+and no recharge ledger entry is created. An invitation sent or Clerk identity
+created is **not** proof that H5 business initialization has completed.
+
+Before releasing this change, require isolated backend/90% coverage, H5 browser
+and contract tests, static checks, reviewed CI-passing Git source and a fresh
+restore-verified production backup. No financial schema migration is needed.
+Read back both services' global closed gates, verify normal signup/recharge stay
+closed and compare production wallet/ledger/order/task snapshots before handing
+off the invitation. Do not test by creating a payment or generation.
+
+After successful human signup, verify the exact issuer/subject, verified email,
+active identity and zero wallet without reading passwords or impersonating the
+user. Disable controlled registration after this one-account setup; it can be
+disabled immediately to stop further initialization without deleting the account.
+Any later Live acceptance/public opening still needs its separate authorization
+and eligible independent real buyer. Revoke an unused invitation only if asked;
+do not silently recreate, extend or forward it to another email.

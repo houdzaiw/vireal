@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
@@ -21,7 +22,11 @@ from app.models import (
 )
 from app.services.app_identity import hash_clerk_session_id, serialize_app_user
 from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
-from app.services.commercial_access import acceptance_subject_allowed, require_region
+from app.services.commercial_access import (
+    acceptance_subject_allowed,
+    controlled_registration_profile_allowed,
+    require_region,
+)
 
 router = APIRouter(prefix="/app/auth", tags=["app auth"])
 
@@ -98,14 +103,44 @@ def initialize_clerk_session(
     app_user: AppUser | None = None
     if identity is None:
         require_region(request)
+        controlled = controlled_registration_profile_allowed(
+            profile=profile, issuer=clerk_session.issuer
+        )
         if (
             settings.ENVIRONMENT == "production"
             and not settings.APP_PUBLIC_REGISTRATION_ENABLED
             and not acceptance_subject_allowed(
                 subject=clerk_session.subject, issuer=clerk_session.issuer
             )
+            and not controlled
         ):
             raise HTTPException(403, "Registration is not yet open / 注册尚未开放")
+        if controlled:
+            # Bind this verified email to one business identity, including when
+            # concurrent first logins arrive. Never revive an old disabled user.
+            session.connection().execute(
+                text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                {
+                    "key": f"controlled-registration:{clerk_session.issuer}:{profile.primary_email.casefold()}"
+                },
+            )
+            existing = session.exec(
+                select(AppUserIdentity).where(
+                    AppUserIdentity.issuer == clerk_session.issuer,
+                    func.lower(AppUserIdentity.primary_email)
+                    == profile.primary_email.casefold(),
+                )
+            ).first()
+            if existing is not None and existing.subject != clerk_session.subject:
+                raise HTTPException(
+                    409, "Controlled email is already linked to an account"
+                )
+            if existing is not None:
+                # A concurrent request already initialized this same subject.
+                identity = existing
+                app_user = session.get(AppUser, identity.app_user_id)
+                is_new_user = False
+    if identity is None:
         email_name = profile.primary_email.split("@", 1)[0].strip()
         app_user = AppUser(
             account_type="clerk",
