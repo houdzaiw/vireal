@@ -1,9 +1,12 @@
 import re
+import uuid
 import warnings
+from datetime import UTC, datetime, timedelta
 from typing import Literal, Self
 
 from pydantic import (
     AliasChoices,
+    AwareDatetime,
     EmailStr,
     Field,
     HttpUrl,
@@ -99,6 +102,11 @@ class Settings(BaseSettings):
     APP_INTERNAL_ACCEPTANCE_SUBJECT: str | None = None
     APP_LIVE_ACCEPTANCE_ENABLED: bool = False
     APP_LIVE_ACCEPTANCE_SUBJECTS: list[str] = []
+    # Existing-account payment only; disabled until a separate release approval.
+    APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED: bool = False
+    APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT: str | None = None
+    APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID: uuid.UUID | None = None
+    APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT: AwareDatetime | None = None
     # Only these catalogue slugs can be browsed/submitted in production.
     APP_LAUNCH_EFFECT_SLUGS: list[str] = ["dance-1", "romance-1"]
     # Emergency pause affects new submissions, not provider queries/callbacks.
@@ -250,6 +258,33 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED and (
+            self.ENVIRONMENT != "production"
+            or self.APP_AUTH_MODE != "clerk"
+            or not self.APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT
+            or not re.fullmatch(
+                r"user_[A-Za-z0-9_-]+", self.APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT
+            )
+            or not self.APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID
+            or not self.APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT
+            or self.APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT
+            > datetime.now(UTC) + timedelta(hours=24)
+            or not self.APP_REGION_ENFORCEMENT_ENABLED
+            or not self.PAYPAL_ENABLED
+            or not self.APP_COMMERCE_TERMS_APPROVED
+            or self.APP_PUBLIC_REGISTRATION_ENABLED
+            or self.APP_CONTROLLED_REGISTRATION_ENABLED
+            or self.APP_INTERNAL_ACCEPTANCE_ENABLED
+            or self.APP_LIVE_ACCEPTANCE_ENABLED
+            or self.APP_LIVE_ACCEPTANCE_SUBJECTS
+            or self.APP_VIDEO_SUBMISSIONS_ENABLED
+            or self.ADMIN_PUBLIC_SIGNUP_ENABLED
+            or self.LOCAL_DEMO_ENABLED
+            or self.APP_LEGACY_VIDEO_TASKS_ENABLED
+        ):
+            raise ValueError(
+                "Payment-only acceptance requires production Clerk, an existing exact user/subject, an aware expiry within 24 hours, signed regions, live payments and terms, with registration, other acceptance modes and new generation closed"
+            )
         if self.APP_INTERNAL_ACCEPTANCE_ENABLED and (
             self.ENVIRONMENT != "production"
             or self.APP_AUTH_MODE != "clerk"

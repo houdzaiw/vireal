@@ -15,6 +15,9 @@ from app.services.commercial_access import (
     edge_country,
     internal_acceptance_enabled,
     lock_commercial_user,
+    payment_only_acceptance_enabled,
+    payment_only_order_created,
+    payment_only_user,
     region_allowed,
     require_new_commerce_user,
     require_region,
@@ -43,6 +46,9 @@ def payment_config(
         0,
     )
     allowed = region_allowed(request)
+    payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+    payment_user = payment_only_user(request, session) if payment_only else None
+    slot_used = bool(payment_user and payment_only_order_created(session, payment_user))
     acceptance_allowed = (
         acceptance_request_allowed(request)
         if settings.APP_LIVE_ACCEPTANCE_ENABLED
@@ -58,17 +64,28 @@ def payment_config(
         # This is not an entitlement; upload/generation authenticate again.
         "internal_sign_in_enabled": internal_acceptance_enabled()
         and edge_country(request) == "CN",
+        "payment_only_acceptance_mode": payment_only,
+        # A private login form only; the URL and this hint confer no entitlement.
+        "payment_only_sign_in_enabled": payment_only_acceptance_enabled()
+        and edge_country(request) == "CN",
+        "payment_only_acceptance_allowed": payment_user is not None,
+        "payment_only_order_created": slot_used,
+        "payment_only_expires_at": settings.APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT
+        if payment_user
+        else None,
         "registration_enabled": (
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )
-        and allowed,
+        and allowed
+        and not payment_only,
         # This advertises only a private invitation landing page, not signup.
         # The verified primary email is checked again by the session endpoint.
         "controlled_registration_enabled": controlled_registration_enabled()
-        and allowed,
+        and allowed
+        and not payment_only,
         "recharge_enabled": settings.PAYPAL_ENABLED
         and paypal_configured()
-        and allowed
+        and (payment_user is not None and not slot_used if payment_only else allowed)
         and identity_allowed
         and remaining > 0,
         "global_real_limit": settings.APP_GLOBAL_DAILY_REAL_SUBMISSIONS,
@@ -78,6 +95,7 @@ def payment_config(
         "products": [
             {"product_id": key, "coins": coins, "amount": amount, "currency": "USD"}
             for key, (coins, amount) in PRODUCTS.items()
+            if not payment_only or key == "coins_100"
         ],
     }
 
@@ -90,14 +108,39 @@ def create_paypal_order(
     body: AppPayPalOrderCreate,
     idempotency_key: Annotated[str, Header(min_length=8, max_length=120)],
 ) -> AppOrderPublic:
-    require_region(request)
-    require_new_commerce_user(request)
+    payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+    if payment_only:
+        permitted = payment_only_user(request, session, verify_profile=True)
+        if permitted is None or permitted.id != current_app_user.id:
+            raise HTTPException(
+                403, "Payment-only acceptance is unavailable for this account"
+            )
+        if body.product_id != "coins_100" or PRODUCTS.get("coins_100") != (100, 599):
+            raise HTTPException(
+                403, "Payment-only acceptance permits only USD 5.99 for 100 credits"
+            )
+    else:
+        require_region(request)
+        require_new_commerce_user(request)
     if body.product_id not in PRODUCTS:
         raise HTTPException(422, "Unknown recharge package")
     session.connection().execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
         {"key": f"paypal-create:{current_app_user.id}:{idempotency_key}"},
     )
+    if payment_only:
+        # Preserve the same budget -> user lock order as video/new-order paths,
+        # including requests already in flight during a configuration rollout.
+        from app.api.routes.app_video_tasks import POC_BUDGET_LOCK_ID
+
+        session.connection().execute(
+            text("SELECT pg_advisory_xact_lock(:id)"), {"id": POC_BUDGET_LOCK_ID}
+        )
+        # Serialize all keys for the beneficiary before checking the lifetime
+        # slot. The local reservation commits before provider I/O.
+        lock_commercial_user(session, current_app_user)
+        if not payment_only_acceptance_enabled():
+            raise HTTPException(403, "Payment-only acceptance has expired")
     order = session.exec(
         select(AppOrder).where(
             AppOrder.app_user_id == current_app_user.id,
@@ -105,6 +148,13 @@ def create_paypal_order(
         )
     ).first()
     if order:
+        if payment_only and (
+            order.provider != "paypal"
+            or (order.amount, order.currency, order.coin_quantity) != (599, "USD", 100)
+        ):
+            raise HTTPException(
+                409, "Existing order is not the permitted acceptance package"
+            )
         if (
             order.product_id != body.product_id
             or order.payment_environment != settings.PAYPAL_ENVIRONMENT
@@ -112,9 +162,21 @@ def create_paypal_order(
             raise HTTPException(409, "Idempotency key belongs to another request")
         if order.provider_order_id:
             return AppOrderPublic.model_validate(order)
+        if payment_only:
+            # A committed reservation with no provider ID may already have
+            # created an order. Never rely on an unbounded provider dedup window
+            # or resubmit it, even under the same application idempotency key.
+            raise HTTPException(
+                409,
+                "The single acceptance order requires manual verification; do not pay again",
+            )
     if not settings.PAYPAL_ENABLED or not paypal_configured():
         raise HTTPException(503, "Recharge is not yet available / 充值尚未开放")
     if order is None:
+        if payment_only and payment_only_order_created(session, current_app_user):
+            raise HTTPException(
+                409, "The single acceptance order already exists; check its status"
+            )
         # Same lock as video submission: check and reserve/insert atomically.
         from app.api.routes.app_video_tasks import POC_BUDGET_LOCK_ID
 
@@ -122,6 +184,8 @@ def create_paypal_order(
             text("SELECT pg_advisory_xact_lock(:id)"), {"id": POC_BUDGET_LOCK_ID}
         )
         lock_commercial_user(session, current_app_user)
+        if payment_only and not payment_only_acceptance_enabled():
+            raise HTTPException(403, "Payment-only acceptance has expired")
         now = datetime.now(UTC)
         if (
             global_real_count(session=session, now=now)

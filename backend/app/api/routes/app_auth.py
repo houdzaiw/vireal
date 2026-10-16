@@ -103,6 +103,10 @@ def initialize_clerk_session(
 
     app_user: AppUser | None = None
     if identity is None:
+        if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
+            raise HTTPException(
+                403, "Payment-only acceptance requires an existing account"
+            )
         require_region(request)
         controlled = controlled_registration_profile_allowed(
             profile=profile, issuer=clerk_session.issuer
