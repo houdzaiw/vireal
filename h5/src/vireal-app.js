@@ -8,6 +8,9 @@
   const invitationLanding = new URLSearchParams(location.search).get("controlled_registration") === "1"
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
   const internalAcceptanceLanding = new URLSearchParams(location.search).get("internal_acceptance") === "1"
+  const paymentOnlyLanding = new URLSearchParams(location.search).get("payment_only_acceptance") === "1"
+  // A private URL can only restrict UI; server identity checks grant payment.
+  const paymentOnlyRestricted = () => paymentOnlyLanding || state.commerce?.payment_only_acceptance_mode === true
   const signupRoutes = ["register", "controlled-register"]
   const icons = {
     home: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 10.8 12 4l8.5 6.8V20H15v-5.3H9V20H3.5v-9.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
@@ -147,6 +150,7 @@
     try {
       const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
       state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers }))
+      if (state.commerce.payment_only_acceptance_mode) state.rechargeProduct = "coins_100"
       state.commerceError = ""
     } catch (_) {
       state.commerce = null
@@ -221,6 +225,7 @@
     const userId = state.appUser?.id
     const product = state.rechargeProduct
     if (!root || root.dataset.mounted || !userId || !config?.recharge_enabled || state.wallet?.payment_hold) return
+    if (config.payment_only_acceptance_mode && (!config.payment_only_acceptance_allowed || config.payment_only_order_created)) return
     root.dataset.mounted = "true"
     const mount = { context: paymentContext(), checkout: null }
     paypalMounts.set(root, mount)
@@ -396,6 +401,7 @@
 
   function signInRegionAllowed() {
     return Boolean(state.commerce && (state.commerce.region_allowed === true
+      || (paymentOnlyLanding && state.commerce.payment_only_sign_in_enabled === true)
       || (internalAcceptanceLanding && state.commerce.internal_sign_in_enabled === true)))
   }
 
@@ -430,6 +436,7 @@
   }
 
   function generatePage(params) {
+    if (paymentOnlyRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("支付专用验收", "Payment-only acceptance")}</h1><p>${paymentText("本次不开放上传或生成；余额保留不代表当前地区可以消费。", "Uploads and generation are unavailable. Retained credits do not grant service access in this region.")}</p><button class="primary-button" data-route="wallet">${paymentText("查看钱包", "View wallet")}</button>${nav("")}</section>`)
     const effect = effectBySlug(params.get("video")) || allEffects()[0]
     if (!effect) return homePage()
     const category = categoryFor(effect)
@@ -488,9 +495,12 @@
     const wallet = state.wallet
     const ledger = (wallet?.ledger || []).map((item) => `<div class="ledger-row"><div><strong>${esc(item.reason)}</strong><small>${formatDate(item.created_at)} · ${esc(item.entry_type)}</small></div><b class="${item.delta > 0 ? "positive" : ""}">${item.delta > 0 ? "+" : ""}${item.delta} ✦</b></div>`).join("")
     const config = state.commerce
-    const available = config?.recharge_enabled && !wallet?.payment_hold
-    const notice = wallet?.payment_hold ? paymentText("支付账户正在人工审核，请联系客服。", "Your payment account is under review. Please contact support.") : config?.region_allowed === false ? paymentText("当前地区暂未开放充值。", "Recharge is unavailable in this region.") : config?.global_real_remaining === 0 ? paymentText("今日全站额度已用完，暂停新充值和生成。", "Daily generation capacity is exhausted. New recharge and generation are paused.") : state.commerceError || (!available ? paymentText("充值尚未开放；等待收款验收完成。", "Recharge will open after payment verification is complete.") : paymentText("注册不赠币；充值不会解除生成额度限制。", "No signup credits. Recharge does not bypass generation limits."))
-    const products = (config?.products || []).map(product => `<button class="recharge-product ${product.product_id === state.rechargeProduct ? "selected" : ""}" data-recharge-product="${esc(product.product_id)}" ${available ? "" : "disabled"}><b>${product.coins} ✦</b><span>$${(product.amount / 100).toFixed(2)} USD</span></button>`).join("")
+    const paymentOnly = config?.payment_only_acceptance_mode === true
+    const offeredProducts = (config?.products || []).filter(product => !paymentOnly || (product.product_id === "coins_100" && product.coins === 100 && product.amount === 599 && product.currency === "USD"))
+    const available = config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
+    const paymentOnlyNotice = paymentOnly ? paymentText("支付专用验收：金币归当前登录账号，不归 PayPal 邮箱，付款人须本人确认。不开放注册、上传或生成；余额保留不代表当前地区可消费，仍按规则人工处理退款。请勿共享密码或验证码。", "Payment-only acceptance: credits belong to the signed-in account, not the PayPal email; the payer must personally approve. No signup, uploads or generation. Retained credits do not grant regional service access; refunds remain subject to manual review. Never share passwords or verification codes.") + " " + (config.payment_only_order_created ? paymentText("唯一订单已创建，请查原单，不要再次付款。", "The single order already exists; check it, do not pay again.") : !available ? paymentText("新订单授权不可用或已到期。", "New-order authorization is unavailable or expired.") : paymentText("仅一笔 $5.99 / 100 金币，公众充值仍关闭。", "One USD 5.99 / 100-credit order only. Public recharge remains closed.")) + (config.payment_only_expires_at ? ` ${paymentText("新订单授权截止", "New-order authorization expires")}: ${new Date(config.payment_only_expires_at).toLocaleString()}` : "") : ""
+    const notice = wallet?.payment_hold ? paymentText("支付账户正在人工审核，请联系客服。", "Your payment account is under review. Please contact support.") : paymentOnly ? paymentOnlyNotice : config?.region_allowed === false ? paymentText("当前地区暂未开放充值。", "Recharge is unavailable in this region.") : config?.global_real_remaining === 0 ? paymentText("今日全站额度已用完，暂停新充值和生成。", "Daily generation capacity is exhausted. New recharge and generation are paused.") : state.commerceError || (!available ? paymentText("充值尚未开放；等待收款验收完成。", "Recharge will open after payment verification is complete.") : paymentText("注册不赠币；充值不会解除生成额度限制。", "No signup credits. Recharge does not bypass generation limits."))
+    const products = offeredProducts.map(product => `<button class="recharge-product ${product.product_id === state.rechargeProduct ? "selected" : ""}" data-recharge-product="${esc(product.product_id)}" ${available ? "" : "disabled"}><b>${product.coins} ✦</b><span>$${(product.amount / 100).toFixed(2)} USD</span></button>`).join("")
     const orders = state.rechargeOrders.map(order => `<div class="ledger-row"><div><strong>${esc(paymentStatus(order))} · ${order.coin_quantity || 0} ✦</strong><small>${formatDate(order.created_at)} · ${esc(order.id)}</small></div><b>$${((order.amount || 0) / 100).toFixed(2)}</b></div>`).join("")
     if (available) setTimeout(mountPayPal, 0)
     return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${paymentText("金币与充值", "Credits & recharge")}</h1><p class="screen-copy">${esc(notice)}</p><div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${wallet?.balance ?? "--"} ✦</strong><p>今日剩余 ${wallet?.daily_remaining ?? "--"} 次 · 当前可并发 ${wallet?.concurrent_remaining ?? "--"} 个任务</p><p>${paymentText("全站今日剩余", "Site daily capacity remaining")}: ${wallet?.global_real_remaining ?? config?.global_real_remaining ?? "--"} / ${config?.global_real_limit ?? 30}</p>${config?.resets_at ? `<p>${paymentText("额度恢复时间", "Capacity resets")}: ${esc(new Date(config.resets_at).toLocaleString())}</p>` : ""}</div><div class="recharge-products">${products}</div>${available ? '<div id="paypalCheckout" class="profile-card"><p data-payment-message class="screen-copy">Loading PayPal…</p></div>' : ""}<p class="screen-copy">${paymentText("点击支付即确认服务条款与充值说明。", "By paying, you accept the terms and recharge information.")} <a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私", "Privacy")}</a> · <a href="#refunds">${paymentText("充值与退款帮助", "Recharge & refunds")}</a></p><button class="secondary-button" data-refresh-payments>${paymentText("刷新余额与充值记录", "Refresh balance & orders")}</button><div class="subsection-head"><h2>${paymentText("充值记录", "Recharge orders")}</h2></div><div class="profile-card">${orders || paymentText("暂无充值订单", "No recharge orders")}</div><div class="subsection-head" style="margin-top:24px"><h2>余额流水</h2><span>最近 50 条</span></div><div class="profile-card">${ledger || '<p class="screen-copy" style="margin:0">暂无金币流水</p>'}</div>${nav("")}</section>`)
@@ -521,6 +531,7 @@
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
+    if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
@@ -574,7 +585,7 @@
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
       state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
-      const internalQuery = internalAcceptanceLanding ? "?internal_acceptance=1" : ""
+      const internalQuery = paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : ""
       clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
@@ -584,6 +595,7 @@
   }
 
   async function uploadImage(index, file) {
+    if (paymentOnlyRestricted()) return
     if (!requireAuth(location.hash)) return
     if (state.uploads.some((entry) => entry?.pending)) return
     if (!file?.type.startsWith("image/")) return toast("请选择 JPG、PNG 或 WebP 图片", true)
@@ -610,6 +622,7 @@
   }
 
   async function createTask() {
+    if (paymentOnlyRestricted()) return
     if (state.isSubmitting) return
     const current = route()
     const effect = effectBySlug(current.params.get("video")) || allEffects()[0]

@@ -227,8 +227,8 @@ test("refreshing an invitation after the controlled gate closes cannot mount sig
   await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
 })
 
-async function mockPayPalLifecycle(page: Page, failFirst = false) {
-  await page.route("https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
+async function mockPayPalLifecycle(page: Page, failFirst = false, environment = "sandbox") {
+  await page.route(environment === "live" ? "https://www.paypal.com/web-sdk/v6/core" : "https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
     contentType: "application/javascript",
     body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement {
       connectedCallback() { this.textContent = 'PayPal checkout (UI mock)'; this.style.display = 'block'; this.style.padding = '12px'; }
@@ -248,6 +248,114 @@ async function mockPayPalLifecycle(page: Page, failFirst = false) {
     }};`,
   }))
 }
+
+function paymentOnlyConfig(overrides = {}) {
+  return {
+    ...paymentConfig, environment: "live", country: "CN", region_allowed: false,
+    registration_enabled: false, controlled_registration_enabled: false,
+    payment_only_acceptance_mode: true, payment_only_sign_in_enabled: true,
+    payment_only_acceptance_allowed: true, payment_only_order_created: false,
+    payment_only_expires_at: "2099-01-01T01:00:00Z", ...overrides,
+  }
+}
+
+test("payment-only private landing allows sign-in, never signup", async ({ page }) => {
+  await mockControlledRegistration(page, false, false)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({recharge_enabled: false, payment_only_acceptance_allowed: false})}))
+  await page.goto("/?payment_only_acceptance=1#login")
+  await expect(page.getByRole("heading", {name: "Payment-only acceptance sign-in"})).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.evaluate(() => { location.hash = "/factor-one" })
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.evaluate(() => { location.hash = "register" })
+  await expect(page.getByRole("heading", {name: "Service unavailable in this region"})).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+  await page.goto("/#login")
+  await expect(page.getByRole("heading", {name: "Service unavailable in this region"})).toBeVisible()
+})
+
+test("payment-only wallet shows one package and disables upload and generation deep links", async ({ page }, testInfo) => {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig()}))
+  await mockPayPalLifecycle(page, false, "live")
+  const writes: string[] = []
+  page.on("request", req => { if (req.method() === "POST" && /paypal\/orders|uploads|video-tasks/.test(req.url())) writes.push(req.url()) })
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await expect(page.locator(".recharge-product")).toHaveCount(1)
+  await expect(page.locator(".recharge-product")).toContainText("$5.99 USD")
+  await expect(page.getByText(/credits belong to the signed-in account/)).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath("payment-only-wallet.png"), fullPage: true, animations: "disabled" })
+  await page.evaluate(() => { location.hash = "generate?video=dance-1" })
+  await expect(page.getByRole("heading", {name: "Payment-only acceptance"})).toBeVisible()
+  await expect(page.locator("input[type=file], [data-generate], [data-confirm-generation]")).toHaveCount(0)
+  expect(writes).toEqual([])
+})
+
+for (const scenario of ["server-mode-without-private-url", "private-url-config-unavailable"]) {
+  test(`payment-only generation remains closed for ${scenario}`, async ({ page }) => {
+    await mockSignedInApi(page)
+    await page.route("https://api.example.com/api/v1/app/paypal/config", route => scenario === "private-url-config-unavailable"
+      ? route.fulfill({status: 503, json: {detail: "Unavailable"}})
+      : route.fulfill({json: paymentOnlyConfig({recharge_enabled: false})}))
+    const calls: string[] = []
+    page.on("request", req => { if (req.method() === "POST" && /paypal\/orders|uploads|video-tasks/.test(req.url())) calls.push(req.url()) })
+    await page.goto(scenario === "private-url-config-unavailable"
+      ? "/?payment_only_acceptance=1#generate?video=dance-1" : "/#generate?video=dance-1")
+    await expect(page.getByRole("heading", {name: "Payment-only acceptance"})).toBeVisible()
+    await expect(page.locator("input[type=file], [data-generate], [data-confirm-generation]")).toHaveCount(0)
+    expect(calls).toEqual([])
+  })
+}
+
+for (const scenario of ["not-selected", "expired", "slot-used"]) {
+  test(`payment-only checkout stays closed for ${scenario}`, async ({ page }) => {
+    await mockSignedInApi(page)
+    await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({
+      recharge_enabled: false, payment_only_acceptance_allowed: scenario === "slot-used",
+      payment_only_order_created: scenario === "slot-used", payment_only_sign_in_enabled: scenario !== "expired",
+    })}))
+    const calls: string[] = []
+    page.on("request", req => { if (/paypal\/orders|web-sdk/.test(req.url())) calls.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await expect(page.locator(".wallet-card strong")).toBeVisible()
+    await expect(page.locator(".recharge-product")).toBeDisabled()
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    if (scenario === "slot-used") await expect(page.getByText(/single order already exists/)).toBeVisible()
+    expect(calls).toEqual([])
+  })
+}
+
+test("payment-only paid order survives reload with 100 retained credits and no second checkout", async ({ page }) => {
+  await mockSignedInApi(page)
+  let created = 0
+  let captured = 0
+  let balance = 0
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({recharge_enabled: !created, payment_only_order_created: Boolean(created)})}))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance, ledger: []}}))
+  await page.route("https://api.example.com/api/v1/app/paypal/orders", route => {
+    created++
+    expect(route.request().postDataJSON()).toEqual({product_id: "coins_100"})
+    return route.fulfill({json: {id: "payment-only-order", provider_order_id: "PAY-ONLY", status: "created"}})
+  })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/payment-only-order/capture", route => {
+    captured++
+    balance = 100
+    return route.fulfill({json: {id: "payment-only-order", status: "paid", fulfilled_at: "2026-10-16T00:00:00Z"}})
+  })
+  await mockPayPalLifecycle(page, false, "live")
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await expect(page.locator("paypal-button")).toHaveCount(1)
+  await page.locator("paypal-button").click()
+  await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.reload()
+  await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+  await expect(page.getByText(/single order already exists/)).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  expect(created).toBe(1)
+  expect(captured).toBe(1)
+})
 
 test("wallet refresh and scheduled payment polling reuse the SDK and checkout", async ({ page }) => {
   await page.clock.install()

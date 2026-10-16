@@ -2,6 +2,111 @@
 
 ## Release state
 
+### Payment-only acceptance — review publication only, not released
+
+The initial October 16 implementation and verification were local only. The
+owner subsequently authorized excluding exactly `codex/payment-only-acceptance`
+from staging Pages previews, then pushing that branch and creating a PR for CI.
+This is **review publication only**, not merge, deployment, payment, refund,
+generation or public-opening authorization. No production feature flag changes.
+
+At **18:14:52 Beijing on October 16**, the staging Pages source was read back
+after appending only this sixth preview exclusion. All five existing exclusions,
+`main`, `*` inclusion, complete remaining source/build/deployment settings and
+latest deployment were unchanged. Production H5 remains direct-upload. A fresh
+Railway GraphQL read confirms project `prDeploys=false`; all four production/
+staging API/worker triggers still follow `main`. GitHub deployment workflows
+require `master` push or explicit dispatch; PR checks do not deploy the app.
+CI may publish its existing coverage report and auto-format the review branch.
+
+The owner now reports the friend personally owns/controls the US personal PayPal
+account, meets its residency requirements and is temporarily in Shanghai. This
+is an owner-supplied eligibility statement, not official PayPal certification or
+a successful Live payment. Same-device handoff is still to be confirmed. No new
+payer account or remote third-party checkout link is created here. Do not share
+either party's password, verification code or complete login session. A future
+payment requires fresh action-time approval.
+
+`APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED` defaults to **false**. If separately
+approved later, it requires one pre-existing business user ID, one exact Clerk
+subject from the configured production issuer, and the already-verified primary
+email `li8483@yeah.net`. Bind both `APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID` and
+`APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT` to the existing identity after rechecking
+it; email or query strings alone never grant access. Configure the explicit
+timezone-aware `APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT` for a window at most
+24 hours ahead. Expired configuration may still boot so callbacks/reconciliation
+can finish; expiry never enables new actions or changes the ledger.
+
+The mode retains genuine signed **CN** geography, normal authentication/session
+revocation, account/hold checks, global capacity and PayPal snapshot verification.
+It requires Live PayPal and terms approval internally, but public registration,
+controlled registration, internal-generation acceptance, general Live acceptance,
+administrator signup, demo/legacy generation and `APP_VIDEO_SUBMISSIONS_ENABLED`
+must all be off. These are **future prerequisites, not settings applied here**.
+All new upload/generation actions are also independently denied by the mode.
+
+Only `coins_100` / **USD 5.99 / 100 credits** can be ordered. A user-row lock
+serializes different idempotency keys before reserving the existing order table.
+Any persisted Live PayPal order for the beneficiary consumes the lifetime slot,
+including canceled, failed, refunded or unknown submissions. Refresh, flag
+off/on and a new key cannot reset it. A retry of the same key returns the same
+known provider order. If the committed reservation has no provider order ID,
+even the same key is refused: manual verification is required, not another
+provider create attempt. The first call retains the existing stable provider
+request ID, but safety does not rely on an unbounded provider deduplication
+window. No automatic slot reset or additional payment is authorized.
+
+The private `?payment_only_acceptance=1#login` landing only mounts existing-account
+sign-in when the server advertises it. It does not mount signup. The authenticated
+wallet shows only the lowest package, beneficiary/payer and retained-balance
+notices, expiry and the original order's state. Once reserved, checkout stays
+closed on refresh; pending orders continue through normal queries/reconciliation.
+The UI does not offer upload or generation, including deep links. Additional
+payment-config fields are additive; no financial schema migration or separate
+settlement path is introduced. Anonymized config never discloses selected email,
+subject or business user ID.
+
+Previously approved capture/verified callbacks and unique credit settlement keep
+working after this mode expires or closes. For a future manual closure, apply
+`PAYPAL_ENABLED=false`, `APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED=false` and
+`APP_COMMERCE_TERMS_APPROVED=false` together to API/worker, keeping all public,
+other acceptance and new-generation gates closed. **Do not disable only the
+payment-only flag while leaving PayPal enabled**: that restores the ordinary
+recharge policy rather than a closed state. No manual credit, fake success,
+signature bypass or automatic refund is added. Credits remain in the beneficiary
+account and remain subject to region/service/refund rules; retention is not an
+entitlement to generation. Future evidence is **existing-account payment/credit
+integration only**, not independent signup, overseas access, generation delivery
+or public paid-opening approval. Before any later activation, recheck payer
+eligibility, beneficiary consent and unused-credit handling, reviewed CI/source,
+fresh backup/restore and the closed public gates. No repeat of paid Sandbox or
+generation evidence is required by this local change.
+
+Local verification uses a fresh Unix-socket-only PostgreSQL database with dummy
+configuration, mocked Clerk/PayPal and an external-HTTP denial fixture for the
+new backend tests. H5 browser tests intercept APIs and the SDK, abort other
+external requests, and are not evidence of a real Live payment.
+
+Verification on the final local source:
+
+- Backend: **533 passed**, total statement coverage **92%** (90% gate passed),
+  using only the fresh isolated PostgreSQL database. The two existing framework/
+  SQLAlchemy warnings are not payment failures.
+- H5: **128 passed** across Chromium/WebKit, plus **41** Python/static tests;
+  the production-shaped bundle builds using dummy API/Clerk values. The payment
+  wallet screenshot was visually checked using mock data, not real funds.
+- Mypy, ty (explicit installed virtualenv), Ruff lint/format and
+  `git diff --check` pass. This is **local validation, not hosted CI**.
+- Negative checks include another initialized account, forged region proofs,
+  changed/unverified primary email, revoked sessions, frozen/deleted accounts,
+  extra packages/amount fields, concurrent distinct keys, waiting past expiry,
+  canceled/unknown lifetime reservations, and closed-mode unique settlement.
+- No migration is added and no production configuration or payment/refund/
+  generation request is sent to a real provider. The local test database is
+  stopped and temporary dependency symlinks removed. The original repository's
+  unrelated document edits remain untouched; only this isolated feature branch
+  is authorized for remote review publication.
+
 ### Latest closed update — October 14, 15:45 Beijing
 
 After the explicit next-step proposal, the owner replied **continue execution**,
