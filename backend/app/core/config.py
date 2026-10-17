@@ -104,6 +104,7 @@ class Settings(BaseSettings):
     APP_LIVE_ACCEPTANCE_SUBJECTS: list[str] = []
     # Existing-account payment only; disabled until a separate release approval.
     APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED: bool = False
+    APP_PAYMENT_ONLY_REPLACEMENT_ENABLED: bool = False
     APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT: str | None = None
     APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID: uuid.UUID | None = None
     APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT: AwareDatetime | None = None
@@ -258,6 +259,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if (
+            self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED
+            and not self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+        ):
+            raise ValueError(
+                "Replacement requires the closed payment-only acceptance mode"
+            )
         if self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED and (
             self.ENVIRONMENT != "production"
             or self.APP_AUTH_MODE != "clerk"

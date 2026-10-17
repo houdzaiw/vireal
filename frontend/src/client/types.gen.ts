@@ -1391,6 +1391,106 @@ export type AppPayPalOrderCreate = {
 };
 
 /**
+ * AppPayPalOrderRecoveryPublic
+ *
+ * Read-only guidance, never an entitlement to create a replacement.
+ */
+export type AppPayPalOrderRecoveryPublic = {
+    /**
+     * Order Id
+     */
+    order_id: string;
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Decision
+     */
+    decision?: 'resume_original' | 'authorization_required' | 'settlement_pending' | 'credited' | 'manual_review' | 'replacement_candidate';
+    /**
+     * Reason Code
+     */
+    reason_code?: string;
+    /**
+     * Provider Order Status
+     */
+    provider_order_status?: string | null;
+    /**
+     * Provider Http Status
+     */
+    provider_http_status?: number | null;
+    /**
+     * Resume Allowed
+     */
+    resume_allowed?: boolean;
+    /**
+     * Replacement Candidate
+     */
+    replacement_candidate?: boolean;
+    /**
+     * Replacement Allowed
+     */
+    replacement_allowed?: false;
+};
+
+/**
+ * AppPayPalReplacementApproval
+ */
+export type AppPayPalReplacementApproval = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Evidence Reference
+     */
+    evidence_reference: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string;
+    /**
+     * Merchant Checked No Payment
+     */
+    merchant_checked_no_payment: true;
+    /**
+     * Payer Confirmed No Payment
+     */
+    payer_confirmed_no_payment: true;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+};
+
+/**
+ * AppPayPalReplacementPublic
+ */
+export type AppPayPalReplacementPublic = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Original Order Id
+     */
+    original_order_id: string;
+    /**
+     * Replacement Order Id
+     */
+    replacement_order_id: string | null;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Consumed At
+     */
+    consumed_at: string | null;
+};
+
+/**
  * AppPaymentCasePublic
  */
 export type AppPaymentCasePublic = {
@@ -3685,6 +3785,72 @@ export type appPaypalResumePaypalCheckoutResponses = {
 
 export type appPaypalResumePaypalCheckoutResponse = appPaypalResumePaypalCheckoutResponses[keyof appPaypalResumePaypalCheckoutResponses];
 
+export type appPaypalCreateReplacementOrderData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'idempotency-key': string;
+    };
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/paypal/orders/{order_id}/replacement';
+};
+
+export type appPaypalCreateReplacementOrderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalCreateReplacementOrderError = appPaypalCreateReplacementOrderErrors[keyof appPaypalCreateReplacementOrderErrors];
+
+export type appPaypalCreateReplacementOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalCreateReplacementOrderResponse = appPaypalCreateReplacementOrderResponses[keyof appPaypalCreateReplacementOrderResponses];
+
+export type appPaypalInspectPaypalOrderRecoveryData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/paypal/orders/{order_id}/recovery';
+};
+
+export type appPaypalInspectPaypalOrderRecoveryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalInspectPaypalOrderRecoveryError = appPaypalInspectPaypalOrderRecoveryErrors[keyof appPaypalInspectPaypalOrderRecoveryErrors];
+
+export type appPaypalInspectPaypalOrderRecoveryResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppPayPalOrderRecoveryPublic;
+};
+
+export type appPaypalInspectPaypalOrderRecoveryResponse = appPaypalInspectPaypalOrderRecoveryResponses[keyof appPaypalInspectPaypalOrderRecoveryResponses];
+
 export type appPaypalCapturePaypalOrderData = {
     body?: never;
     path: {
@@ -3883,6 +4049,36 @@ export type appWalletReadWalletResponses = {
 };
 
 export type appWalletReadWalletResponse = appWalletReadWalletResponses[keyof appWalletReadWalletResponses];
+
+export type adminAppApprovePaypalReplacementData = {
+    body: AppPayPalReplacementApproval;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/app/orders/{order_id}/replacement-approval';
+};
+
+export type adminAppApprovePaypalReplacementErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppApprovePaypalReplacementError = adminAppApprovePaypalReplacementErrors[keyof adminAppApprovePaypalReplacementErrors];
+
+export type adminAppApprovePaypalReplacementResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppPayPalReplacementPublic;
+};
+
+export type adminAppApprovePaypalReplacementResponse = adminAppApprovePaypalReplacementResponses[keyof adminAppApprovePaypalReplacementResponses];
 
 export type adminAppReadAppUsersData = {
     body?: never;

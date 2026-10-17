@@ -34,6 +34,8 @@ from app.models import (
     AppPaymentCase,
     AppPaymentCasePublic,
     AppPaymentCaseResolve,
+    AppPayPalReplacementApproval,
+    AppPayPalReplacementPublic,
     AppUser,
     AppUserAdminPublic,
     AppUserIdentity,
@@ -45,6 +47,8 @@ from app.models import (
 )
 from app.services.app_identity import identity_providers, revoke_local_app_sessions
 from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
+from app.services.paypal_client import PayPalError, get_paypal_client
+from app.services.paypal_replacement import approve_replacement
 
 router = APIRouter(
     prefix="/admin/app",
@@ -54,6 +58,28 @@ router = APIRouter(
         Depends(get_current_active_superuser),
     ],
 )
+
+
+@router.post(
+    "/orders/{order_id}/replacement-approval", response_model=AppPayPalReplacementPublic
+)
+def approve_paypal_replacement(
+    order_id: uuid.UUID,
+    body: AppPayPalReplacementApproval,
+    session: SessionDep,
+    current_admin: User = Depends(get_current_active_superuser),
+) -> AppPayPalReplacementPublic:
+    """Record an explicit grant, never create/pay/cancel a provider order."""
+    client = None
+    try:
+        client = get_paypal_client()
+        result = approve_replacement(session, order_id, body, current_admin, client)
+        return AppPayPalReplacementPublic.model_validate(result)
+    except PayPalError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    finally:
+        if client:
+            client.close()
 
 
 def serialize_admin_content(content: AppContent) -> AppContentAdminPublic:

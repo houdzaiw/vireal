@@ -8,7 +8,12 @@ from sqlmodel import col, select
 
 from app.api.deps import CurrentAppUser, SessionDep
 from app.core.config import settings
-from app.models import AppOrder, AppOrderPublic, AppPayPalOrderCreate
+from app.models import (
+    AppOrder,
+    AppOrderPublic,
+    AppPayPalOrderCreate,
+    AppPayPalOrderRecoveryPublic,
+)
 from app.services.commercial_access import (
     acceptance_request_allowed,
     controlled_registration_enabled,
@@ -28,7 +33,15 @@ from app.services.paypal_client import (
     get_paypal_client,
     paypal_configured,
 )
+from app.services.paypal_order_recovery import inspect_original_order
 from app.services.paypal_orders import confirm_order, lock_order, validate_order
+from app.services.paypal_replacement import (
+    checkout_lineage,
+    grant_for_user,
+    reserve_replacement,
+    valid_grant,
+    verify_voided,
+)
 from app.services.video_quota import global_real_count, utc_day_bounds
 
 router = APIRouter(prefix="/app/paypal", tags=["app paypal"])
@@ -49,6 +62,8 @@ def payment_config(
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
     payment_user = payment_only_user(request, session) if payment_only else None
     slot_used = bool(payment_user and payment_only_order_created(session, payment_user))
+    grant = grant_for_user(session, payment_user.id) if payment_user else None
+    replacement_ready = bool(grant and valid_grant(session, grant, unused=True))
     acceptance_allowed = (
         acceptance_request_allowed(request)
         if settings.APP_LIVE_ACCEPTANCE_ENABLED
@@ -70,6 +85,14 @@ def payment_config(
         and edge_country(request) == "CN",
         "payment_only_acceptance_allowed": payment_user is not None,
         "payment_only_order_created": slot_used,
+        "payment_only_replacement_original_id": str(grant.original_order_id)
+        if grant and replacement_ready
+        else None,
+        "payment_only_checkout_order_id": str(grant.replacement_order_id)
+        if grant
+        and grant.replacement_order_id
+        and valid_grant(session, grant, unused=False)
+        else None,
         "payment_only_expires_at": settings.APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT
         if payment_user
         else None,
@@ -161,6 +184,14 @@ def create_paypal_order(
         ):
             raise HTTPException(409, "Idempotency key belongs to another request")
         if order.provider_order_id:
+            if (
+                payment_only
+                and (grant := grant_for_user(session, current_app_user.id))
+                and grant.original_order_id == order.id
+            ):
+                raise HTTPException(
+                    409, "Original order has a replacement grant; do not pay it"
+                )
             return AppOrderPublic.model_validate(order)
         if payment_only:
             # A committed reservation with no provider ID may already have
@@ -261,16 +292,7 @@ def _require_resumable_acceptance_order(session: SessionDep, order: AppOrder) ->
         raise HTTPException(
             409, "Check the original order status; do not create or pay another order"
         )
-    ids = session.exec(
-        select(AppOrder.id)
-        .where(
-            AppOrder.app_user_id == order.app_user_id,
-            AppOrder.provider == "paypal",
-            AppOrder.payment_environment == "live",
-        )
-        .limit(2)
-    ).all()
-    if len(ids) != 1 or ids[0] != order.id:
+    if not checkout_lineage(session, order):
         raise HTTPException(
             409, "The original acceptance order requires manual verification"
         )
@@ -309,6 +331,12 @@ def resume_paypal_checkout(
     _require_resumable_acceptance_order(session, order)
     client = get_paypal_client()
     try:
+        grant = grant_for_user(session, order.app_user_id)
+        if grant:
+            original = session.get(AppOrder, grant.original_order_id)
+            if original is None:
+                raise HTTPException(409, "Original payment requires review")
+            verify_voided(original, client)
         data = client.order_details(str(order.provider_order_id))
         unit = validate_order(order, data)
         payments = unit.get("payments", {})
@@ -338,6 +366,124 @@ def resume_paypal_checkout(
         raise HTTPException(exc.status_code, str(exc)) from exc
     finally:
         client.close()
+
+
+@router.post("/orders/{order_id}/replacement", response_model=AppOrderPublic)
+def create_replacement_order(
+    order_id: uuid.UUID,
+    request: Request,
+    session: SessionDep,
+    current_app_user: CurrentAppUser,
+    idempotency_key: Annotated[str, Header(min_length=10, max_length=120)],
+) -> AppOrderPublic:
+    """Consume exactly one reviewed grant. No capture or implicit slot reset."""
+    permitted = payment_only_user(request, session, verify_profile=True)
+    if permitted is None or permitted.id != current_app_user.id:
+        raise HTTPException(403, "Payment-only acceptance is unavailable")
+    from app.api.routes.app_video_tasks import POC_BUDGET_LOCK_ID
+
+    session.connection().execute(
+        text("SELECT pg_advisory_xact_lock(:id)"), {"id": POC_BUDGET_LOCK_ID}
+    )
+    client = get_paypal_client()
+    try:
+
+        def may_create() -> bool:
+            user = payment_only_user(request, session)
+            return user is not None and user.id == current_app_user.id
+
+        order, submit = reserve_replacement(
+            session, order_id, current_app_user.id, idempotency_key, client, may_create
+        )
+        if submit:
+            result = client.create_order(order)
+            provider_id = result.get("id")
+            if (
+                not isinstance(provider_id, str)
+                or not provider_id
+                or len(provider_id) > 255
+            ):
+                raise PayPalError()
+            order = lock_order(session, order.id)
+            if order.provider_order_id not in {None, provider_id}:
+                raise PayPalError("Conflicting replacement provider reference", 409)
+            order.provider_order_id = provider_id
+            session.add(order)
+            session.commit()
+            session.refresh(order)
+        return AppOrderPublic.model_validate(order)
+    except PayPalError as exc:
+        session.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    finally:
+        client.close()
+
+
+@router.get("/orders/{order_id}/recovery", response_model=AppPayPalOrderRecoveryPublic)
+def inspect_paypal_order_recovery(
+    order_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    current_app_user: CurrentAppUser,
+) -> AppPayPalOrderRecoveryPublic:
+    """Owner-only read access survives expiry; it never grants checkout access."""
+    response.headers["Cache-Control"] = "no-store"
+    owner_id = current_app_user.id
+    if (
+        not settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+        or settings.ENVIRONMENT != "production"
+        or settings.APP_AUTH_MODE != "clerk"
+        or settings.PAYPAL_ENVIRONMENT != "live"
+        or owner_id != settings.APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID
+    ):
+        raise HTTPException(404, "Payment order not found")
+    order = session.exec(
+        select(AppOrder).where(
+            AppOrder.id == order_id,
+            AppOrder.app_user_id == owner_id,
+            AppOrder.provider == "paypal",
+            AppOrder.payment_environment == "live",
+        )
+    ).first()
+    if order is None:
+        raise HTTPException(404, "Payment order not found")
+    if not paypal_configured():
+        return AppPayPalOrderRecoveryPublic(
+            order_id=order_id,
+            checked_at=datetime.now(UTC),
+            reason_code="payment_service_unavailable",
+        )
+    verified = payment_only_user(request, session, verify_profile=True)
+    profile_authorized = verified is not None and verified.id == owner_id
+    client = None
+    try:
+        client = get_paypal_client()
+
+        def may_resume() -> bool:
+            permitted = payment_only_user(request, session)
+            return (
+                profile_authorized
+                and permitted is not None
+                and permitted.id == owner_id
+            )
+
+        return inspect_original_order(
+            session,
+            order_id=order_id,
+            owner_id=owner_id,
+            client=client,
+            resume_authorized=may_resume,
+        )
+    except PayPalError:
+        return AppPayPalOrderRecoveryPublic(
+            order_id=order_id,
+            checked_at=datetime.now(UTC),
+            reason_code="provider_query_unconfirmed",
+        )
+    finally:
+        if client is not None:
+            client.close()
 
 
 @router.post("/orders/{order_id}/capture", response_model=AppOrderPublic)

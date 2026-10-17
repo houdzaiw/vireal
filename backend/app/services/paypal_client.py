@@ -22,9 +22,13 @@ class PayPalError(Exception):
         self,
         message: str = "Payment confirmation unavailable; please retry",
         status_code: int = 502,
+        *,
+        provider_status_code: int | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
+        # Internal diagnostic only; do not expose raw provider bodies/tokens.
+        self.provider_status_code = provider_status_code
 
 
 def paypal_configured() -> bool:
@@ -114,7 +118,8 @@ class PayPalClient:
                 raise PayPalError(
                     status_code=409
                     if response.status_code in (400, 403, 404, 422)
-                    else 502
+                    else 502,
+                    provider_status_code=response.status_code,
                 )
             response.raise_for_status()
             result = response.json()

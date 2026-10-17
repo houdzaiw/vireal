@@ -62,6 +62,16 @@ def validate_order(order: AppOrder, data: dict[str, Any]) -> dict[str, Any]:
 
 
 def lock_order(session: Session, order_id: uuid.UUID) -> AppOrder:
+    # Shared by capture, callbacks, refunds and replacement: user -> order.
+    owner_id = session.exec(
+        select(AppOrder.app_user_id).where(AppOrder.id == order_id)
+    ).one()
+    session.exec(
+        select(AppUser)
+        .where(AppUser.id == owner_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).one()
     return session.exec(
         select(AppOrder)
         .where(AppOrder.id == order_id)
@@ -111,6 +121,9 @@ def apply_order_state(
 ) -> AppOrder:
     order = lock_order(session, order_id)
     unit = validate_order(order, data)
+    from app.services.paypal_replacement import hold_conflicting_settlement
+
+    hold_conflicting_settlement(session, order, data)
     captures = unit.get("payments", {}).get("captures", [])
     now = datetime.now(UTC)
     if len(captures) > 1:
@@ -207,6 +220,10 @@ def confirm_order(
         raise PayPalError("Payment environment or order ID mismatch", 409)
     data = client.order_details(order.provider_order_id)
     validate_order(order, data)
+    if data.get("status") == "APPROVED" and capture_approved:
+        from app.services.paypal_replacement import guard_replacement_capture
+
+        capture_approved = guard_replacement_capture(session, order, client)
     if data.get("status") == "APPROVED" and capture_approved:
         try:
             client.capture_order(order)
@@ -455,6 +472,11 @@ def resolve_case(
     case = session.get(AppPaymentCase, case_id)
     if case is None:
         raise HTTPException(404, "Payment case not found")
+    if case.kind == "replacement_conflict":
+        raise HTTPException(
+            409,
+            "Replacement payment conflicts require separately verified reconciliation; zero-coin recovery cannot unfreeze them",
+        )
     # Fetch external evidence before taking financial row locks.
     dispute = (
         client.dispute_details(case.external_id)
