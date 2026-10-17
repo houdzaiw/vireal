@@ -3655,6 +3655,36 @@ export type appPaypalCreatePaypalOrderResponses = {
 
 export type appPaypalCreatePaypalOrderResponse = appPaypalCreatePaypalOrderResponses[keyof appPaypalCreatePaypalOrderResponses];
 
+export type appPaypalResumePaypalCheckoutData = {
+    body?: never;
+    path: {
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/v1/app/paypal/orders/{order_id}/checkout';
+};
+
+export type appPaypalResumePaypalCheckoutErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type appPaypalResumePaypalCheckoutError = appPaypalResumePaypalCheckoutErrors[keyof appPaypalResumePaypalCheckoutErrors];
+
+export type appPaypalResumePaypalCheckoutResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppOrderPublic;
+};
+
+export type appPaypalResumePaypalCheckoutResponse = appPaypalResumePaypalCheckoutResponses[keyof appPaypalResumePaypalCheckoutResponses];
+
 export type appPaypalCapturePaypalOrderData = {
     body?: never;
     path: {
