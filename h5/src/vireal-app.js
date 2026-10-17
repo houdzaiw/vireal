@@ -54,6 +54,8 @@
     rechargeProduct: "coins_100",
     paymentPolling: null,
     checkoutActive: false,
+    paymentRecovery: new Map(),
+    paymentRecoveryBusy: null,
   }
   const observedClerks = new WeakSet()
 
@@ -151,8 +153,13 @@
     if (!state.appUser || state.wallet?.payment_hold || !config?.payment_only_acceptance_mode
       || !config.payment_only_acceptance_allowed || !config.payment_only_order_created
       || !(Date.parse(config.payment_only_expires_at) > Date.now())
-      || state.rechargeOrders.length !== 1) return null
-    const order = state.rechargeOrders[0]
+      || config.payment_only_replacement_original_id) return null
+    const selected = config.payment_only_checkout_order_id
+    if (!selected && state.rechargeOrders.length !== 1) return null
+    const order = selected ? state.rechargeOrders.find(item => item.id === selected) : state.rechargeOrders[0]
+    if (!order) return null
+    const inspection = state.paymentRecovery.get(`${state.appUser.id}:${order.id}`)
+    if (inspection && inspection.resume_allowed !== true) return null
     return order.app_user_id === state.appUser.id && order.provider === "paypal" && order.payment_environment === "live"
       && order.product_id === "coins_100" && order.amount === 599 && order.currency === "USD" && order.coin_quantity === 100
       && order.status === "created" && order.provider_order_id && !order.fulfilled_at && !order.paid_at && !order.capture_id && !order.transaction_id
@@ -164,6 +171,17 @@
     const resumeOrder = originalPaymentOrder()
     if (resumeOrder) return { resumeOrder }
     const config = state.commerce
+    const replacement = config?.payment_only_replacement_original_id
+    if (replacement && config.payment_only_acceptance_mode && config.payment_only_acceptance_allowed && config.global_real_remaining > 0
+      && Date.parse(config.payment_only_expires_at) > Date.now() && state.rechargeOrders.length === 1) {
+      const old = state.rechargeOrders[0]
+      if (old.id === replacement && old.app_user_id === state.appUser.id && old.provider === "paypal"
+        && old.payment_environment === "live" && old.product_id === "coins_100"
+        && old.amount === 599 && old.currency === "USD" && old.coin_quantity === 100
+        && ["created", "canceled"].includes(old.status) && !old.capture_id && !old.transaction_id && !old.paid_at && !old.fulfilled_at) {
+        return {resumeOrder: null, replacementOf: replacement}
+      }
+    }
     if (!config?.recharge_enabled || (config.payment_only_acceptance_mode
       && (!config.payment_only_acceptance_allowed || config.payment_only_order_created))) return null
     return { resumeOrder: null }
@@ -199,6 +217,50 @@
     }
   }
 
+  function recoveryText(result) {
+    if (result?.decision === "credited") return paymentText("此单金币已到账；不要再次付款。", "Credits for this order were received. Do not pay again.")
+    if (result?.decision === "settlement_pending") return paymentText("已有付款正在确认，请等待回调或后台对账；不要重复付款。", "An existing payment is awaiting confirmation. Wait for reconciliation; do not pay again.")
+    if (result?.decision === "resume_original" && result.resume_allowed === true) return paymentText("原单经核对可继续；付款仍须本人确认，不会新建订单。", "The original order is resumable. The payer must personally approve; no new order is created.")
+    if (result?.decision === "authorization_required") return paymentText("原单仍可核对，但支付入口需重新授权；本次查询没有续期。", "The original order was checked, but checkout needs renewed authorization. This query did not extend it.")
+    if (result?.decision === "replacement_candidate") return paymentText("PayPal 已明确将原单作废；仅可准备人工换单方案，尚未授权换单或再次付款。", "PayPal explicitly voided the original order. A manual replacement can be reviewed, but no replacement or new payment is authorized.")
+    if (result?.reason_code === "provider_order_unavailable") return paymentText("PayPal 暂时查不到原单（404）；不能据此认定未扣款或已退款。请联系客服，勿重复付款或另建订单。", "PayPal cannot find the original order (404). This does not prove no charge or a refund. Contact support; do not pay again or create another order.")
+    return paymentText("原单结果仍需人工核查；本次没有付款、退款、换单或释放名额。", "The original order needs manual verification. No payment, refund, replacement or slot release occurred.")
+  }
+
+  async function inspectPayment(orderId) {
+    if (!state.appUser || state.checkoutActive || state.paymentRecoveryBusy) return
+    const owner = state.appUser.id
+    const order = state.rechargeOrders.find(item => item.id === orderId && item.app_user_id === owner)
+    if (!state.commerce?.payment_only_acceptance_mode || !order || order.provider !== "paypal" || order.payment_environment !== "live") return
+    const request = {owner, orderId}
+    const key = `${owner}:${orderId}`
+    state.paymentRecoveryBusy = request
+    render()
+    try {
+      const result = await parseResponse(await authFetch(`/api/v1/app/paypal/orders/${encodeURIComponent(orderId)}/recovery`, {cache: "no-store"}))
+      if (state.appUser?.id !== owner || state.paymentRecoveryBusy !== request) return
+      if (result.order_id !== orderId || result.replacement_allowed !== false
+        || typeof result.resume_allowed !== "boolean" || (result.resume_allowed && result.decision !== "resume_original")) throw new Error("Invalid original-order inspection")
+      state.paymentRecovery.set(key, result)
+    } catch (_) {
+      if (state.appUser?.id !== owner || state.paymentRecoveryBusy !== request) return
+      state.paymentRecovery.set(key, {decision: "manual_review", reason_code: "query_unconfirmed", resume_allowed: false})
+    } finally {
+      if (state.paymentRecoveryBusy === request) state.paymentRecoveryBusy = null
+      if (state.appUser?.id === owner && route().name === "wallet") render()
+    }
+  }
+
+  function rechargeOrderRow(order) {
+    const inspection = state.paymentRecovery.get(`${state.appUser?.id}:${order.id}`)
+    const inspectable = state.commerce?.payment_only_acceptance_mode && order.app_user_id === state.appUser?.id
+      && order.provider === "paypal" && order.payment_environment === "live"
+    const busy = Boolean(state.paymentRecoveryBusy) || state.checkoutActive
+    const query = inspectable ? `<button class="secondary-button" data-inspect-payment="${esc(order.id)}" ${busy ? "disabled" : ""}>${paymentText("核对原单（仅查询）", "Check original order (read-only)")}</button>` : ""
+    const result = inspection ? `<p class="screen-copy" role="status" data-payment-inspection>${esc(recoveryText(inspection))}</p>` : ""
+    return `<div class="ledger-row"><div><strong>${esc(paymentStatus(order))} · ${order.coin_quantity || 0} ✦</strong><small>${formatDate(order.created_at)} · ${esc(order.id)}</small>${query}${result}</div><b>$${((order.amount || 0) / 100).toFixed(2)}</b></div>`
+  }
+
   let paypalSdkPromise
   let paypalInstancePromise
   let paypalInstanceKey
@@ -208,7 +270,7 @@
   function paymentContext() {
     const checkout = paymentCheckout()
     return JSON.stringify([state.appUser?.id, state.authSyncedSessionId, state.commerce?.environment, state.commerce?.client_id, state.rechargeProduct,
-      checkout ? checkout.resumeOrder?.id || "new" : "unavailable", checkout?.resumeOrder?.provider_order_id])
+      checkout ? checkout.resumeOrder?.id || checkout.replacementOf || "new" : "unavailable", checkout?.resumeOrder?.provider_order_id])
   }
 
   function releasePayPal(root) {
@@ -252,13 +314,14 @@
     const selection = paymentCheckout()
     if (!root || root.dataset.mounted || !userId || !selection) return
     const resumeOrder = selection.resumeOrder
+    const replacementOf = selection.replacementOf
     root.dataset.mounted = "true"
     const mount = { context: paymentContext(), checkout: null }
     paypalMounts.set(root, mount)
     const current = () => root.isConnected && paypalMounts.get(root) === mount && mount.context === paymentContext()
     const finish = () => { if (paypalActiveMount === mount) { paypalActiveMount = null; state.checkoutActive = false } }
     const message = text => { if (root.isConnected) root.querySelector("[data-payment-message]").textContent = text }
-    const key = `vireal-payment:${userId}`
+    const key = replacementOf ? `vireal-payment:${userId}:replacement:${replacementOf}` : `vireal-payment:${userId}`
     let activeOrder
     try {
       const instance = await paymentInstance(config)
@@ -288,10 +351,11 @@
       mount.checkout = checkout
       const button = document.createElement("paypal-button")
       if (resumeOrder) button.setAttribute("aria-label", paymentText("继续支付原订单（PayPal）", "Continue original payment with PayPal"))
+      if (replacementOf) button.setAttribute("aria-label", paymentText("使用一次性授权换单（PayPal）", "Use the one approved replacement with PayPal"))
       root.insertBefore(button, root.querySelector("[data-payment-message]"))
       let starting = false
       button.addEventListener("click", async () => {
-        if (starting || state.checkoutActive || !current()) return
+        if (starting || state.checkoutActive || state.paymentRecoveryBusy || !current()) return
         starting = true
         paypalActiveMount = mount
         state.checkoutActive = true
@@ -313,7 +377,11 @@
           try { attempt = JSON.parse(sessionStorage.getItem(key) || "null") } catch (_) {}
           if (!attempt || attempt.product_id !== product) attempt = { product_id: product, idempotency_key: crypto.randomUUID() }
           sessionStorage.setItem(key, JSON.stringify(attempt))
-          activeOrder = await parseResponse(await authFetch("/api/v1/app/paypal/orders", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.idempotency_key }, body: JSON.stringify({ product_id: product }) }))
+          const createPath = replacementOf ? `/api/v1/app/paypal/orders/${encodeURIComponent(replacementOf)}/replacement` : "/api/v1/app/paypal/orders"
+          activeOrder = await parseResponse(await authFetch(createPath, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.idempotency_key }, ...(replacementOf ? {} : {body: JSON.stringify({ product_id: product })}) }))
+          if (replacementOf && (activeOrder.id === replacementOf || activeOrder.app_user_id !== userId
+            || activeOrder.provider !== "paypal" || activeOrder.payment_environment !== "live" || activeOrder.product_id !== "coins_100"
+            || activeOrder.amount !== 599 || activeOrder.currency !== "USD" || activeOrder.coin_quantity !== 100)) throw new Error("Replacement needs verification")
           if (activeOrder.fulfilled_at || ["failed", "canceled", "refunded", "reversed"].includes(activeOrder.status) || !activeOrder.provider_order_id) {
             sessionStorage.removeItem(key)
             throw new Error("Please refresh your payment records")
@@ -349,6 +417,8 @@
       state.wallet = null
       state.tasks = []
       state.rechargeOrders = []
+      state.paymentRecovery.clear()
+      state.paymentRecoveryBusy = null
       clearTimeout(state.paymentPolling)
       state.checkoutActive = false
       state.currentTask = null
@@ -370,6 +440,8 @@
       const payload = await parseResponse(response)
       if (state.appUser?.id !== payload.app_user.id) {
         state.rechargeOrders = []
+        state.paymentRecovery.clear()
+        state.paymentRecoveryBusy = null
         clearTimeout(state.paymentPolling)
         state.checkoutActive = false
         state.currentTask = null
@@ -537,13 +609,21 @@
     const offeredProducts = (config?.products || []).filter(product => !paymentOnly || (product.product_id === "coins_100" && product.coins === 100 && product.amount === 599 && product.currency === "USD"))
     const available = config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
     const resumeOrder = originalPaymentOrder()
-    const paymentOnlyNotice = paymentOnly ? paymentText("支付专用验收：金币归当前登录账号，不归 PayPal 邮箱，付款人须本人确认。不开放注册、上传或生成；余额保留不代表当前地区可消费，仍按规则人工处理退款。请勿共享密码或验证码。", "Payment-only acceptance: credits belong to the signed-in account, not the PayPal email; the payer must personally approve. No signup, uploads or generation. Retained credits do not grant regional service access; refunds remain subject to manual review. Never share passwords or verification codes.") + " " + (resumeOrder ? paymentText("原订单尚未完成，可在下方继续同一笔付款；不要另建订单。", "The original order is unfinished. Continue the same payment below; do not create another order.") : config.payment_only_order_created ? paymentText("唯一订单已创建，请查原单，不要再次付款。", "The single order already exists; check it, do not pay again.") : !available ? paymentText("新订单授权不可用或已到期。", "New-order authorization is unavailable or expired.") : paymentText("仅一笔 $5.99 / 100 金币，公众充值仍关闭。", "One USD 5.99 / 100-credit order only. Public recharge remains closed.")) + (config.payment_only_expires_at ? ` ${paymentText("新订单授权截止", "New-order authorization expires")}: ${new Date(config.payment_only_expires_at).toLocaleString()}` : "") : ""
+    const replacementReady = Boolean(paymentCheckout()?.replacementOf)
+    const privateOrderNotice = replacementReady
+      ? paymentText("原单已单独获准换单；只可使用下方一次性替换入口，不可重付旧单。", "The original has a separately approved replacement. Use only the one replacement below; never repay the old order.")
+      : resumeOrder ? paymentText("原订单尚未完成，可在下方继续同一笔付款；不要另建订单。", "The original order is unfinished. Continue the same payment below; do not create another order.")
+      : config?.payment_only_order_created ? paymentText("唯一订单已创建，请查原单，不要再次付款。", "The single order already exists; check it, do not pay again.")
+      : !available ? paymentText("新订单授权不可用或已到期。", "New-order authorization is unavailable or expired.")
+      : paymentText("仅一笔 $5.99 / 100 金币，公众充值仍关闭。", "One USD 5.99 / 100-credit order only. Public recharge remains closed.")
+    const paymentOnlyNotice = paymentOnly ? paymentText("支付专用验收：金币归当前登录账号，不归 PayPal 邮箱，付款人须本人确认。不开放注册、上传或生成；余额保留不代表当前地区可消费，仍按规则人工处理退款。请勿共享密码或验证码。", "Payment-only acceptance: credits belong to the signed-in account, not the PayPal email; the payer must personally approve. No signup, uploads or generation. Retained credits do not grant regional service access; refunds remain subject to manual review. Never share passwords or verification codes.") + " " + privateOrderNotice + (config.payment_only_expires_at ? ` ${paymentText("新订单授权截止", "New-order authorization expires")}: ${new Date(config.payment_only_expires_at).toLocaleString()}` : "") : ""
     const notice = wallet?.payment_hold ? paymentText("支付账户正在人工审核，请联系客服。", "Your payment account is under review. Please contact support.") : paymentOnly ? paymentOnlyNotice : config?.region_allowed === false ? paymentText("当前地区暂未开放充值。", "Recharge is unavailable in this region.") : config?.global_real_remaining === 0 ? paymentText("今日全站额度已用完，暂停新充值和生成。", "Daily generation capacity is exhausted. New recharge and generation are paused.") : state.commerceError || (!available ? paymentText("充值尚未开放；等待收款验收完成。", "Recharge will open after payment verification is complete.") : paymentText("注册不赠币；充值不会解除生成额度限制。", "No signup credits. Recharge does not bypass generation limits."))
     const products = offeredProducts.map(product => `<button class="recharge-product ${product.product_id === state.rechargeProduct ? "selected" : ""}" data-recharge-product="${esc(product.product_id)}" ${available ? "" : "disabled"}><b>${product.coins} ✦</b><span>$${(product.amount / 100).toFixed(2)} USD</span></button>`).join("")
-    const orders = state.rechargeOrders.map(order => `<div class="ledger-row"><div><strong>${esc(paymentStatus(order))} · ${order.coin_quantity || 0} ✦</strong><small>${formatDate(order.created_at)} · ${esc(order.id)}</small></div><b>$${((order.amount || 0) / 100).toFixed(2)}</b></div>`).join("")
-    if (available || resumeOrder) setTimeout(mountPayPal, 0)
+    const orders = state.rechargeOrders.map(rechargeOrderRow).join("")
+    if (available || resumeOrder || replacementReady) setTimeout(mountPayPal, 0)
     const resumeNotice = resumeOrder ? `<h2>${paymentText("继续支付原订单", "Continue original payment")}</h2><p class="screen-copy">${paymentText("仅恢复这一笔 $5.99 / 100 金币订单", "Resume only this USD 5.99 / 100-credit order")}: ${esc(resumeOrder.id)}</p>` : ""
-    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${paymentText("金币与充值", "Credits & recharge")}</h1><p class="screen-copy">${esc(notice)}</p><div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${wallet?.balance ?? "--"} ✦</strong><p>今日剩余 ${wallet?.daily_remaining ?? "--"} 次 · 当前可并发 ${wallet?.concurrent_remaining ?? "--"} 个任务</p><p>${paymentText("全站今日剩余", "Site daily capacity remaining")}: ${wallet?.global_real_remaining ?? config?.global_real_remaining ?? "--"} / ${config?.global_real_limit ?? 30}</p>${config?.resets_at ? `<p>${paymentText("额度恢复时间", "Capacity resets")}: ${esc(new Date(config.resets_at).toLocaleString())}</p>` : ""}</div><div class="recharge-products">${products}</div>${available || resumeOrder ? `<div id="paypalCheckout" class="profile-card">${resumeNotice}<p data-payment-message class="screen-copy">Loading PayPal…</p></div>` : ""}<p class="screen-copy">${paymentText("点击支付即确认服务条款与充值说明。", "By paying, you accept the terms and recharge information.")} <a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私", "Privacy")}</a> · <a href="#refunds">${paymentText("充值与退款帮助", "Recharge & refunds")}</a></p><button class="secondary-button" data-refresh-payments>${paymentText("刷新余额与充值记录", "Refresh balance & orders")}</button><div class="subsection-head"><h2>${paymentText("充值记录", "Recharge orders")}</h2></div><div class="profile-card">${orders || paymentText("暂无充值订单", "No recharge orders")}</div><div class="subsection-head" style="margin-top:24px"><h2>余额流水</h2><span>最近 50 条</span></div><div class="profile-card">${ledger || '<p class="screen-copy" style="margin:0">暂无金币流水</p>'}</div>${nav("")}</section>`)
+    const replacementNotice = replacementReady ? `<h2>${paymentText("一次性授权换单", "One approved replacement")}</h2><p class="screen-copy">${paymentText("仅在 PayPal 已明确作废原单且管理员已授权后，可创建一笔 $5.99 / 100 金币替换单。不会取消、退款或重试原单；付款仍须本人确认。", "Only after PayPal explicitly voided the original and an administrator approved, create one USD 5.99 / 100-credit replacement. No cancellation, refund or retry of the original; the payer must personally approve.")}</p>` : ""
+    return shell(`<section class="page screen-page page-enter">${header()}<h1 class="screen-title">${paymentText("金币与充值", "Credits & recharge")}</h1><p class="screen-copy">${esc(notice)}</p><div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${wallet?.balance ?? "--"} ✦</strong><p>今日剩余 ${wallet?.daily_remaining ?? "--"} 次 · 当前可并发 ${wallet?.concurrent_remaining ?? "--"} 个任务</p><p>${paymentText("全站今日剩余", "Site daily capacity remaining")}: ${wallet?.global_real_remaining ?? config?.global_real_remaining ?? "--"} / ${config?.global_real_limit ?? 30}</p>${config?.resets_at ? `<p>${paymentText("额度恢复时间", "Capacity resets")}: ${esc(new Date(config.resets_at).toLocaleString())}</p>` : ""}</div><div class="recharge-products">${products}</div>${available || resumeOrder || replacementReady ? `<div id="paypalCheckout" class="profile-card">${resumeNotice}${replacementNotice}<p data-payment-message class="screen-copy">Loading PayPal…</p></div>` : ""}<p class="screen-copy">${paymentText("点击支付即确认服务条款与充值说明。", "By paying, you accept the terms and recharge information.")} <a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私", "Privacy")}</a> · <a href="#refunds">${paymentText("充值与退款帮助", "Recharge & refunds")}</a></p><button class="secondary-button" data-refresh-payments>${paymentText("刷新余额与充值记录", "Refresh balance & orders")}</button><div class="subsection-head"><h2>${paymentText("充值记录", "Recharge orders")}</h2></div><div class="profile-card">${orders || paymentText("暂无充值订单", "No recharge orders")}</div><div class="subsection-head" style="margin-top:24px"><h2>余额流水</h2><span>最近 50 条</span></div><div class="profile-card">${ledger || '<p class="screen-copy" style="margin:0">暂无金币流水</p>'}</div>${nav("")}</section>`)
   }
 
   function accountPage() {
@@ -841,6 +921,8 @@
   }
 
   document.addEventListener("click", (event) => {
+    const inspect = event.target.closest("[data-inspect-payment]")
+    if (inspect) { void inspectPayment(inspect.dataset.inspectPayment); return }
     const product = event.target.closest("[data-recharge-product]")
     if (product) {
       if (state.checkoutActive) return

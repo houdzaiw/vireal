@@ -24,6 +24,7 @@ from app.models import (
     AppManagedMediaAsset,
     AppOrder,
     AppOrderEvent,
+    AppPayPalReplacement,
     AppUpload,
     AppUser,
     AppUserIdentity,
@@ -73,6 +74,7 @@ def db() -> Generator[Session]:
         yield session
         statement = delete(AppOrderEvent)
         session.execute(statement)
+        session.execute(delete(AppPayPalReplacement))
         statement = delete(AppAdminOperationLog)
         session.execute(statement)
         statement = delete(AppOrder)

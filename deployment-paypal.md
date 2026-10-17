@@ -2,6 +2,212 @@
 
 ## Release state
 
+### Review publication — October 18, not deployed
+
+The owner separately authorized excluding **only**
+`codex/paypal-order-recovery` from staging automatic previews, then pushing the
+branch and opening a PR for CI. This is review-publication authorization only:
+**no merge, deployment, migration, renewed window, replacement grant/order,
+payment/refund, generation or public opening is approved by this step**.
+
+At **00:05:22 Beijing on October 18**, Cloudflare read-back confirmed the eighth
+exact preview exclusion while preserving all seven earlier exclusions, `main`,
+the `*` inclusion, other source/build/deployment settings and latest deployment.
+Production H5 remains direct-upload. Fresh Railway reads confirmed project
+`prDeploys=false` and all four production/staging API/Worker sources still follow
+`houdzaiw/vireal` on `main`. GitHub deployment workflows require `master` push or
+explicit dispatch, not this feature branch/PR. Existing CI may format the review
+branch and publish its normal coverage report; that is not an app deployment.
+
+The local results below remain separate from hosted CI. Check the latest PR head
+and its checks before any later release decision. In particular, the unresolved
+Live original-order 404 remains unresolved; review publication does not make the
+beneficiary eligible for replacement or make payment available.
+
+### One approved replacement — local verification checkpoint, October 17
+
+The owner approved local once-only replacement implementation and isolated
+verification. This supersedes the earlier "replacement not implemented" local
+checkpoint below, **not** the requirement for new review/publication, deployment,
+configuration and action-time payment approvals. Branch
+`codex/paypal-order-recovery` is based on the deployed PR #25 merge; its new code
+has not been pushed, reviewed by hosted CI, merged or deployed. No production
+flag, provider order, payment/refund or generation was created by this work.
+
+The one additional table, `app_paypal_replacement`, is introduced incrementally
+by revision `c5d6e7f8a9b0`. It preserves both original/replacement orders, unique
+capture references and financial ledgers. Unique beneficiary/original/child
+constraints bound the grant to **one lifetime replacement**, including an
+unknown provider create result. RESTRICT foreign keys prevent erasing linked
+history. A separate legacy-schema-to-new-schema test seeded an isolated old
+order and confirmed its full JSON row was unchanged after migration; the new
+grant table was empty. This is not a production backup/restore verification.
+
+`APP_PAYMENT_ONLY_REPLACEMENT_ENABLED` is new and **false by default**. Any later
+activation still requires the full existing production payment-only safety
+configuration, exact user/Clerk identity, genuine signed CN region, verified
+email/session, active time window, account status and capacity. It cannot open
+signup, general recharge, uploads or generation.
+
+The new flow is deliberately narrow:
+
+1. A Cloudflare Access-protected superuser explicitly calls
+   `POST /api/v1/admin/app/orders/{id}/replacement-approval`, supplying a
+   substantive reason, evidence reference, unique idempotency key, explicit
+   merchant/payer no-payment confirmations and an expiry within the private
+   window. The backend independently GETs and validates **VOIDED**, original
+   amount/currency/payee/ownership, no captures/authorizations and no local
+   financial history. Approval only records the grant and an audit entry; it
+   never creates a provider order. A vague reason, 404, timeout, human no-charge
+   assertion, approval or pending capture cannot override the provider check.
+2. The verified beneficiary may later explicitly use
+   `POST /api/v1/app/paypal/orders/{id}/replacement` with an Idempotency-Key.
+   The backend rechecks the old provider evidence and fresh session/window,
+   consumes the grant and commits a fixed **USD 5.99 / 100-credit** reservation
+   before provider creation. Same-key known-result replay returns that child;
+   different keys and unknown-result retries are refused, never resubmitted.
+   The ordinary create endpoint still cannot bypass the lifetime guard.
+3. H5 offers an explicitly labeled replacement only when current authenticated
+   config advertises that approved grant. It uses a separate idempotency scope,
+   never falls back to ordinary create, and resumes only the linked child after
+   refresh. Existing payment capture/webhook/Worker settlement remains the only
+   credit path. Original-order checkout/capture is barred after a grant. If
+   contradictory approval/payment later appears for the old order, the account
+   is held and a manual payment case is recorded; no second auto-credit, automatic
+   cash refund or deletion is performed. Already-paid child reconciliation works
+   after feature closure. Financial locks use the same user -> order ordering.
+   Generic refund-case recover/dismiss cannot clear `replacement_conflict` with
+   a zero-coin operation; a case-specific verified resolution needs separate
+   review/authorization. Retain the hold and contact the provider in the meantime.
+
+The latest production public-only probe confirmed health `true`, H5 still at
+`d6e506312f4142cfdf8c356c0ad9d7b793438850`, public registration/recharge false,
+and private sign-in/controlled-registration/internal sign-in unavailable. These
+anonymous probes do not replace authenticated merchant or order/ledger checks.
+The earlier exact-order audit remains the last provider/ledger observation; no
+new real payment or provider order was attempted. Owner and payer report that
+the payer never initiated payment and saw no matching transaction or debit.
+
+**The current real original order's last GET was 404, not VOIDED. It therefore
+does not qualify for this implementation's replacement path.** PayPal documents
+that [RESOURCE_NOT_FOUND](https://developer.paypal.com/api/errors/resource-not-found)
+can include resource-ID or access problems; do not mislabel it a verified void.
+Resolve that exact Live resource with authoritative provider evidence, or obtain
+separate review/authorization for a different manually evidenced recovery policy.
+Do not reuse the resolved Sandbox MTS case as proof about this Live order.
+
+Final local verification:
+
+- Backend **653 passed**, overall statement coverage **92%**, replacement service
+  **93%**; isolated PostgreSQL, mocked payment/identity providers, external HTTP
+  denied in these payment tests. Covered concurrent keys, lost create response,
+  late original approval/capture, account/session/expiry changes, old-order
+  ownership/reference conflicts, quota denial and unique child credit after
+  closure. A concurrency test was corrected to check ownership before acquiring
+  the reservation lock, rather than synchronously blocking itself on that lock;
+  no production lock or safety assertion was removed.
+- H5 **194 passed** (Chromium/WebKit), plus **41** Python/static tests. Mock UI
+  screenshots are not evidence of actual PayPal funds or public readiness.
+- Ruff, mypy, ty, generated SDK TypeScript and JavaScript syntax checks pass;
+  generated files follow the existing client convention. No model expense.
+
+Remaining release/acceptance checklist (do not repeat completed paid Sandbox):
+
+| Remaining item | Completion requirement |
+| --- | --- |
+| This original Live resource | Resolve 404/permission/lifecycle uncertainty; no automatic replacement |
+| Publish this local change | Review publication now authorized as recorded above; hosted CI/review required, no implicit merge or deployment |
+| Closed production update | Separately approve fresh backup + restore verification, additive migration, API/Worker/H5 version checks; new replacement flag stays off |
+| Private Live payment | Separate approval for the exact beneficiary, grant/window and one payment; payer personally approves; verify real capture and exactly one +100 credit |
+| Production generation delivery | Separate action-time cost/model/budget authorization; one 5-second task, one debit, playback/download/system-save evidence |
+| Independent new-user flow | Existing merchant-controlled Vireal account + friend's PayPal tests payment integration, not independent signup or an overseas end-to-end user |
+| Public trial | Independent opening authorization after applicable gates pass, still 72-hour small traffic with manual checks and pause responsibility |
+
+For any future shutdown, set replacement, private acceptance, PayPal new-order
+and commerce-terms flags **off together** on API/Worker while preserving verified
+callbacks, reconciliation, history and ledgers. Never drop/downgrade the financial
+migration or disable only the private flag while leaving new recharge enabled.
+The test cluster is stopped and temporary dependency links removed after checks.
+The original source checkout's unrelated edits remain untouched.
+
+### Original-order recovery — earlier local preparation checkpoint, October 17
+
+This section supersedes the older review-only status below. PR
+[#25](https://github.com/houdzaiw/vireal/pull/25), merge
+`d6e506312f4142cfdf8c356c0ad9d7b793438850`, is the existing original-order-resume
+release, not this new recovery implementation. The owner authorized only local
+recovery work and isolated tests for `codex/paypal-order-recovery`. **Do not push,
+merge, deploy, renew the private window, cancel/replace/create an order or make a
+payment as part of this work.** No financial migration is added.
+
+The private payment window expired at **18:30:28 Beijing on October 17**. Public
+registration/recharge, uploads and generation remain unavailable. The latest
+read-only provider query returned HTTP 404 / `RESOURCE_NOT_FOUND` for the original
+Live order, using unchanged reviewed configuration; its local order has no
+capture, fulfillment, linked credit or associated webhook event. The owner also
+reports no matching merchant-side receipt was visible. These observations are
+**not proof of an unpaid, expired, refunded or safely replaceable order**. No
+reporting/search permission was added and no reporting API was called. Keep
+private transaction IDs and provider debug IDs out of this public repository.
+
+The new owner-only `GET /api/v1/app/paypal/orders/{order_id}/recovery` reads the
+existing selected Live order, its linked ledger and PayPal order details. It is
+available for record inspection after window expiry, but never grants checkout
+or a region exception. Responses are `no-store`; no raw provider body, secret or
+token is returned. Order ownership, financial evidence and account state are
+reloaded after provider I/O. Existing checkout still independently checks the
+verified identity, signed geography, active window and exact order snapshot.
+
+| Verified evidence | Read-only guidance; no financial mutation |
+| --- | --- |
+| Original CREATED/PAYER_ACTION_REQUIRED with fresh checkout authorization | Resume the same original order only; payer approval still required |
+| Same order without a current authorized window | Authorization required; querying does not renew it |
+| Existing approval, authorization, PENDING/COMPLETED capture | Wait for existing settlement/reconciliation; do not pay again |
+| Consistent paid order and exactly one linked +100 credit | Already credited; no further payment |
+| Genuine verified VOIDED, no local/provider financial resources | Manual replacement candidate only |
+| 404, timeout, malformed/mismatched evidence, financial or identity conflict | Manual review; never assume unpaid or release the lifetime slot |
+
+`replacement_allowed` is always **false**, including for a replacement candidate.
+The lifetime-one-order guard remains unchanged. H5 adds “Check original order
+(read-only)” and explicit bilingual uncertainty messages, preserves a blocking
+inspection result across wallet refresh, and ignores results after sign-out.
+The query does not call create/capture/cancel/refund, change balances/statuses or
+clear any reservation. Existing callbacks and Worker settlement remain intact.
+
+Next steps require separate action-time authorization:
+
+1. Reconcile authoritative merchant/payer transaction evidence or obtain PayPal
+   confirmation for this exact provider order. A missing UI row, HTTP 404, local
+   zero balance or generic age limit is insufficient for replacement.
+2. If the original order becomes genuinely resumable, review/CI this code and
+   complete fresh backup/restore verification before any approved deployment or
+   renewed private window. Do not broaden public or generation gates.
+3. Only if original-payment uncertainty is resolved, review a separately
+   authorized, audited old-to-new replacement plan with a once-only replacement
+   budget. This implementation does **not** create that financial operation or
+   approve a new order. Preserve all original callbacks, records and ledgers;
+   never obtain replacement by deleting a row, changing its status or toggling
+   acceptance flags.
+
+Verification uses only a fresh Unix-socket-only local PostgreSQL database,
+mocked providers and blocked external HTTP in payment tests. Browser screenshots
+are mock UI evidence, not payment evidence. Final local verification:
+
+- Backend **617 passed**, total statement coverage **92%**, new recovery service
+  **100%** statement coverage. No production data is used in this database.
+- H5 **180 passed** across Chromium/WebKit and **41** Python/static tests; the
+  final query-only UI screenshot was rechecked in both browser runs (2 passed)
+  and visually inspected for readable uncertainty and no checkout controls.
+- Ruff lint/format, mypy, ty, JavaScript syntax, generated SDK TypeScript compile
+  and `git diff --check` pass. Generated SDK files follow the existing generator
+  and are excluded by the repository's Biome configuration; no Biome pass over
+  those ignored files is claimed. These are local results, not hosted CI.
+
+The isolated test database is stopped and temporary dependency symlinks removed
+after verification. The original checkout's unrelated uncommitted document edits
+are preserved; credentials stay in memory and private diagnostics remain outside
+Git. Production is not changed by this local preparation.
+
 ### Payment-only acceptance — review publication only, not released
 
 The initial October 16 implementation and verification were local only. The

@@ -514,6 +514,181 @@ test("original payment expiry, hold and wrong-owner snapshots cannot mount check
   await expect(page.locator("paypal-button")).toHaveCount(0)
 })
 
+test("one explicitly approved replacement uses only its dedicated endpoint and resumes the child", async ({page}, testInfo) => {
+  const old = originalPayment({status: "canceled"})
+  const child = originalPayment({id: "qa-replacement", provider_order_id: "PAY-REPLACEMENT"})
+  await mockOriginalPayment(page, old, {payment_only_replacement_original_id: old.id})
+  await mockResumeSession(page, "cancel")
+  let replaced = false
+  const writes: string[] = []
+  page.on("request", req => { if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({
+    recharge_enabled: false, payment_only_order_created: true,
+    payment_only_replacement_original_id: replaced ? null : old.id,
+    payment_only_checkout_order_id: replaced ? child.id : null,
+  })}))
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({json: {data: replaced ? [child, old] : [old]}}))
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/replacement", route => {
+    expect(route.request().method()).toBe("POST")
+    expect(route.request().postData()).toBeNull()
+    expect(route.request().headers()["idempotency-key"]).toBeTruthy()
+    replaced = true
+    return route.fulfill({json: child})
+  })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-replacement/checkout", route => route.fulfill({json: child}))
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  const button = page.getByLabel("Use the one approved replacement with PayPal", {exact: true})
+  await expect(button).toBeVisible()
+  await expect(page.getByRole("heading", {name: "One approved replacement", exact: true})).toBeVisible()
+  expect(writes).toEqual([])
+  await page.locator("#paypalCheckout").scrollIntoViewIfNeeded()
+  await page.locator("#paypalCheckout").screenshot({path: testInfo.outputPath("approved-replacement-mock.png"), animations: "disabled"})
+  await button.click()
+  await expect(page.locator("body")).toHaveAttribute("data-resumed-order", "PAY-REPLACEMENT")
+  await expect(page.getByRole("heading", {name: "Continue original payment", exact: true})).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel("Continue original payment with PayPal", {exact: true})).toBeVisible()
+  await page.getByLabel("Continue original payment with PayPal", {exact: true}).click()
+  await expect(page.locator("body")).toHaveAttribute("data-resumed-order", "PAY-REPLACEMENT")
+  expect(writes).toEqual(["https://api.example.com/api/v1/app/paypal/orders/qa-original-order/replacement"])
+  await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+})
+
+for (const condition of ["expired", "denied", "hold", "capacity", "wrong-owner"]) {
+  test(`replacement checkout stays closed for ${condition}`, async ({page}) => {
+    const old = originalPayment({status: "canceled", ...(condition === "wrong-owner" ? {app_user_id: "other-user"} : {})})
+    await mockOriginalPayment(page, old, {payment_only_replacement_original_id: old.id,
+      ...(condition === "expired" ? {payment_only_expires_at: "2020-01-01T00:00:00Z"} : {}),
+      ...(condition === "denied" ? {payment_only_acceptance_allowed: false} : {}),
+      ...(condition === "capacity" ? {global_real_remaining: 0} : {}),
+    })
+    if (condition === "hold") await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance: 0, payment_hold: true, ledger: []}}))
+    const requests: string[] = []
+    page.on("request", req => { if (/web-sdk|\/replacement$/.test(req.url())) requests.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await expect(page.locator(".wallet-card strong")).toBeVisible()
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    expect(requests).toEqual([])
+  })
+}
+
+test("replacement network failure cannot fall back to ordinary create or fake a credit", async ({page}) => {
+  const old = originalPayment({status: "canceled"})
+  await mockOriginalPayment(page, old, {payment_only_replacement_original_id: old.id})
+  await mockResumeSession(page, "cancel")
+  const writes: string[] = []
+  page.on("request", req => { if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/replacement", route => route.abort("failed"))
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await page.getByLabel("Use the one approved replacement with PayPal", {exact: true}).click()
+  await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+  await expect(page.locator("body")).not.toHaveAttribute("data-resumed-order")
+  expect(writes).toEqual(["https://api.example.com/api/v1/app/paypal/orders/qa-original-order/replacement"])
+})
+
+function recoveryResult(overrides = {}) {
+  return {order_id: "qa-original-order", checked_at: "2026-10-17T15:00:00Z",
+    decision: "manual_review", reason_code: "provider_order_unavailable", provider_http_status: 404,
+    resume_allowed: false, replacement_candidate: false, replacement_allowed: false, ...overrides}
+}
+
+test("expired original order offers GET-only diagnosis without mounting SDK or resetting the slot", async ({page}, testInfo) => {
+  await mockOriginalPayment(page, originalPayment(), {payment_only_acceptance_allowed: false, payment_only_expires_at: null})
+  let queries = 0
+  const writes: string[] = []
+  const sdkRequests: string[] = []
+  page.on("request", req => {
+    if (req.method() !== "GET" && /paypal\/orders|uploads|video-tasks/.test(req.url())) writes.push(req.url())
+    if (/web-sdk/.test(req.url())) sdkRequests.push(req.url())
+  })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/recovery", route => {
+    queries++
+    return route.fulfill({json: recoveryResult()})
+  })
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  const check = page.getByRole("button", {name: "Check original order (read-only)", exact: true})
+  await expect(check).toBeVisible()
+  expect(queries).toBe(0)
+  await check.click()
+  await expect(page.locator("[data-payment-inspection]")).toContainText("This does not prove no charge or a refund")
+  await page.getByRole("button", {name: "Refresh balance & orders", exact: true}).click()
+  await expect(page.locator("[data-payment-inspection]")).toContainText("PayPal cannot find the original order (404)")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await expect(page.locator(".recharge-product")).toBeDisabled()
+  await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+  expect(queries).toBe(1)
+  expect(writes).toEqual([])
+  expect(sdkRequests).toEqual([])
+  await page.locator("[data-payment-inspection]").scrollIntoViewIfNeeded()
+  await page.screenshot({path: testInfo.outputPath("original-order-readonly-404.png"), fullPage: true, animations: "disabled"})
+})
+
+for (const decision of ["settlement_pending", "authorization_required", "replacement_candidate"]) {
+  test(`original order diagnosis ${decision} cannot authorize a replacement, payment or renewal`, async ({page}) => {
+    await mockOriginalPayment(page, originalPayment(), {payment_only_acceptance_allowed: false, payment_only_expires_at: null})
+    await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/recovery", route => route.fulfill({json: recoveryResult({decision, replacement_candidate: decision === "replacement_candidate"})}))
+    const writes: string[] = []
+    page.on("request", req => { if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await page.getByRole("button", {name: "Check original order (read-only)", exact: true}).click()
+    await expect(page.locator("[data-payment-inspection]")).toContainText({
+      settlement_pending: "do not pay again",
+      authorization_required: "This query did not extend it",
+      replacement_candidate: "no replacement or new payment is authorized",
+    }[decision]!)
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    await expect(page.locator(".wallet-card strong")).toHaveText("0 ✦")
+    expect(writes).toEqual([])
+  })
+}
+
+for (const failure of ["network", "wrong-order", "replacement-authorized", "invalid-resume"]) {
+  test(`original order inspection ${failure} stays unknown without another payment`, async ({page}) => {
+    await mockOriginalPayment(page)
+    await mockResumeSession(page)
+    await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/recovery", route => failure === "network" ? route.abort()
+      : route.fulfill({json: recoveryResult(failure === "wrong-order" ? {order_id: "someone-else"} : failure === "replacement-authorized" ? {replacement_allowed: true} : {resume_allowed: true})}))
+    const writes: string[] = []
+    page.on("request", req => { if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await expect(page.locator("paypal-button")).toBeVisible()
+    await page.getByRole("button", {name: "Check original order (read-only)", exact: true}).click()
+    await expect(page.locator("[data-payment-inspection]")).toContainText("needs manual verification")
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    await page.getByRole("button", {name: "Refresh balance & orders", exact: true}).click()
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    expect(writes).toEqual([])
+  })
+}
+
+test("in-flight original order inspection blocks payment and ignores a signed-out response", async ({page}) => {
+  await mockOriginalPayment(page)
+  await mockResumeSession(page)
+  let release!: () => void
+  const blocked = new Promise<void>(resolve => { release = resolve })
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/recovery", async route => {
+    await blocked
+    return route.fulfill({json: recoveryResult()})
+  })
+  const paymentRequests: string[] = []
+  page.on("request", req => { if (/paypal\/orders/.test(req.url()) && !req.url().endsWith("/recovery")) paymentRequests.push(req.url()) })
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await expect(page.locator("paypal-button")).toBeVisible()
+  await page.getByRole("button", {name: "Check original order (read-only)", exact: true}).click()
+  await expect(page.getByRole("button", {name: "Check original order (read-only)", exact: true})).toBeDisabled()
+  await page.locator("paypal-button").click()
+  expect(paymentRequests).toEqual([])
+  await page.evaluate(() => {
+    window.VirealClerk.session = null
+    window.VirealClerk.user = null
+    window.dispatchEvent(new CustomEvent("vireal:clerk-ready", {detail: window.VirealClerk}))
+  })
+  release()
+  await expect(page.locator("[data-payment-inspection]")).toHaveCount(0)
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  expect(paymentRequests).toEqual([])
+})
+
 test("wallet refresh and scheduled payment polling reuse the SDK and checkout", async ({ page }) => {
   await page.clock.install()
   await mockSignedInApi(page)

@@ -1062,6 +1062,92 @@ class AppPayPalOrderCreate(SQLModel):
     product_id: str = Field(min_length=1, max_length=100)
 
 
+class AppPayPalOrderRecoveryPublic(SQLModel):
+    """Read-only guidance, never an entitlement to create a replacement."""
+
+    order_id: uuid.UUID
+    checked_at: datetime
+    decision: Literal[
+        "resume_original",
+        "authorization_required",
+        "settlement_pending",
+        "credited",
+        "manual_review",
+        "replacement_candidate",
+    ] = "manual_review"
+    reason_code: str = Field(default="verification_required", max_length=80)
+    provider_order_status: str | None = Field(default=None, max_length=30)
+    provider_http_status: int | None = Field(default=None, ge=100, le=599)
+    resume_allowed: bool = False
+    replacement_candidate: bool = False
+    replacement_allowed: Literal[False] = False
+
+
+class AppPayPalReplacement(SQLModel, table=True):
+    """One lifetime replacement grant; never erase either payment's history."""
+
+    __tablename__ = "app_paypal_replacement"
+    __table_args__ = (
+        UniqueConstraint("app_user_id"),
+        UniqueConstraint("original_order_id"),
+        UniqueConstraint("replacement_order_id"),
+        CheckConstraint(
+            "replacement_order_id IS NULL OR replacement_order_id <> original_order_id"
+        ),
+        CheckConstraint("(replacement_order_id IS NULL) = (consumed_at IS NULL)"),
+    )
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    app_user_id: uuid.UUID = Field(foreign_key="app_user.id", ondelete="RESTRICT")
+    original_order_id: uuid.UUID = Field(
+        foreign_key="app_order.id", ondelete="RESTRICT"
+    )
+    original_provider_order_id: str = Field(max_length=255)
+    replacement_order_id: uuid.UUID | None = Field(
+        default=None, foreign_key="app_order.id", ondelete="RESTRICT"
+    )
+    approved_by: uuid.UUID = Field(foreign_key="user.id", ondelete="RESTRICT")
+    subject: str = Field(max_length=255)
+    issuer: str = Field(max_length=500)
+    idempotency_key: str = Field(max_length=120)
+    reason: str = Field(max_length=500)
+    evidence_reference: str = Field(max_length=500)
+    expires_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False)
+    )
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    consumed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+
+
+class AppPayPalReplacementApproval(SQLModel):
+    model_config = SQLModelConfig(extra="forbid")
+    reason: str = Field(min_length=10, max_length=500)
+    evidence_reference: str = Field(min_length=10, max_length=500)
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    merchant_checked_no_payment: Literal[True]
+    payer_confirmed_no_payment: Literal[True]
+    expires_at: datetime
+
+    @field_validator("reason", "evidence_reference", "idempotency_key")
+    @classmethod
+    def substantive_replacement_evidence(cls, value: str) -> str:
+        if len(value.strip()) < 10:
+            raise ValueError("Substantive evidence is required")
+        return value.strip()
+
+
+class AppPayPalReplacementPublic(SQLModel):
+    id: uuid.UUID
+    original_order_id: uuid.UUID
+    replacement_order_id: uuid.UUID | None
+    expires_at: datetime
+    consumed_at: datetime | None
+
+
 class AppPaymentCase(SQLModel, table=True):
     __tablename__ = "app_payment_case"
     __table_args__ = (
