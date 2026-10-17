@@ -28,7 +28,7 @@ from app.services.paypal_client import (
     get_paypal_client,
     paypal_configured,
 )
-from app.services.paypal_orders import confirm_order, lock_order
+from app.services.paypal_orders import confirm_order, lock_order, validate_order
 from app.services.video_quota import global_real_count, utc_day_bounds
 
 router = APIRouter(prefix="/app/paypal", tags=["app paypal"])
@@ -244,6 +244,100 @@ def create_paypal_order(
         if client:
             client.close()
     return AppOrderPublic.model_validate(order)
+
+
+def _require_resumable_acceptance_order(session: SessionDep, order: AppOrder) -> None:
+    if (
+        order.payment_environment != "live"
+        or order.product_id != "coins_100"
+        or (order.amount, order.currency, order.coin_quantity) != (599, "USD", 100)
+        or not order.provider_order_id
+        or order.status != "created"
+        or order.fulfilled_at
+        or order.paid_at
+        or order.capture_id
+        or order.transaction_id
+    ):
+        raise HTTPException(
+            409, "Check the original order status; do not create or pay another order"
+        )
+    ids = session.exec(
+        select(AppOrder.id)
+        .where(
+            AppOrder.app_user_id == order.app_user_id,
+            AppOrder.provider == "paypal",
+            AppOrder.payment_environment == "live",
+        )
+        .limit(2)
+    ).all()
+    if len(ids) != 1 or ids[0] != order.id:
+        raise HTTPException(
+            409, "The original acceptance order requires manual verification"
+        )
+
+
+@router.get("/orders/{order_id}/checkout", response_model=AppOrderPublic)
+def resume_paypal_checkout(
+    order_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    current_app_user: CurrentAppUser,
+) -> AppOrderPublic:
+    """Read-only preflight for resuming the same controlled payment in the SDK.
+
+    Never create/capture/cancel an order or apply provider state here. Approved
+    or uncertain payments are left to the existing callback/reconciliation path.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    order = session.exec(
+        select(AppOrder).where(
+            AppOrder.id == order_id,
+            AppOrder.app_user_id == current_app_user.id,
+            AppOrder.provider == "paypal",
+        )
+    ).first()
+    if order is None:
+        raise HTTPException(404, "Payment order not found")
+    permitted = payment_only_user(request, session, verify_profile=True)
+    if permitted is None or permitted.id != current_app_user.id:
+        raise HTTPException(403, "Payment-only acceptance is unavailable or expired")
+    if not paypal_configured():
+        raise HTTPException(
+            503, "Payment service is unavailable; check the original order"
+        )
+    _require_resumable_acceptance_order(session, order)
+    client = get_paypal_client()
+    try:
+        data = client.order_details(str(order.provider_order_id))
+        unit = validate_order(order, data)
+        payments = unit.get("payments", {})
+        if (
+            data.get("status") not in {"CREATED", "PAYER_ACTION_REQUIRED"}
+            or not isinstance(payments, dict)
+            or payments.get("captures")
+            or payments.get("authorizations")
+        ):
+            raise HTTPException(
+                409, "The original payment cannot be restarted; refresh its status"
+            )
+        # Callback, hold and expiry changes during provider I/O must fail closed.
+        session.expire_all()
+        permitted = payment_only_user(request, session)
+        if permitted is None or permitted.id != current_app_user.id:
+            raise HTTPException(
+                403, "Payment-only acceptance is unavailable or expired"
+            )
+        session.refresh(order)
+        if order.app_user_id != current_app_user.id or order.provider != "paypal":
+            raise HTTPException(404, "Payment order not found")
+        _require_resumable_acceptance_order(session, order)
+        validate_order(order, data)
+        return AppOrderPublic.model_validate(order)
+    except PayPalError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    finally:
+        client.close()
 
 
 @router.post("/orders/{order_id}/capture", response_model=AppOrderPublic)

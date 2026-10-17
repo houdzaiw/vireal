@@ -357,6 +357,163 @@ test("payment-only paid order survives reload with 100 retained credits and no s
   expect(captured).toBe(1)
 })
 
+function originalPayment(overrides = {}) {
+  return {
+    id: "qa-original-order", app_user_id: "qa-app-user", provider: "paypal", payment_environment: "live",
+    provider_order_id: "QA-EXISTING-PAYPAL", product_id: "coins_100", amount: 599,
+    currency: "USD", coin_quantity: 100, status: "created", fulfilled_at: null,
+    paid_at: null, capture_id: null, transaction_id: null, ...overrides,
+  }
+}
+
+async function mockOriginalPayment(page: Page, order = originalPayment(), config = {}) {
+  await mockSignedInApi(page)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({
+    recharge_enabled: false, payment_only_order_created: true, ...config,
+  })}))
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({json: {data: [order]}}))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance: 0, payment_hold: false, ledger: []}}))
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/checkout", route => route.fulfill({json: order}))
+}
+
+async function mockResumeSession(page: Page, outcome = "cancel") {
+  await page.route("https://www.paypal.com/web-sdk/v6/core", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `if (!customElements.get('paypal-button')) customElements.define('paypal-button', class extends HTMLElement {
+      connectedCallback() { this.textContent = 'PayPal checkout (UI mock)'; this.style.display = 'block'; this.style.padding = '12px'; }
+    }); window.paypal = { createInstance: async () => ({
+      findEligibleMethods: async () => ({isEligible: () => true}),
+      createPayPalOneTimePaymentSession: callbacks => ({
+        start: async (_, orderPromise) => {
+          document.body.dataset.resumeStarts = String(Number(document.body.dataset.resumeStarts || 0) + 1);
+          const order = await orderPromise;
+          document.body.dataset.resumedOrder = order.orderId;
+          if (${JSON.stringify(outcome)} === 'approve') await callbacks.onApprove({orderId: order.orderId});
+          else if (${JSON.stringify(outcome)} === 'cancel') callbacks.onCancel();
+          else if (${JSON.stringify(outcome)} === 'error') callbacks.onError();
+        }, destroy() {},
+      }),
+    }) };`,
+  }))
+}
+
+for (const outcome of ["cancel", "error"]) {
+  test(`original payment survives refresh and ${outcome} without creating or capturing an order`, async ({page}) => {
+    await mockOriginalPayment(page)
+    await mockResumeSession(page, outcome)
+    let preflights = 0
+    const writes: string[] = []
+    page.on("request", req => {
+      if (req.url().endsWith("/qa-original-order/checkout")) preflights++
+      if (req.method() !== "GET" && /paypal\/orders|uploads|video-tasks/.test(req.url())) writes.push(req.url())
+    })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await expect(page.getByRole("heading", {name: "Continue original payment", exact: true})).toBeVisible()
+    await expect(page.locator(".recharge-product")).toBeDisabled()
+    await expect(page.locator("paypal-button")).toBeVisible()
+    expect(preflights).toBe(0)
+    for (let i = 0; i < 3; i++) await page.getByRole("button", {name: "Refresh balance & orders", exact: true}).click()
+    await page.reload()
+    await expect(page.locator("paypal-button")).toBeVisible()
+    expect(preflights).toBe(0)
+    await page.locator("paypal-button").click()
+    await expect(page.locator("body")).toHaveAttribute("data-resumed-order", "QA-EXISTING-PAYPAL")
+    await expect(page.locator("paypal-button")).toBeVisible()
+    expect(preflights).toBe(1)
+    expect(writes).toEqual([])
+  })
+}
+
+test("original payment uses one existing capture only after mocked buyer approval, then removes checkout", async ({page}) => {
+  await mockOriginalPayment(page)
+  await mockResumeSession(page, "approve")
+  let paid = false
+  const writes: string[] = []
+  page.on("request", req => { if (req.method() === "POST" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({json: {data: [originalPayment(paid ? {status: "paid", fulfilled_at: "2026-10-17T00:00:00Z"} : {})]}}))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance: paid ? 100 : 0, ledger: []}}))
+  await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/capture", route => {
+    paid = true
+    return route.fulfill({json: originalPayment({status: "paid", fulfilled_at: "2026-10-17T00:00:00Z"})})
+  })
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await expect(page.locator("paypal-button")).toBeVisible()
+  expect(writes).toEqual([])
+  await page.locator("paypal-button").click()
+  await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.reload()
+  await expect(page.locator(".wallet-card strong")).toHaveText("100 ✦")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  expect(writes).toEqual(["https://api.example.com/api/v1/app/paypal/orders/qa-original-order/capture"])
+})
+
+test("original payment double click and refresh keep a single buyer-initiated checkout", async ({page}) => {
+  await mockOriginalPayment(page)
+  await mockResumeSession(page, "hold")
+  let preflights = 0
+  const writes: string[] = []
+  page.on("request", req => {
+    if (req.url().endsWith("/qa-original-order/checkout")) preflights++
+    if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url())
+  })
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await page.locator("paypal-button").dblclick()
+  await expect(page.locator("body")).toHaveAttribute("data-resumed-order", "QA-EXISTING-PAYPAL")
+  await page.getByRole("button", {name: "Refresh balance & orders", exact: true}).click()
+  await expect(page.locator("body")).toHaveAttribute("data-resume-starts", "1")
+  expect(preflights).toBe(1)
+  expect(writes).toEqual([])
+})
+
+for (const failure of ["unavailable", "network", "wrong-order", "paid"]) {
+  test(`original payment preflight ${failure} never falls back to a new order or capture`, async ({page}) => {
+    await mockOriginalPayment(page)
+    await mockResumeSession(page)
+    await page.route("https://api.example.com/api/v1/app/paypal/orders/qa-original-order/checkout", route => failure === "network"
+      ? route.abort() : failure === "unavailable"
+        ? route.fulfill({status: 409, json: {detail: "Original order unavailable"}})
+        : route.fulfill({json: originalPayment(failure === "wrong-order" ? {provider_order_id: "OTHER-ORDER"} : {status: "paid"})}))
+    const writes: string[] = []
+    page.on("request", req => { if (req.method() !== "GET" && /paypal\/orders/.test(req.url())) writes.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await page.locator("paypal-button").click()
+    await expect(page.getByText("The original order cannot continue; refresh or contact support. No new order was created.", {exact: true})).toBeVisible()
+    await expect(page.locator("body")).not.toHaveAttribute("data-resumed-order")
+    expect(writes).toEqual([])
+  })
+}
+
+for (const status of ["approved", "capture_pending", "payment_review", "paid", "failed", "canceled", "refunded", "reversed"]) {
+  test(`original payment ${status} shows records without a payment restart`, async ({page}) => {
+    await mockOriginalPayment(page, originalPayment({status}))
+    const checkoutRequests: string[] = []
+    page.on("request", req => { if (/paypal\/orders|web-sdk/.test(req.url())) checkoutRequests.push(req.url()) })
+    await page.goto("/?payment_only_acceptance=1#wallet")
+    await expect(page.locator(".wallet-card strong")).toBeVisible()
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+    await expect(page.getByRole("heading", {name: "Continue original payment", exact: true})).toHaveCount(0)
+    expect(checkoutRequests).toEqual([])
+  })
+}
+
+test("original payment expiry, hold and wrong-owner snapshots cannot mount checkout", async ({page}) => {
+  await mockOriginalPayment(page, originalPayment(), {payment_only_expires_at: "2020-01-01T00:00:00Z"})
+  await page.goto("/?payment_only_acceptance=1#wallet")
+  await expect(page.locator(".wallet-card strong")).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({json: paymentOnlyConfig({recharge_enabled: false, payment_only_order_created: true})}))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance: 0, payment_hold: true, ledger: []}}))
+  await page.reload()
+  await expect(page.getByText("Your payment account is under review. Please contact support.", {exact: true})).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({json: {balance: 0, payment_hold: false, ledger: []}}))
+  await page.route("https://api.example.com/api/v1/app/orders?**", route => route.fulfill({json: {data: [originalPayment({app_user_id: "other-user"})]}}))
+  await page.reload()
+  await expect(page.locator(".wallet-card strong")).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+})
+
 test("wallet refresh and scheduled payment polling reuse the SDK and checkout", async ({ page }) => {
   await page.clock.install()
   await mockSignedInApi(page)

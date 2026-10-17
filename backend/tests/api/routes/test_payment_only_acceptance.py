@@ -456,6 +456,273 @@ def test_provider_create_unknown_preserves_slot_without_a_second_order(
     assert len(fake.orders) == 1
 
 
+def checkout_path(order):
+    return f"{ORDERS}/{order['id']}/checkout"
+
+
+@pytest.mark.parametrize("provider_status", ["CREATED", "PAYER_ACTION_REQUIRED"])
+def test_resume_original_order_is_read_only_and_never_creates_or_captures(
+    client, db, payment_only, monkeypatch, provider_status
+):
+    _, user_id, _, _, fake = payment_only
+    order = create(client).json()
+    path = checkout_path(order)
+    fake.orders[order["provider_order_id"]]["status"] = provider_status
+    before = db.get(AppOrder, uuid.UUID(order["id"])).model_dump()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Read-only checkout must not create or capture a payment")
+
+    monkeypatch.setattr(fake, "create_order", forbidden)
+    monkeypatch.setattr(fake, "capture_order", forbidden)
+    # Existing payments may continue even when no new generation/checkout is available.
+    monkeypatch.setattr(app_paypal, "global_real_count", lambda **_kwargs: 30)
+    for _ in range(3):
+        response = client.get(path, headers=headers(path, "GET"))
+        assert response.status_code == 200, response.text
+        assert response.headers["cache-control"] == "no-store"
+        assert response.json()["provider_order_id"] == order["provider_order_id"]
+        assert response.json()["id"] == order["id"]
+    db.expire_all()
+    assert db.get(AppOrder, uuid.UUID(order["id"])).model_dump() == before
+    assert (
+        len(db.exec(select(AppOrder).where(AppOrder.app_user_id == user_id)).all()) == 1
+    )
+    assert not db.exec(
+        select(AppCoinLedger).where(AppCoinLedger.order_id == uuid.UUID(order["id"]))
+    ).first()
+    assert fake.create_calls == 1
+
+
+@pytest.mark.parametrize(
+    "status", ["APPROVED", "COMPLETED", "VOIDED", "SAVED", "UNKNOWN"]
+)
+def test_resume_never_restarts_approved_complete_void_or_unknown_provider_state(
+    client, db, payment_only, monkeypatch, status
+):
+    order = create(client).json()
+    fake = payment_only[-1]
+    fake.orders[order["provider_order_id"]]["status"] = status
+    monkeypatch.setattr(
+        fake, "capture_order", lambda *_: pytest.fail("Must not capture")
+    )
+    path = checkout_path(order)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+    db.expire_all()
+    assert db.get(AppOrder, uuid.UUID(order["id"])).status == "created"
+    assert fake.create_calls == 1
+
+
+@pytest.mark.parametrize("kind", ["captures", "authorizations"])
+def test_resume_rejects_any_payment_resource_even_if_provider_status_is_action_required(
+    client, payment_only, kind
+):
+    order = create(client).json()
+    data = payment_only[-1].orders[order["provider_order_id"]]
+    data["status"] = "PAYER_ACTION_REQUIRED"
+    data["purchase_units"][0]["payments"] = {kind: [{"status": "PENDING"}]}
+    path = checkout_path(order)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+
+
+@pytest.mark.parametrize(
+    "tampering", ["amount", "currency", "merchant", "invoice", "provider_id", "country"]
+)
+def test_resume_verifies_original_provider_ownership_and_snapshot(
+    client, payment_only, tampering
+):
+    order = create(client).json()
+    data = payment_only[-1].orders[order["provider_order_id"]]
+    unit = data["purchase_units"][0]
+    if tampering == "amount":
+        unit["amount"]["value"] = "0.01"
+    elif tampering == "currency":
+        unit["amount"]["currency_code"] = "EUR"
+    elif tampering == "merchant":
+        unit["payee"]["merchant_id"] = "OTHER-MERCHANT"
+    elif tampering == "invoice":
+        unit["invoice_id"] = str(uuid.uuid4())
+    elif tampering == "provider_id":
+        data["id"] = "OTHER-PROVIDER-ORDER"
+    else:
+        data["payer"] = {"address": {"country_code": "CN"}}
+    path = checkout_path(order)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "approved",
+        "capture_pending",
+        "payment_review",
+        "paid",
+        "failed",
+        "canceled",
+        "refunded",
+        "reversed",
+    ],
+)
+def test_resume_rejects_local_terminal_or_uncertain_states_without_provider_call(
+    client, db, payment_only, monkeypatch, status
+):
+    order = create(client).json()
+    saved = db.get(AppOrder, uuid.UUID(order["id"]))
+    saved.status = status
+    db.add(saved)
+    db.commit()
+    fake = payment_only[-1]
+    monkeypatch.setattr(
+        fake,
+        "order_details",
+        lambda *_: pytest.fail("Unsafe order must not reach provider"),
+    )
+    path = checkout_path(order)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+    assert fake.create_calls == 1
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["expiry", "hold", "revoked", "region", "unsigned", "not-selected", "closed"],
+)
+def test_resume_keeps_identity_region_freeze_and_time_boundaries(
+    client, db, payment_only, monkeypatch, reason
+):
+    _, user_id, _, session_id, fake = payment_only
+    order = create(client).json()
+    path = checkout_path(order)
+    h = headers(path, "GET")
+    if reason == "expiry":
+        monkeypatch.setattr(
+            settings,
+            "APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT",
+            datetime.now(UTC) - timedelta(seconds=1),
+        )
+    elif reason == "hold":
+        user = db.get(AppUser, user_id)
+        user.payment_hold = True
+        db.add(user)
+        db.commit()
+    elif reason == "revoked":
+        local = db.get(AppUserSession, session_id)
+        local.revoked_at = datetime.now(UTC)
+        db.add(local)
+        db.commit()
+    elif reason == "region":
+        h = headers(path, "GET", country="US")
+    elif reason == "unsigned":
+        h = {"Authorization": "Bearer isolated-payment-only", "CF-IPCountry": "CN"}
+    elif reason == "not-selected":
+        monkeypatch.setattr(
+            settings, "APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID", uuid.uuid4()
+        )
+    else:
+        monkeypatch.setattr(settings, "APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED", False)
+        monkeypatch.setattr(settings, "PAYPAL_ENABLED", False)
+    monkeypatch.setattr(
+        fake,
+        "order_details",
+        lambda *_: pytest.fail("Denied request must not reach provider"),
+    )
+    assert client.get(path, headers=h).status_code == 403
+
+
+def test_resume_cross_user_missing_provider_and_provider_failure_preserve_original(
+    client, db, payment_only, monkeypatch
+):
+    order = create(client).json()
+    path = checkout_path(order)
+    saved = db.get(AppOrder, uuid.UUID(order["id"]))
+    original_user = saved.app_user_id
+    other = AppUser(account_type="clerk")
+    db.add(other)
+    db.flush()
+    saved.app_user_id = other.id
+    db.add(saved)
+    db.commit()
+    assert client.get(path, headers=headers(path, "GET")).status_code == 404
+    saved.app_user_id = original_user
+    provider_id = saved.provider_order_id
+    saved.provider_order_id = None
+    db.add(saved)
+    db.commit()
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+    saved.provider_order_id = provider_id
+    db.add(saved)
+    db.commit()
+
+    def unavailable(_provider_id):
+        raise PayPalError("Isolated timeout or unavailable order")
+
+    monkeypatch.setattr(payment_only[-1], "order_details", unavailable)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 502
+    db.expire_all()
+    assert db.get(AppOrder, uuid.UUID(order["id"])).status == "created"
+    assert payment_only[-1].create_calls == 1
+
+
+def test_resume_requires_one_lifetime_order_and_a_configured_provider(
+    client, db, payment_only, monkeypatch
+):
+    order = create(client).json()
+    path = checkout_path(order)
+    monkeypatch.setattr(settings, "PAYPAL_CLIENT_SECRET", None)
+    assert client.get(path, headers=headers(path, "GET")).status_code == 503
+    monkeypatch.setattr(settings, "PAYPAL_CLIENT_SECRET", "unit-private")
+    saved = db.get(AppOrder, uuid.UUID(order["id"]))
+    duplicate = AppOrder(
+        app_user_id=saved.app_user_id,
+        provider="paypal",
+        product_id="coins_100",
+        payment_environment="live",
+        payment_idempotency_key=str(uuid.uuid4()),
+        amount=599,
+        currency="USD",
+        coin_quantity=100,
+    )
+    db.add(duplicate)
+    db.commit()
+    assert client.get(path, headers=headers(path, "GET")).status_code == 409
+    assert payment_only[-1].create_calls == 1
+
+
+@pytest.mark.parametrize("change", ["expiry", "hold", "settled"])
+def test_resume_rechecks_changes_while_provider_get_is_in_flight(
+    client, db, payment_only, monkeypatch, change
+):
+    _, user_id, _, _, fake = payment_only
+    order = create(client).json()
+    original_get = fake.order_details
+
+    def provider_get(provider_id):
+        result = original_get(provider_id)
+        if change == "expiry":
+            monkeypatch.setattr(
+                settings,
+                "APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT",
+                datetime.now(UTC) - timedelta(seconds=1),
+            )
+        elif change == "hold":
+            user = db.get(AppUser, user_id)
+            user.payment_hold = True
+            db.add(user)
+            db.commit()
+        else:
+            saved = db.get(AppOrder, uuid.UUID(order["id"]))
+            saved.status = "capture_pending"
+            db.add(saved)
+            db.commit()
+        return result
+
+    monkeypatch.setattr(fake, "order_details", provider_get)
+    path = checkout_path(order)
+    assert client.get(path, headers=headers(path, "GET")).status_code == (
+        409 if change == "settled" else 403
+    )
+    assert fake.create_calls == 1
+
+
 @pytest.mark.parametrize("close", ["expiry", "disabled"])
 def test_pending_existing_payment_can_complete_once_after_close(
     client, db, payment_only, monkeypatch, close
