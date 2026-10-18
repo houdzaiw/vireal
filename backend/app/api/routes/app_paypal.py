@@ -15,6 +15,7 @@ from app.models import (
     AppPayPalOrderRecoveryPublic,
 )
 from app.services.commercial_access import (
+    PAYMENT_ONLY_COUNTRIES,
     acceptance_request_allowed,
     controlled_cn_account_setup_enabled,
     controlled_registration_enabled,
@@ -90,7 +91,7 @@ def payment_config(
         "payment_only_acceptance_mode": payment_only,
         # A private login form only; the URL and this hint confer no entitlement.
         "payment_only_sign_in_enabled": payment_only_acceptance_enabled()
-        and edge_country(request) == "CN",
+        and edge_country(request) in PAYMENT_ONLY_COUNTRIES,
         "payment_only_acceptance_allowed": payment_user is not None,
         "payment_only_order_created": slot_used,
         "payment_only_replacement_original_id": str(grant.original_order_id)

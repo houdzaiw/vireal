@@ -2,6 +2,28 @@
 
 ## Release state
 
+### CN/HK payment-only scope — October 18
+
+The owner authorized adding genuine signed HK connections to the existing
+`li522903183@163.com` payment-only window; signed CN remains supported. This
+changes only private sign-in eligibility and the exact existing beneficiary's
+payment eligibility. It does not change ordinary geography rules or open any
+public registration/recharge, upload or generation flow. Every other country,
+unknown/unsigned geography and every other identity remain denied by this mode.
+
+The original deadline **2026-10-18 18:53:55 Asia/Shanghai** is fixed; do not restart,
+extend or recompute it when deploying. API and Worker must retain identical
+configuration and the same exact subject/user ID. One lifetime reservation,
+**USD 5.99 / 100 credits**, disabled replacement, active/unfrozen account,
+revocation, issuer, verified primary-email and settlement checks are unchanged.
+No new order, payment, refund or generation is part of entry verification; the
+real payer must personally log in and confirm payment after readiness is reported.
+
+Release from a reviewed, passing Git commit, with a new production backup and
+isolated restore verification before merge/deployment. Reuse the already-excluded
+review branch only after reading back deployment triggers; do not change preview
+settings or use a forged HK header on a deployed service as verification.
+
 ### New beneficiary — local implementation, October 18; not deployed
 
 The new production account `li522903183@163.com` completed its separately
@@ -15,7 +37,7 @@ is needed.
 The former beneficiary `li8483@yeah.net` is no longer eligible for a new
 payment-only window, even if an operator accidentally reuses its old subject
 and user ID. The new email still requires the exact existing verified Clerk
-subject, production issuer, business user ID, unrevoked session, signed CN
+subject, production issuer, business user ID, unrevoked session, signed CN/HK
 context, active/unfrozen account and an explicit unexpired window. No email
 header/query parameter, fresh login or registration invite grants payment access.
 
@@ -109,7 +131,7 @@ grant table was empty. This is not a production backup/restore verification.
 
 `APP_PAYMENT_ONLY_REPLACEMENT_ENABLED` is new and **false by default**. Any later
 activation still requires the full existing production payment-only safety
-configuration, exact user/Clerk identity, genuine signed CN region, verified
+configuration, exact user/Clerk identity, genuine signed CN/HK region, verified
 email/session, active time window, account status and capacity. It cannot open
 signup, general recharge, uploads or generation.
 
@@ -308,7 +330,7 @@ timezone-aware `APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT` for a window at most
 24 hours ahead. Expired configuration may still boot so callbacks/reconciliation
 can finish; expiry never enables new actions or changes the ledger.
 
-The mode retains genuine signed **CN** geography, normal authentication/session
+The mode retains genuine signed **CN/HK** geography, normal authentication/session
 revocation, account/hold checks, global capacity and PayPal snapshot verification.
 It requires Live PayPal and terms approval internally, but public registration,
 controlled registration, internal-generation acceptance, general Live acceptance,

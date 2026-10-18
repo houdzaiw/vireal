@@ -23,6 +23,7 @@ from app.services.clerk_auth import (
 # Reviewed beneficiary only. Deployment must separately bind its exact existing
 # Clerk subject and business user ID; this does not move any historical order.
 PAYMENT_ONLY_EMAIL = "li522903183@163.com"
+PAYMENT_ONLY_COUNTRIES = frozenset({"CN", "HK"})
 
 
 def payment_only_acceptance_enabled() -> bool:
@@ -62,8 +63,11 @@ def payment_only_acceptance_enabled() -> bool:
 def payment_only_user(
     request: Request, session: Session, *, verify_profile: bool = False
 ) -> AppUser | None:
-    # Geography remains a real signed CN context, never a substituted US header.
-    if not payment_only_acceptance_enabled() or edge_country(request) != "CN":
+    # Only genuine signed CN/HK context; this never changes ordinary region policy.
+    if (
+        not payment_only_acceptance_enabled()
+        or edge_country(request) not in PAYMENT_ONLY_COUNTRIES
+    ):
         return None
     claims = getattr(request.state, "clerk_claims", None)
     if claims is None:
