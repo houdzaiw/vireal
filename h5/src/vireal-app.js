@@ -9,8 +9,10 @@
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
   const internalAcceptanceLanding = new URLSearchParams(location.search).get("internal_acceptance") === "1"
   const paymentOnlyLanding = new URLSearchParams(location.search).get("payment_only_acceptance") === "1"
+  const accountSetupLoginLanding = new URLSearchParams(location.search).get("controlled_account_setup") === "1"
   // A private URL can only restrict UI; server identity checks grant payment.
   const paymentOnlyRestricted = () => paymentOnlyLanding || state.commerce?.payment_only_acceptance_mode === true
+  const accountSetupRestricted = () => state.commerce?.controlled_account_setup_mode === true
   const signupRoutes = ["register", "controlled-register"]
   const icons = {
     home: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 10.8 12 4l8.5 6.8V20H15v-5.3H9V20H3.5v-9.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
@@ -56,6 +58,7 @@
     checkoutActive: false,
     paymentRecovery: new Map(),
     paymentRecoveryBusy: null,
+    accountSetupTimer: null,
   }
   const observedClerks = new WeakSet()
 
@@ -149,6 +152,7 @@
     : ({ created: paymentText("等待支付", "Awaiting payment"), approved: paymentText("正在确认", "Confirming payment"), capture_pending: paymentText("支付待确认", "Payment pending"), payment_review: paymentText("人工审核中", "Under review"), refunded: paymentText("已退款", "Refunded"), reversed: paymentText("付款已撤销", "Payment reversed"), canceled: paymentText("已取消", "Cancelled"), failed: paymentText("支付失败", "Payment failed") })[order.status] || paymentText("待确认", "Pending confirmation")
 
   function originalPaymentOrder() {
+    if (accountSetupRestricted()) return null
     const config = state.commerce
     if (!state.appUser || state.wallet?.payment_hold || !config?.payment_only_acceptance_mode
       || !config.payment_only_acceptance_allowed || !config.payment_only_order_created
@@ -167,7 +171,7 @@
   }
 
   function paymentCheckout() {
-    if (!state.appUser || state.wallet?.payment_hold) return null
+    if (accountSetupRestricted() || !state.appUser || state.wallet?.payment_hold) return null
     const resumeOrder = originalPaymentOrder()
     if (resumeOrder) return { resumeOrder }
     const config = state.commerce
@@ -188,11 +192,14 @@
   }
 
   async function loadCommerce(redraw = true) {
+    clearTimeout(state.accountSetupTimer)
     try {
       const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
       state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers }))
       if (state.commerce.payment_only_acceptance_mode) state.rechargeProduct = "coins_100"
       state.commerceError = ""
+      if (controlledAccountSetupAllowed()) state.accountSetupTimer = setTimeout(() => render(),
+        Math.max(0, Date.parse(state.commerce.controlled_account_setup_expires_at) - Date.now()) + 10)
     } catch (_) {
       state.commerce = null
       state.commerceError = paymentText("暂时无法确认服务地区和充值状态", "Service availability could not be confirmed")
@@ -510,9 +517,23 @@
   }
 
   function signInRegionAllowed() {
+    if (accountSetupRestricted()) return controlledAccountSetupAllowed()
     return Boolean(state.commerce && (state.commerce.region_allowed === true
       || (paymentOnlyLanding && state.commerce.payment_only_sign_in_enabled === true)
       || (internalAcceptanceLanding && state.commerce.internal_sign_in_enabled === true)))
+  }
+
+  function controlledAccountSetupAllowed() {
+    const remaining = Date.parse(state.commerce?.controlled_account_setup_expires_at) - Date.now()
+    return Boolean((invitationLanding || accountSetupLoginLanding) && accountSetupRestricted()
+      && state.commerce?.controlled_account_setup_enabled === true && state.commerce.country === "CN"
+      && remaining > 0 && remaining <= 8 * 3600 * 1000)
+  }
+
+  function signupAvailable(controlled = route().name === "controlled-register") {
+    if (controlled) return Boolean(invitationPresent && state.commerce?.controlled_registration_enabled === true
+      && (accountSetupRestricted() ? controlledAccountSetupAllowed() : state.commerce.region_allowed === true))
+    return !accountSetupRestricted() && state.commerce?.region_allowed === true && state.commerce.registration_enabled === true
   }
 
   function surface(effect, category, index = 0) {
@@ -546,6 +567,7 @@
   }
 
   function generatePage(params) {
+    if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("仅账号初始化验收", "Account setup only")}</h1><p>${paymentText("本次仅验证指定邮箱注册和登录，不开放支付、上传或生成，也不代表海外真实买家验收通过。", "Only the approved email may test signup and sign-in. No payment, uploads or generation; this is not overseas buyer acceptance.")}</p><button class="primary-button" data-route="wallet">${paymentText("查看钱包", "View wallet")}</button>${nav("")}</section>`)
     if (paymentOnlyRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("支付专用验收", "Payment-only acceptance")}</h1><p>${paymentText("本次不开放上传或生成；余额保留不代表当前地区可以消费。", "Uploads and generation are unavailable. Retained credits do not grant service access in this region.")}</p><button class="primary-button" data-route="wallet">${paymentText("查看钱包", "View wallet")}</button>${nav("")}</section>`)
     const effect = effectBySlug(params.get("video")) || allEffects()[0]
     if (!effect) return homePage()
@@ -607,7 +629,7 @@
     const config = state.commerce
     const paymentOnly = config?.payment_only_acceptance_mode === true
     const offeredProducts = (config?.products || []).filter(product => !paymentOnly || (product.product_id === "coins_100" && product.coins === 100 && product.amount === 599 && product.currency === "USD"))
-    const available = config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
+    const available = !accountSetupRestricted() && config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
     const resumeOrder = originalPaymentOrder()
     const replacementReady = Boolean(paymentCheckout()?.replacementOf)
     const privateOrderNotice = replacementReady
@@ -646,11 +668,12 @@
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
-    if (state.commerce?.region_allowed === false && (signup || !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
-    if (controlled && (!invitationPresent || !state.commerce?.controlled_registration_enabled)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
+    if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
+    if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
+    if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
@@ -662,8 +685,8 @@
     const current = route()
     const loginRoot = document.getElementById("clerkSignIn")
     const showsLogin = ["login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
-    const signupAvailable = current.name === "controlled-register" ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled
-    if (loginRoot && ((!signInRegionAllowed() || (signupRoutes.includes(current.name) && state.commerce?.region_allowed === false)) || (signupRoutes.includes(current.name) && !signupAvailable) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
+    const canSignup = signupAvailable(current.name === "controlled-register")
+    if (loginRoot && (!signInRegionAllowed() || (signupRoutes.includes(current.name) && !canSignup) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
       window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
       loginRoot.remove()
     }
@@ -700,12 +723,11 @@
     if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !signInRegionAllowed()) return
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
-    if (signup && state.commerce?.region_allowed === false) return
-    if (signup && !(controlled ? invitationPresent && state.commerce?.controlled_registration_enabled : state.commerce?.registration_enabled)) return
+    if (signup && !signupAvailable(controlled)) return
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
       state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
-      const internalQuery = paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : ""
+      const internalQuery = paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : (invitationLanding || accountSetupLoginLanding) && accountSetupRestricted() ? "?controlled_account_setup=1" : ""
       clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
@@ -715,7 +737,7 @@
   }
 
   async function uploadImage(index, file) {
-    if (paymentOnlyRestricted()) return
+    if (paymentOnlyRestricted() || accountSetupRestricted()) return
     if (!requireAuth(location.hash)) return
     if (state.uploads.some((entry) => entry?.pending)) return
     if (!file?.type.startsWith("image/")) return toast("请选择 JPG、PNG 或 WebP 图片", true)
@@ -742,7 +764,7 @@
   }
 
   async function createTask() {
-    if (paymentOnlyRestricted()) return
+    if (paymentOnlyRestricted() || accountSetupRestricted()) return
     if (state.isSubmitting) return
     const current = route()
     const effect = effectBySlug(current.params.get("video")) || allEffects()[0]

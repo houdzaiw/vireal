@@ -24,6 +24,7 @@ from app.services.app_identity import hash_clerk_session_id, serialize_app_user
 from app.services.clerk_auth import ClerkAPIError, get_clerk_auth_service
 from app.services.commercial_access import (
     acceptance_subject_allowed,
+    controlled_cn_account_setup_profile_allowed,
     controlled_registration_profile_allowed,
     internal_generation_allowed,
     require_region,
@@ -84,12 +85,23 @@ def initialize_clerk_session(
     clerk_session: VerifiedClerkSession,
 ) -> AppAuthSessionResponse:
     """Create or refresh the local App identity for a verified Clerk session."""
+    cn_setup_request = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+
+    def require_current_setup_authorization() -> None:
+        if cn_setup_request and not controlled_cn_account_setup_profile_allowed(
+            request, profile=profile, issuer=clerk_session.issuer
+        ):
+            raise HTTPException(
+                403, "Controlled account setup is unavailable or expired"
+            )
+
     try:
         profile = get_clerk_auth_service().get_user_profile(clerk_session.subject)
     except ClerkAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not profile.email_verified:
         raise HTTPException(status_code=403, detail="A verified email is required")
+    require_current_setup_authorization()
 
     identity = session.exec(
         select(AppUserIdentity).where(
@@ -107,7 +119,8 @@ def initialize_clerk_session(
             raise HTTPException(
                 403, "Payment-only acceptance requires an existing account"
             )
-        require_region(request)
+        if not cn_setup_request:
+            require_region(request)
         controlled = controlled_registration_profile_allowed(
             profile=profile, issuer=clerk_session.issuer
         )
@@ -129,6 +142,8 @@ def initialize_clerk_session(
                     "key": f"controlled-registration:{clerk_session.issuer}:{profile.primary_email.casefold()}"
                 },
             )
+            # A slow lock must not extend or revive the temporary authorization.
+            require_current_setup_authorization()
             existing = session.exec(
                 select(AppUserIdentity).where(
                     AppUserIdentity.issuer == clerk_session.issuer,
@@ -146,6 +161,7 @@ def initialize_clerk_session(
                 app_user = session.get(AppUser, identity.app_user_id)
                 is_new_user = False
     if identity is None:
+        require_current_setup_authorization()
         email_name = profile.primary_email.split("@", 1)[0].strip()
         app_user = AppUser(
             account_type="clerk",
@@ -163,6 +179,7 @@ def initialize_clerk_session(
             login_count=0,
         )
         session.add(identity)
+        require_current_setup_authorization()
         try:
             session.commit()
         except IntegrityError:
@@ -202,6 +219,9 @@ def initialize_clerk_session(
         raise HTTPException(status_code=403, detail="Inactive app user")
     if app_user.account_type != "clerk":
         raise HTTPException(status_code=403, detail="Legacy App users cannot use Clerk")
+    require_current_setup_authorization()
+    if cn_setup_request and app_user.payment_hold:
+        raise HTTPException(status_code=403, detail="Account requires payment review")
 
     app_session = session.exec(
         select(AppUserSession).where(AppUserSession.session_id_hash == session_id_hash)
@@ -231,6 +251,7 @@ def initialize_clerk_session(
         identity.last_login_at = now
         identity.login_count += 1
     session.add(identity)
+    require_current_setup_authorization()
     try:
         session.commit()
     except IntegrityError:

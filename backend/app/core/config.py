@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     # A single verified email may initialize an account without enabling commerce.
     APP_CONTROLLED_REGISTRATION_ENABLED: bool = False
     APP_CONTROLLED_REGISTRATION_EMAIL: EmailStr | None = None
+    # Separate, temporary account setup only; never enables mainland commerce.
+    APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED: bool = False
+    APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT: AwareDatetime | None = None
     # Existing identity only: signed CN upload/generation, never payment/signup.
     APP_INTERNAL_ACCEPTANCE_ENABLED: bool = False
     APP_INTERNAL_ACCEPTANCE_SUBJECT: str | None = None
@@ -259,6 +262,33 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if self.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED and (
+            self.ENVIRONMENT != "production"
+            or self.APP_AUTH_MODE != "clerk"
+            or not self.APP_CONTROLLED_REGISTRATION_ENABLED
+            or not self.APP_CONTROLLED_REGISTRATION_EMAIL
+            or not self.APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT
+            or self.APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT
+            > datetime.now(UTC) + timedelta(hours=8)
+            or not self.APP_REGION_ENFORCEMENT_ENABLED
+            or self.APP_PUBLIC_REGISTRATION_ENABLED
+            or self.PAYPAL_ENABLED
+            or self.APP_COMMERCE_TERMS_APPROVED
+            or self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+            or self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED
+            or self.APP_INTERNAL_ACCEPTANCE_ENABLED
+            or self.APP_LIVE_ACCEPTANCE_ENABLED
+            or self.APP_LIVE_ACCEPTANCE_SUBJECTS
+            or self.APP_VIDEO_SUBMISSIONS_ENABLED
+            or self.ADMIN_PUBLIC_SIGNUP_ENABLED
+            or self.LOCAL_DEMO_ENABLED
+            or self.APP_LEGACY_VIDEO_TASKS_ENABLED
+        ):
+            raise ValueError(
+                "CN account setup requires production Clerk, one controlled email, "
+                "a signed region and an aware expiry within 8 hours, with all "
+                "public/commerce/generation/other acceptance gates closed"
+            )
         if (
             self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED
             and not self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED

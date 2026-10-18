@@ -46,6 +46,7 @@ def payment_only_acceptance_enabled() -> bool:
         and settings.APP_COMMERCE_TERMS_APPROVED
         and not settings.APP_PUBLIC_REGISTRATION_ENABLED
         and not settings.APP_CONTROLLED_REGISTRATION_ENABLED
+        and not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
         and not settings.APP_INTERNAL_ACCEPTANCE_ENABLED
         and not settings.APP_LIVE_ACCEPTANCE_ENABLED
         and not settings.APP_LIVE_ACCEPTANCE_SUBJECTS
@@ -144,6 +145,7 @@ def acceptance_subject_allowed(*, subject: str, issuer: str) -> bool:
     return bool(
         settings.ENVIRONMENT == "production"
         and settings.APP_LIVE_ACCEPTANCE_ENABLED
+        and not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
         and settings.APP_AUTH_MODE == "clerk"
         and settings.APP_COMMERCE_TERMS_APPROVED
         and settings.CLERK_ISSUER_URL
@@ -167,6 +169,45 @@ def controlled_registration_enabled() -> bool:
         and not settings.APP_COMMERCE_TERMS_APPROVED
         and not settings.ADMIN_PUBLIC_SIGNUP_ENABLED
         and not settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+        and (
+            not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+            or _controlled_cn_setup_configuration_safe()
+        )
+    )
+
+
+def _controlled_cn_setup_configuration_safe() -> bool:
+    expires = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT
+    return bool(
+        expires
+        and expires.tzinfo is not None
+        and 0 < (expires - datetime.now(UTC)).total_seconds() <= 8 * 3600
+        and settings.APP_EDGE_SIGNING_SECRET
+        and len(settings.APP_EDGE_SIGNING_SECRET) >= 32
+        and not settings.APP_VIDEO_SUBMISSIONS_ENABLED
+        and not settings.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED
+        and not settings.APP_INTERNAL_ACCEPTANCE_ENABLED
+        and not settings.APP_LIVE_ACCEPTANCE_SUBJECTS
+        and not settings.LOCAL_DEMO_ENABLED
+        and not settings.APP_LEGACY_VIDEO_TASKS_ENABLED
+    )
+
+
+def controlled_cn_account_setup_enabled() -> bool:
+    return bool(
+        settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+        and controlled_registration_enabled()
+    )
+
+
+def controlled_cn_account_setup_profile_allowed(
+    request: Request, *, profile: ClerkUserProfile, issuer: str
+) -> bool:
+    """Only verified account setup; never rewrites region_allowed or pays."""
+    return bool(
+        controlled_cn_account_setup_enabled()
+        and edge_country(request) == "CN"
+        and controlled_registration_profile_allowed(profile=profile, issuer=issuer)
     )
 
 
@@ -199,6 +240,9 @@ def acceptance_request_allowed(request: Request) -> bool:
 
 
 def require_new_commerce_user(request: Request) -> None:
+    # The raw mode stays a commerce kill switch even after its window expires.
+    if settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED:
+        raise HTTPException(403, "Account setup does not permit new commerce")
     if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
         raise HTTPException(
             403, "Payment-only acceptance does not permit uploads or generation"
@@ -263,6 +307,7 @@ def internal_acceptance_enabled() -> bool:
         and not settings.LOCAL_DEMO_ENABLED
         and not settings.APP_LEGACY_VIDEO_TASKS_ENABLED
         and not settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+        and not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
     )
 
 
