@@ -34,12 +34,15 @@ from app.services.coin_wallet import (
 from app.services.commercial_access import (
     launch_effect_allowed,
     lock_commercial_user,
-    require_generation_region,
-    require_new_commerce_user,
 )
 from app.services.effect_validation import (
     execution_type_for_model,
     validate_effect_variant,
+)
+from app.services.generation_acceptance import (
+    require_acceptance_variant,
+    require_generation_access,
+    require_new_generation,
 )
 from app.services.replicate_video import (
     ReplicateAPIError,
@@ -275,8 +278,7 @@ async def create_video_task(
     body: AppVideoTaskCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> AppVideoTaskPublic:
-    require_generation_region(request, session, current_app_user)
-    require_new_commerce_user(request)
+    require_generation_access(request, session, current_app_user, verify_profile=True)
     if not settings.REPLICATE_ENABLED and not settings.LOCAL_DEMO_ENABLED:
         raise HTTPException(status_code=503, detail="Replicate integration is disabled")
     idempotency_key = idempotency_key.strip()
@@ -295,8 +297,7 @@ async def create_video_task(
     if existing is not None:
         return _serialize_idempotent_task(session, existing, body)
 
-    if not settings.APP_VIDEO_SUBMISSIONS_ENABLED:
-        raise HTTPException(503, "New video submissions are temporarily paused")
+    require_new_generation(request, session, current_app_user)
 
     effect: AppEffect | None = None
     variant: AppEffectVariant | None = None
@@ -371,6 +372,7 @@ async def create_video_task(
         )
         configured_coin_cost = 0
 
+    require_acceptance_variant(effect, variant)
     uploads = _get_owned_uploads(
         session=session,
         current_app_user=current_app_user,
@@ -391,6 +393,8 @@ async def create_video_task(
 
     now = datetime.now(UTC)
     lock_commercial_user(session, current_app_user)
+    require_new_generation(request, session, current_app_user)
+    require_acceptance_variant(effect, variant)
     user_count, wan_count, active_count, _resets_at = quota_counts(
         session=session,
         app_user_id=current_app_user.id,

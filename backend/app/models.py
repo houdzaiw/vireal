@@ -228,6 +228,7 @@ class AppAuthSessionResponse(SQLModel):
     app_user: AppUserWithIdentityPublic
     is_new_user: bool
     internal_generation_allowed: bool = False
+    generation_acceptance_read_allowed: bool = False
 
 
 class AppDeviceLoginRequest(SQLModel):

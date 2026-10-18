@@ -29,6 +29,7 @@ from app.services.commercial_access import (
     internal_generation_allowed,
     require_region,
 )
+from app.services.generation_acceptance import generation_acceptance_user
 
 router = APIRouter(prefix="/app/auth", tags=["app auth"])
 
@@ -115,9 +116,12 @@ def initialize_clerk_session(
 
     app_user: AppUser | None = None
     if identity is None:
-        if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
+        if (
+            settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+            or settings.APP_GENERATION_ACCEPTANCE_ENABLED
+        ):
             raise HTTPException(
-                403, "Payment-only acceptance requires an existing account"
+                403, "Controlled acceptance requires an existing account"
             )
         if not cn_setup_request:
             require_region(request)
@@ -288,6 +292,10 @@ def initialize_clerk_session(
         internal_generation_allowed=internal_generation_allowed(
             request, session, app_user, claims=clerk_session
         ),
+        generation_acceptance_read_allowed=generation_acceptance_user(
+            request, session, claims=clerk_session
+        )
+        is not None,
     )
 
 

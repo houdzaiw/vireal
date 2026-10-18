@@ -9,10 +9,18 @@
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
   const internalAcceptanceLanding = new URLSearchParams(location.search).get("internal_acceptance") === "1"
   const paymentOnlyLanding = new URLSearchParams(location.search).get("payment_only_acceptance") === "1"
+  const generationAcceptanceLanding = new URLSearchParams(location.search).get("generation_acceptance") === "1"
   const accountSetupLoginLanding = new URLSearchParams(location.search).get("controlled_account_setup") === "1"
   // A private URL can only restrict UI; server identity checks grant payment.
   const paymentOnlyRestricted = () => paymentOnlyLanding || state.commerce?.payment_only_acceptance_mode === true
   const accountSetupRestricted = () => state.commerce?.controlled_account_setup_mode === true
+  const generationAcceptanceRestricted = () => generationAcceptanceLanding || state.commerce?.generation_acceptance_mode === true
+  function generationAcceptanceAllowed() {
+    const remaining = Date.parse(state.commerce?.generation_acceptance_expires_at) - Date.now()
+    return Boolean(state.appUser && state.commerce?.generation_acceptance_mode === true
+      && state.commerce.generation_acceptance_allowed === true && state.commerce.country === "CN"
+      && remaining > 0 && remaining <= 2 * 3600 * 1000)
+  }
   const signupRoutes = ["register", "controlled-register"]
   const icons = {
     home: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 10.8 12 4l8.5 6.8V20H15v-5.3H9V20H3.5v-9.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
@@ -59,6 +67,7 @@
     paymentRecovery: new Map(),
     paymentRecoveryBusy: null,
     accountSetupTimer: null,
+    generationAcceptanceTimer: null,
   }
   const observedClerks = new WeakSet()
 
@@ -171,6 +180,7 @@
   }
 
   function paymentCheckout() {
+    if (generationAcceptanceRestricted()) return null
     if (accountSetupRestricted() || !state.appUser || state.wallet?.payment_hold) return null
     const resumeOrder = originalPaymentOrder()
     if (resumeOrder) return { resumeOrder }
@@ -193,6 +203,7 @@
 
   async function loadCommerce(redraw = true) {
     clearTimeout(state.accountSetupTimer)
+    clearTimeout(state.generationAcceptanceTimer)
     try {
       const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
       state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers }))
@@ -200,6 +211,8 @@
       state.commerceError = ""
       if (controlledAccountSetupAllowed()) state.accountSetupTimer = setTimeout(() => render(),
         Math.max(0, Date.parse(state.commerce.controlled_account_setup_expires_at) - Date.now()) + 10)
+      if (generationAcceptanceAllowed()) state.generationAcceptanceTimer = setTimeout(() => render(),
+        Math.max(0, Date.parse(state.commerce.generation_acceptance_expires_at) - Date.now()) + 10)
     } catch (_) {
       state.commerce = null
       state.commerceError = paymentText("暂时无法确认服务地区和充值状态", "Service availability could not be confirmed")
@@ -509,16 +522,20 @@
   function effectBySlug(slug) { return allEffects().find((effect) => effect.slug === slug) }
   function categoryFor(effect) { return categories().find((category) => category.id === effect?.category_id) }
   function selectedVariant(effect) {
+    if (generationAcceptanceRestricted()) return effect?.slug === "dance-1" && effect.input_image_count === 1
+      ? effect.variants.find(item => item.duration_seconds === 5 && item.coin_cost === 28) : null
     return effect?.variants.find((variant) => variant.id === state.selectedVariants[effect.id]) || effect?.variants.find((variant) => variant.is_default) || effect?.variants[0]
   }
 
   function internalAcceptanceNotice() {
+    if (generationAcceptanceRestricted()) return `<p class="screen-copy" data-generation-acceptance>${paymentText("一次性内部生成验收：仅指定账号、单人舞蹈 5 秒、28 金币。公众注册和充值关闭；必须另获模型费用授权后才可点击生成。失败或超时不重开名额。", "One-time internal generation check: selected account, dance-1, 5 seconds, 28 credits. Public signup and recharge stay closed. Obtain separate model-cost authorization before submitting. Failure or timeout does not reset the slot.")}</p>`
     return state.internalGenerationAllowed ? `<p class="screen-copy" data-internal-acceptance>${paymentText("仅限本账号内部验收，不代表 Live 收款通过。充值未开放，余额、费用和生成限额照常校验；请勿在未获费用授权时提交生成。", "Internal acceptance for this account only, not Live payment verification. Recharge remains closed; normal credit, cost and quota checks apply. Do not generate without cost authorization.")}</p>` : ""
   }
 
   function signInRegionAllowed() {
     if (accountSetupRestricted()) return controlledAccountSetupAllowed()
     return Boolean(state.commerce && (state.commerce.region_allowed === true
+      || (generationAcceptanceLanding && state.commerce.generation_acceptance_sign_in_enabled === true)
       || (paymentOnlyLanding && state.commerce.payment_only_sign_in_enabled === true)
       || (internalAcceptanceLanding && state.commerce.internal_sign_in_enabled === true)))
   }
@@ -531,6 +548,7 @@
   }
 
   function signupAvailable(controlled = route().name === "controlled-register") {
+    if (generationAcceptanceRestricted()) return false
     if (controlled) return Boolean(invitationPresent && state.commerce?.controlled_registration_enabled === true
       && (accountSetupRestricted() ? controlledAccountSetupAllowed() : state.commerce.region_allowed === true))
     return !accountSetupRestricted() && state.commerce?.region_allowed === true && state.commerce.registration_enabled === true
@@ -569,10 +587,16 @@
   function generatePage(params) {
     if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("仅账号初始化验收", "Account setup only")}</h1><p>${paymentText("本次仅验证指定邮箱注册和登录，不开放支付、上传或生成，也不代表海外真实买家验收通过。", "Only the approved email may test signup and sign-in. No payment, uploads or generation; this is not overseas buyer acceptance.")}</p><button class="primary-button" data-route="wallet">${paymentText("查看钱包", "View wallet")}</button>${nav("")}</section>`)
     if (paymentOnlyRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("支付专用验收", "Payment-only acceptance")}</h1><p>${paymentText("本次不开放上传或生成；余额保留不代表当前地区可以消费。", "Uploads and generation are unavailable. Retained credits do not grant service access in this region.")}</p><button class="primary-button" data-route="wallet">${paymentText("查看钱包", "View wallet")}</button>${nav("")}</section>`)
+    if (generationAcceptanceRestricted() && !state.appUser) return loginPage()
+    if (generationAcceptanceRestricted() && !generationAcceptanceAllowed()) {
+      const taskId = state.commerce?.generation_acceptance_task_id
+      return shell(`<section class="page screen-page">${header()}<h1>${paymentText("一次性生成验收暂不可提交", "One-time generation unavailable")}</h1><p>${paymentText("未获授权、窗口已到期或名额已使用。只可查询已有任务，不会重新生成。", "Not authorized, expired or already used. Existing tasks remain readable; no resubmission.")}</p>${taskId ? `<button class="primary-button" data-open-task="${esc(taskId)}">${paymentText("查看已有任务", "View existing task")}</button>` : ""}${nav("")}</section>`)
+    }
     const effect = effectBySlug(params.get("video")) || allEffects()[0]
     if (!effect) return homePage()
     const category = categoryFor(effect)
     const variant = selectedVariant(effect)
+    if (generationAcceptanceRestricted() && !variant) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("仅单人舞蹈 5 秒可验收", "Only dance-1 / 5 seconds is permitted")}</h1><button data-effect="dance-1" class="primary-button">${paymentText("前往验收效果", "Open acceptance effect")}</button></section>`)
     const enough = state.wallet && variant && state.wallet.balance >= variant.coin_cost
     const uploaded = state.uploads.filter((entry) => entry?.id).length
     const uploading = state.uploads.some((entry) => entry?.pending)
@@ -580,8 +604,8 @@
       const entry = state.uploads[index]
       return `<label class="upload-tile" aria-pressed="${Boolean(entry)}" aria-busy="${Boolean(entry?.pending)}"><input type="file" accept="image/jpeg,image/png,image/webp" data-upload-index="${index}" ${uploading ? "disabled" : ""}>${entry ? `<img src="${esc(entry.preview)}" alt="${entry.pending ? "正在上传照片" : "已上传照片"} ${index + 1}"><button class="remove-upload" type="button" data-remove-upload="${index}" ${uploading ? "disabled" : ""}>×</button>` : `<span class="upload-center"><span class="plus-ring">${icons.plus}</span><span class="upload-title">上传照片 ${index + 1}</span><span class="upload-hint">JPG / PNG / WebP</span></span>`}</label>`
     }).join("")
-    const variants = effect.variants.map((item) => `<button class="duration-button" data-variant="${item.id}" aria-pressed="${item.id === variant?.id}"><b>${item.duration_seconds} 秒</b><small>${item.coin_cost} ✦</small></button>`).join("")
-    const recommendations = (effect.recommendations || []).map((slug) => effectBySlug(slug)).filter(Boolean).slice(0, 4).map((item, index) => `<button class="recommend-card" data-effect="${esc(item.slug)}">${surface(item, categoryFor(item), index)}<strong>${esc(item.title_zh)}</strong></button>`).join("")
+    const variants = (generationAcceptanceRestricted() ? [variant] : effect.variants).map((item) => `<button class="duration-button" data-variant="${item.id}" aria-pressed="${item.id === variant?.id}"><b>${item.duration_seconds} 秒</b><small>${item.coin_cost} ✦</small></button>`).join("")
+    const recommendations = (generationAcceptanceRestricted() ? [] : effect.recommendations || []).map((slug) => effectBySlug(slug)).filter(Boolean).slice(0, 4).map((item, index) => `<button class="recommend-card" data-effect="${esc(item.slug)}">${surface(item, categoryFor(item), index)}<strong>${esc(item.title_zh)}</strong></button>`).join("")
     let buttonText = "登录后生成"
     let disabled = false
     if (state.appUser) {
@@ -668,11 +692,13 @@
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
+    if (signup && generationAcceptanceRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("注册暂未开放", "Registration is not yet open")}</h1><button data-route="login">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
+    if (!signup && generationAcceptanceLanding && state.commerce?.generation_acceptance_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("一次性生成验收登录", "One-time generation sign-in")}</h1><p>${paymentText("仅指定既有账号。到期后仅可查看已有任务，不开放注册或充值。", "Selected existing account only. Read existing tasks after expiry. No signup or recharge.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus">${paymentText("安全邮箱验证", "Secure email verification")}</p></section>`)
     if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
     if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
@@ -727,7 +753,7 @@
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
       state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
-      const internalQuery = paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : (invitationLanding || accountSetupLoginLanding) && accountSetupRestricted() ? "?controlled_account_setup=1" : ""
+      const internalQuery = generationAcceptanceLanding ? "?generation_acceptance=1" : paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : (invitationLanding || accountSetupLoginLanding) && accountSetupRestricted() ? "?controlled_account_setup=1" : ""
       clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
@@ -738,6 +764,7 @@
 
   async function uploadImage(index, file) {
     if (paymentOnlyRestricted() || accountSetupRestricted()) return
+    if (generationAcceptanceRestricted() && (!generationAcceptanceAllowed() || index !== 0 || !selectedVariant(effectBySlug(route().params.get("video")) || allEffects()[0]))) return
     if (!requireAuth(location.hash)) return
     if (state.uploads.some((entry) => entry?.pending)) return
     if (!file?.type.startsWith("image/")) return toast("请选择 JPG、PNG 或 WebP 图片", true)
@@ -765,6 +792,7 @@
 
   async function createTask() {
     if (paymentOnlyRestricted() || accountSetupRestricted()) return
+    if (generationAcceptanceRestricted() && !generationAcceptanceAllowed()) return
     if (state.isSubmitting) return
     const current = route()
     const effect = effectBySlug(current.params.get("video")) || allEffects()[0]
@@ -793,10 +821,11 @@
       state.currentTask = task
       state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
       state.uploads = []
-      await Promise.all([loadWallet(false), loadTasks(false)])
+      await Promise.all([loadWallet(false), loadTasks(false), loadCommerce(false)])
       navigate("generation", { id: task.id })
       startPolling(task.id)
     } catch (error) {
+      if (generationAcceptanceRestricted()) await loadCommerce(false)
       const message = errorDetail(error)
       if (/insufficient coin/i.test(message)) navigate("wallet")
       toast(`提交失败：${message}`, true)
@@ -970,6 +999,7 @@
     const effectButton = event.target.closest("[data-effect]")
     if (effectButton) {
       const effect = effectBySlug(effectButton.dataset.effect)
+      if (!effect) return
       state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
       state.uploads = []
       navigate("generate", { category: effect.category_slug, video: effect.slug })
@@ -977,6 +1007,7 @@
     }
     const variantButton = event.target.closest("[data-variant]")
     if (variantButton) {
+      if (generationAcceptanceRestricted()) return
       const effect = effectBySlug(route().params.get("video")) || allEffects()[0]
       state.selectedVariants[effect.id] = variantButton.dataset.variant
       render()
@@ -992,6 +1023,7 @@
       return
     }
     if (event.target.closest("[data-generate]")) {
+      if (generationAcceptanceRestricted() && !generationAcceptanceAllowed()) return
       if (!requireAuth(location.hash)) return
       const effect = effectBySlug(route().params.get("video")) || allEffects()[0]
       const variant = selectedVariant(effect)

@@ -110,6 +110,105 @@ const paymentConfig = {
   ],
 }
 
+const generationAcceptanceConfig = () => ({
+  ...paymentConfig, country: "CN", region_allowed: false,
+  registration_enabled: false, recharge_enabled: false,
+  generation_acceptance_mode: true, generation_acceptance_sign_in_enabled: true,
+  generation_acceptance_read_allowed: true, generation_acceptance_allowed: true,
+  generation_acceptance_task_id: null,
+  generation_acceptance_expires_at: new Date(Date.now() + 3600000).toISOString(),
+})
+
+async function mockGenerationAcceptance(page: Page, overrides = {}) {
+  await mockSignedInApi(page)
+  const scoped = structuredClone(catalog)
+  scoped.categories[1].effects[0].variants[0].coin_cost = 28
+  await page.route("https://api.example.com/api/v1/app/effect-catalog", route => route.fulfill({ json: scoped }))
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: { ...generationAcceptanceConfig(), ...overrides } }))
+  await page.route("https://api.example.com/api/v1/app/wallet", route => route.fulfill({ json: { balance: 100, daily_remaining: 5, concurrent_remaining: 1, ledger: [] } }))
+}
+
+test("generation acceptance only shows dance 5 seconds, without payment or automatic submission", async ({ page }) => {
+  await mockGenerationAcceptance(page)
+  const mutations: string[] = []
+  page.on("request", request => { if (request.method() === "POST" && !request.url().endsWith("/auth/session")) mutations.push(request.url()) })
+  await page.goto("/?generation_acceptance=1#generate?video=dance-1")
+  await expect(page.locator("[data-generation-acceptance]")).toContainText("28 credits")
+  await expect(page.locator("input[type=file]")).toHaveCount(1)
+  await expect(page.locator("[data-variant]")).toHaveCount(1)
+  await expect(page.locator("[data-variant]")).toContainText("5 秒")
+  await expect(page.locator("[data-variant]")).toContainText("28 ✦")
+  await page.goto("/?generation_acceptance=1#generate?video=kiss-1")
+  await expect(page.getByRole("heading", { name: "Only dance-1 / 5 seconds is permitted" })).toBeVisible()
+  await expect(page.locator("input[type=file]")).toHaveCount(0)
+  await page.goto("/?generation_acceptance=1#wallet")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await expect(page.locator("[data-route=register]")).toHaveCount(0)
+  expect(mutations).toEqual([])
+})
+
+for (const scenario of ["expired", "other-account", "used-slot", "unavailable-config", "HK"]) {
+  test(`generation acceptance fails closed for ${scenario}`, async ({ page }) => {
+    await mockGenerationAcceptance(page, {
+      ...(scenario === "expired" ? { generation_acceptance_expires_at: new Date(Date.now() - 1000).toISOString() } : {}),
+      ...(scenario === "other-account" ? { generation_acceptance_allowed: false, generation_acceptance_read_allowed: false } : {}),
+      ...(scenario === "used-slot" ? { generation_acceptance_allowed: false, generation_acceptance_task_id: "existing-acceptance-task" } : {}),
+      ...(scenario === "HK" ? { country: "HK" } : {}),
+    })
+    if (scenario === "unavailable-config") await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ status: 503, json: { detail: "Unavailable" } }))
+    await page.goto("/?generation_acceptance=1#generate?video=dance-1")
+    await expect(page.getByRole("heading", { name: "One-time generation unavailable" })).toBeVisible()
+    await expect(page.locator("input[type=file], [data-generate], [data-confirm-generation]")).toHaveCount(0)
+    await expect(page.locator("[data-open-task=existing-acceptance-task]")).toHaveCount(scenario === "used-slot" ? 1 : 0)
+    await page.goto("/?generation_acceptance=1#register")
+    await expect(page.getByRole("heading", { name: "Registration is not yet open" })).toBeVisible()
+    await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+  })
+}
+
+test("generation private login preserves Clerk routing, never mounts signup", async ({ page }) => {
+  await mockControlledRegistration(page, false, false)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: generationAcceptanceConfig() }))
+  await page.goto("/?generation_acceptance=1#login")
+  await expect(page.getByRole("heading", { name: "One-time generation sign-in" })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.evaluate(() => { location.hash = "/factor-one" })
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.goto("/#login")
+  await expect(page.getByRole("heading", { name: "Service unavailable in this region" })).toBeVisible()
+})
+
+test("generation window expiry removes upload controls without refresh", async ({ page }) => {
+  await mockGenerationAcceptance(page, { generation_acceptance_expires_at: new Date(Date.now() + 4000).toISOString() })
+  await page.goto("/?generation_acceptance=1#generate?video=dance-1")
+  await expect(page.locator("input[type=file]")).toHaveCount(1)
+  await expect(page.getByRole("heading", { name: "One-time generation unavailable" })).toBeVisible({ timeout: 8000 })
+  await expect(page.locator("input[type=file]")).toHaveCount(0)
+})
+
+test("lost generation response recovers existing task instead of enabling another submit", async ({ page }) => {
+  await mockGenerationAcceptance(page)
+  let submitted = false
+  let submissions = 0
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
+    ...generationAcceptanceConfig(), generation_acceptance_allowed: !submitted,
+    generation_acceptance_task_id: submitted ? "existing-acceptance-task" : null,
+  } }))
+  await page.route("https://api.example.com/api/v1/app/uploads/images", route => route.fulfill({ json: { id: "qa-upload", url: "/image.png" } }))
+  await page.route("https://api.example.com/api/v1/app/video-tasks", route => {
+    submitted = true; submissions++
+    return route.abort("failed")
+  })
+  await page.goto("/?generation_acceptance=1#generate?video=dance-1")
+  await page.locator("input[type=file]").setInputFiles({ name: "isolated.png", mimeType: "image/png", buffer: Buffer.from("isolated image") })
+  await expect(page.locator("[data-generate]")).toBeEnabled()
+  await page.locator("[data-generate]").click()
+  await page.locator("[data-confirm-generation]").click()
+  await expect(page.locator("[data-open-task=existing-acceptance-task]")).toBeVisible()
+  await expect(page.locator("input[type=file], [data-generate]")).toHaveCount(0)
+  expect(submissions).toBe(1)
+})
+
 test("internal CN landing only mounts sign-in; signup and checkout stay closed", async ({ page }, testInfo) => {
   await mockControlledRegistration(page, false, false)
   await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: {
