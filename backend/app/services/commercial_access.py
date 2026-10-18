@@ -57,6 +57,7 @@ def payment_only_acceptance_enabled() -> bool:
         and not settings.ADMIN_PUBLIC_SIGNUP_ENABLED
         and not settings.LOCAL_DEMO_ENABLED
         and not settings.APP_LEGACY_VIDEO_TASKS_ENABLED
+        and not settings.APP_GENERATION_ACCEPTANCE_ENABLED
     )
 
 
@@ -152,6 +153,7 @@ def acceptance_subject_allowed(*, subject: str, issuer: str) -> bool:
         settings.ENVIRONMENT == "production"
         and settings.APP_LIVE_ACCEPTANCE_ENABLED
         and not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+        and not settings.APP_GENERATION_ACCEPTANCE_ENABLED
         and settings.APP_AUTH_MODE == "clerk"
         and settings.APP_COMMERCE_TERMS_APPROVED
         and settings.CLERK_ISSUER_URL
@@ -175,6 +177,7 @@ def controlled_registration_enabled() -> bool:
         and not settings.APP_COMMERCE_TERMS_APPROVED
         and not settings.ADMIN_PUBLIC_SIGNUP_ENABLED
         and not settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+        and not settings.APP_GENERATION_ACCEPTANCE_ENABLED
         and (
             not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
             or _controlled_cn_setup_configuration_safe()
@@ -247,6 +250,10 @@ def acceptance_request_allowed(request: Request) -> bool:
 
 def require_new_commerce_user(request: Request) -> None:
     # The raw mode stays a commerce kill switch even after its window expires.
+    if settings.APP_GENERATION_ACCEPTANCE_ENABLED:
+        raise HTTPException(
+            403, "Generation acceptance does not permit other new commerce"
+        )
     if settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED:
         raise HTTPException(403, "Account setup does not permit new commerce")
     if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
@@ -314,6 +321,7 @@ def internal_acceptance_enabled() -> bool:
         and not settings.APP_LEGACY_VIDEO_TASKS_ENABLED
         and not settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
         and not settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+        and not settings.APP_GENERATION_ACCEPTANCE_ENABLED
     )
 
 

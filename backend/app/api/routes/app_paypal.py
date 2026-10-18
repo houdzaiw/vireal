@@ -29,6 +29,12 @@ from app.services.commercial_access import (
     require_new_commerce_user,
     require_region,
 )
+from app.services.generation_acceptance import (
+    generation_acceptance_mode_safe,
+    generation_acceptance_task,
+    generation_acceptance_user,
+    generation_acceptance_window_open,
+)
 from app.services.paypal_client import (
     PRODUCTS,
     PayPalError,
@@ -64,6 +70,15 @@ def payment_config(
     cn_setup = controlled_cn_account_setup_enabled() and edge_country(request) == "CN"
     cn_setup_mode = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
+    generation_mode = settings.APP_GENERATION_ACCEPTANCE_ENABLED
+    generation_user = (
+        generation_acceptance_user(request, session) if generation_mode else None
+    )
+    generation_task = (
+        generation_acceptance_task(session, generation_user)
+        if generation_user
+        else None
+    )
     payment_user = payment_only_user(request, session) if payment_only else None
     slot_used = bool(payment_user and payment_only_order_created(session, payment_user))
     grant = grant_for_user(session, payment_user.id) if payment_user else None
@@ -79,6 +94,21 @@ def payment_config(
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        "generation_acceptance_mode": generation_mode,
+        "generation_acceptance_sign_in_enabled": generation_acceptance_mode_safe()
+        and edge_country(request) == "CN",
+        "generation_acceptance_read_allowed": generation_user is not None,
+        "generation_acceptance_allowed": bool(
+            generation_user
+            and not generation_task
+            and generation_acceptance_window_open()
+        ),
+        "generation_acceptance_task_id": str(generation_task.id)
+        if generation_task
+        else None,
+        "generation_acceptance_expires_at": settings.APP_GENERATION_ACCEPTANCE_EXPIRES_AT
+        if generation_user
+        else None,
         "controlled_account_setup_mode": cn_setup_mode,
         "controlled_account_setup_enabled": cn_setup,
         "controlled_account_setup_expires_at": settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT
@@ -110,14 +140,18 @@ def payment_config(
         )
         and allowed
         and not payment_only
-        and not cn_setup_mode,
+        and not cn_setup_mode
+        and not generation_mode,
+        # The raw generation mode is a kill switch even when expired/invalid.
         # This advertises only a private invitation landing page, not signup.
         # The verified primary email is checked again by the session endpoint.
         "controlled_registration_enabled": controlled_registration_enabled()
         and (cn_setup if cn_setup_mode else allowed)
-        and not payment_only,
+        and not payment_only
+        and not generation_mode,
         "recharge_enabled": settings.PAYPAL_ENABLED
         and not cn_setup_mode
+        and not generation_mode
         and paypal_configured()
         and (payment_user is not None and not slot_used if payment_only else allowed)
         and identity_allowed

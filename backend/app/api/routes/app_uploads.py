@@ -12,8 +12,10 @@ from app.core.config import settings
 from app.models import AppUpload, AppUploadPublic
 from app.services.commercial_access import (
     lock_commercial_user,
-    require_generation_region,
-    require_new_commerce_user,
+)
+from app.services.generation_acceptance import (
+    require_generation_access,
+    require_new_generation,
 )
 from app.services.storage import (
     ImageStorageError,
@@ -34,9 +36,9 @@ async def upload_app_image(
     """
     Store an App image and return a stable application URL.
     """
-    require_generation_region(request, session, current_app_user)
-    require_new_commerce_user(request)
+    require_generation_access(request, session, current_app_user, verify_profile=True)
     lock_commercial_user(session, current_app_user)
+    require_new_generation(request, session, current_app_user)
     # Do not retain the account lock during object storage network I/O.
     session.commit()
     content = await file.read(settings.MAX_UPLOAD_IMAGE_BYTES + 1)
@@ -64,12 +66,18 @@ async def upload_app_image(
         expires_at=expires_at,
     )
     try:
+        lock_commercial_user(session, current_app_user)
+        # An expiry, paused release or concurrent task during storage I/O must
+        # not persist another upload. Only clean up this request's own object.
+        require_new_generation(request, session, current_app_user)
         session.add(upload)
         session.commit()
         session.refresh(upload)
-    except SQLAlchemyError:
+    except (SQLAlchemyError, HTTPException) as exc:
         session.rollback()
         await run_in_threadpool(image_storage.delete_object, stored_image.object_key)
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=500, detail="Unable to record image upload")
     return AppUploadPublic.model_validate(upload)
 

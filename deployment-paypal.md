@@ -2,6 +2,79 @@
 
 ## Release state
 
+### One-task production generation — local preparation, October 18; not deployed
+
+The new beneficiary's Live payment/credit integration passed: provider order
+`23632687E8298193N`, capture `5UB25291TT5667741`, USD 5.99, application order
+`83afeae0-f6b4-4a9f-b8fc-830d87c77f37`; genuine capture COMPLETED and exactly
+one +100 ledger entry matched the merchant, currency, amount and ownership.
+Balance is 100, with no generation debit. This is not independent-new-user or
+generation-delivery evidence, and does not authorize public paid operation.
+
+The temporary payment window was shortened to **2026-10-18 14:02:07 Beijing**
+after a new production backup and isolated restore verification. This supersedes
+the earlier 18:53:55 deadline below. Effective public registration, recharge,
+upload and generation remain closed. Until this upload-pause fix is separately
+released, the **expired RAW payment-only mode deliberately remains set**, with
+its matching PayPal/terms flags, to block uploads by existing overseas accounts.
+Do not remove that raw guard on old code merely because its payment window has
+expired. Verified callbacks, reconciliation, the paid order and all 100 credits
+remain intact. Last closed API/Worker source is PR #29, `6b92d5d0`.
+
+This change prepares `APP_GENERATION_ACCEPTANCE_ENABLED=false` by default, plus
+exact subject/user/aware-expiry settings. It uses no new table or migration and
+does not change existing payment or task settlement. Activation must be approved
+separately, after reviewed CI and a new backup/restore check. Bind only the
+existing verified `li522903183@163.com` identity and genuine signed **CN** context;
+HK payment permission does not extend to generation. Maximum window is two hours.
+Public registration, PayPal new orders, commerce terms, administrator signup,
+old acceptance modes, legacy/demo generation and general video submissions must
+all be off. Keep the UTC 30/5/1 limits and a bounded provider lifetime cap (at most
+2; re-read the actual prior count before setting it). Runtime checks fail closed
+if safety settings drift, even after expiry or a restart.
+
+Only `dance-1`, one owned image, 5 seconds, Wan `wan-video/wan-2.7-r2v`, prompt
+version v1 and 28 credits are accepted; provider submission stays 720p/9:16.
+Any prior task row for that identity consumes the lifetime slot, including
+unknown, failed, refunded, expired or deleted tasks. The existing global budget
+lock and user lock serialize reservation/debit; different request keys cannot
+reserve a second task. Same-key replay reads its existing result. Failures do not
+reset the slot; unknown submissions are never resubmitted or blindly refunded.
+Normal confirmed-failure refund/callback/reconciliation remains idempotent.
+
+New uploads now honor the general submission pause outside this private mode.
+Inside it, upload ownership, profile/session, window and unused task slot are
+checked again after storage I/O. Expiry or a concurrent task discards only that
+request's newly stored object. Existing task queries, signed callbacks, media
+retention, playback, download and system-save are not gated by the new-action
+window. A private `?generation_acceptance=1#generate?video=dance-1` page never
+creates a task on open, offers only 5 seconds/28 credits, hides signup/recharge,
+and recovers a lost response by pointing to the existing task. The private URL
+does not itself grant backend permission. Expired safe mode allows the exact
+identity to sign in read-only while it remains configured.
+
+Still required: passing hosted CI/review, explicit merge/deployment approval,
+separate action-time authorization for **one** real 5-second prediction and its
+current model budget, and playback/download/system-save evidence. The proposed
+cost cap is $1 (not yet approved); re-check official pricing and provider balance
+at execution. Do not purchase credits, recharge the provider or submit a real
+prediction in this local-review phase. The earlier internal adult photo remains
+internal-only and must never become a public sample. Public opening remains a
+separate final decision after the paid-wallet generation path passes.
+
+Local verification: **789 backend tests passed**, **92%** overall statement
+coverage (new acceptance guard **97%**), **236 Chromium/WebKit UI tests**,
+**41 H5 contract tests** and **3 edge-proxy tests** passed. Ruff lint/format,
+mypy and ty passed. A fresh Unix-socket-only local PostgreSQL cluster was
+migrated, used and stopped; the new tests block external HTTP and use fake
+Clerk/provider identities, not production credentials or real funds. Review
+publication reuses the already-excluded `codex/payment-only-new-account` branch:
+fresh Cloudflare read-back retained the ten existing exclusions, `main`, `*`
+and the latest deployments; production H5 is direct-upload. Railway still has
+`prDeploys=false` and all four API/Worker sources on `main`. GitHub application
+deployments require `master` or manual dispatch. No preview setting changed.
+Hosted PR checks/review remain separate from these local results.
+
 ### CN/HK payment-only scope — October 18
 
 The owner authorized adding genuine signed HK connections to the existing

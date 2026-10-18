@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT: str | None = None
     APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID: uuid.UUID | None = None
     APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT: AwareDatetime | None = None
+    # Separate, one-task generation check. Never enables public submissions.
+    APP_GENERATION_ACCEPTANCE_ENABLED: bool = False
+    APP_GENERATION_ACCEPTANCE_SUBJECT: str | None = None
+    APP_GENERATION_ACCEPTANCE_USER_ID: uuid.UUID | None = None
+    APP_GENERATION_ACCEPTANCE_EXPIRES_AT: AwareDatetime | None = None
     # Only these catalogue slugs can be browsed/submitted in production.
     APP_LAUNCH_EFFECT_SLUGS: list[str] = ["dance-1", "romance-1"]
     # Emergency pause affects new submissions, not provider queries/callbacks.
@@ -262,6 +267,15 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if (
+            self.APP_GENERATION_ACCEPTANCE_ENABLED
+            and not self.generation_acceptance_configuration_safe()
+        ):
+            raise ValueError(
+                "Generation acceptance requires production Clerk, an exact existing "
+                "user/subject, signed CN context, an aware expiry within 2 hours, "
+                "a bounded real provider budget and all public/other acceptance gates closed"
+            )
         if self.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED and (
             self.ENVIRONMENT != "production"
             or self.APP_AUTH_MODE != "clerk"
@@ -430,6 +444,49 @@ class Settings(BaseSettings):
                     "Public commerce requires real, priced generation only"
                 )
         return self
+
+    def generation_acceptance_configuration_safe(self) -> bool:
+        """Also used at request time; expired mode must boot but cannot submit."""
+        subject = self.APP_GENERATION_ACCEPTANCE_SUBJECT
+        expires = self.APP_GENERATION_ACCEPTANCE_EXPIRES_AT
+        return bool(
+            self.ENVIRONMENT == "production"
+            and self.APP_AUTH_MODE == "clerk"
+            and self.CLERK_ISSUER_URL
+            and subject
+            and re.fullmatch(r"user_[A-Za-z0-9_-]+", subject)
+            and self.APP_GENERATION_ACCEPTANCE_USER_ID
+            and expires
+            and expires.tzinfo is not None
+            and expires <= datetime.now(UTC) + timedelta(hours=2)
+            and self.APP_REGION_ENFORCEMENT_ENABLED
+            and self.APP_EDGE_SIGNING_SECRET
+            and len(self.APP_EDGE_SIGNING_SECRET) >= 32
+            and self.REPLICATE_ENABLED
+            and 1 <= self.REPLICATE_POC_MAX_SUBMISSIONS <= 2
+            and self.APP_USER_DAILY_REAL_SUBMISSIONS == 5
+            and self.APP_USER_MAX_CONCURRENT_VIDEO_TASKS == 1
+            and self.APP_GLOBAL_DAILY_REAL_SUBMISSIONS == 30
+            and self.APP_EFFECT_MAX_DURATION_SECONDS == 10
+            and not any(
+                (
+                    self.APP_PUBLIC_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED,
+                    self.APP_INTERNAL_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_SUBJECTS,
+                    self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED,
+                    self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED,
+                    self.APP_VIDEO_SUBMISSIONS_ENABLED,
+                    self.PAYPAL_ENABLED,
+                    self.APP_COMMERCE_TERMS_APPROVED,
+                    self.ADMIN_PUBLIC_SIGNUP_ENABLED,
+                    self.LOCAL_DEMO_ENABLED,
+                    self.APP_LEGACY_VIDEO_TASKS_ENABLED,
+                )
+            )
+        )
 
     @model_validator(mode="after")
     def _validate_media_worker_configuration(self) -> Self:

@@ -633,6 +633,10 @@ export type AppAuthSessionResponse = {
      * Internal Generation Allowed
      */
     internal_generation_allowed?: boolean;
+    /**
+     * Generation Acceptance Read Allowed
+     */
+    generation_acceptance_read_allowed?: boolean;
 };
 
 /**
