@@ -61,7 +61,7 @@ def payment_only(db, monkeypatch):
             f"session_{uuid.uuid4().hex}",
             "https://app.example.test",
         )
-        profile = ClerkUserProfile("li8483@yeah.net", True, ("email",))
+        profile = ClerkUserProfile("li522903183@163.com", True, ("email",))
 
         def verify_session_token(self, token):
             if token == "invalid":
@@ -165,7 +165,7 @@ def test_target_existing_login_one_package_no_signup_or_identity_leak(
     assert not cfg.json()["recharge_enabled"]
     assert (
         clerk.claims.subject not in cfg.text
-        and "li8483@yeah.net" not in cfg.text
+        and "li522903183@163.com" not in cfg.text
         and str(user_id) not in cfg.text
     )
     cfg = client.get(CONFIG, headers=headers(CONFIG, "GET")).json()

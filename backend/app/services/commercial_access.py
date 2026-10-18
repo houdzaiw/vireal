@@ -20,7 +20,9 @@ from app.services.clerk_auth import (
     get_clerk_auth_service,
 )
 
-PAYMENT_ONLY_EMAIL = "li8483@yeah.net"
+# Reviewed beneficiary only. Deployment must separately bind its exact existing
+# Clerk subject and business user ID; this does not move any historical order.
+PAYMENT_ONLY_EMAIL = "li522903183@163.com"
 
 
 def payment_only_acceptance_enabled() -> bool:

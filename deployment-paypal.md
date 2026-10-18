@@ -2,6 +2,70 @@
 
 ## Release state
 
+### New beneficiary — local implementation, October 18; not deployed
+
+The new production account `li522903183@163.com` completed its separately
+approved invitation/verified-email account setup with zero credits. This change
+adapts only the existing payment-only eligibility check to that primary email.
+It does not change production configuration, open commerce, create/cancel a
+real provider/application order, move the old order, credit a real wallet or
+initiate a payment/refund/generation. No new API, financial field or migration
+is needed.
+
+The former beneficiary `li8483@yeah.net` is no longer eligible for a new
+payment-only window, even if an operator accidentally reuses its old subject
+and user ID. The new email still requires the exact existing verified Clerk
+subject, production issuer, business user ID, unrevoked session, signed CN
+context, active/unfrozen account and an explicit unexpired window. No email
+header/query parameter, fresh login or registration invite grants payment access.
+
+All lifetime-slot, concurrent/idempotent create, fixed **USD 5.99 / 100-credit**,
+capture and unique settlement checks remain unchanged. The legacy Apple/Google
+placeholder-order endpoint is also denied while payment-only mode is set;
+it cannot create another kind of order outside the one-package PayPal flow.
+Historical orders retain their owner and references; the new beneficiary cannot
+list, read, resume,
+capture, recover or replace the former beneficiary's order. Verified callbacks
+and reconciliation still settle an old payment only to its original owner,
+including after the private window closes. A provider 404 remains unconfirmed,
+not a cancellation or proof of no charge. The old MTS investigation is separate.
+
+This round authorizes isolated tests and review publication only. Before pushing
+`codex/payment-only-new-account`, obtain approval for any needed Cloudflare
+preview exclusion and confirm Railway/GitHub deployment triggers. Merge,
+deployment and activation each remain pending owner confirmation. A later
+release must use a new production backup/restore verification, close both
+controlled-registration/setup flags before switching modes, bind the new
+identity in API and Worker, keep replacement **off**, and explicitly authorize
+one new order/payment. Public signup/recharge, administrator signup, uploads,
+generation and all other acceptance modes stay closed. Never copy production
+credentials/identity identifiers into test fixtures or reuse the old order key.
+
+The Vireal beneficiary is the operator's existing account; an eligible friend
+must personally approve payment with their own PayPal account/funds. A future
+successful payment proves payment/credit integration only, not independent
+overseas registration, generation delivery or approval to open public commerce.
+
+Local checks for this adaptation: **705 backend tests passed**, **92%** statement
+coverage, **41 H5 contract tests passed**, Ruff lint/format, mypy and ty passed.
+The new regression tests deny external HTTP, use a fresh private Unix-socket
+PostgreSQL cluster and fake Clerk/PayPal data, and include legacy-order denial,
+the retired identity, cross-owner access, unchanged original ownership and
+duplicate late-old-payment credit only to the original owner. The test server
+was stopped afterwards; no production database or provider order was modified.
+The existing package, concurrency, unknown-create, duplicate settlement,
+expiry, revoked-session, signed-region and upload/generation-denial regressions
+also ran against the new target email. These are isolated integration tests,
+not a new Sandbox or Live payment. Hosted PR CI is still a separate check.
+
+After owner approval, read-back confirmed **only**
+`codex/payment-only-new-account` was appended to `vireal-h5-staging` preview
+exclusions; the nine earlier exclusions, `main`, `*`, other configuration and
+latest deployments were unchanged. Production H5 is still direct-upload.
+Railway `prDeploys=false` and all four API/Worker triggers still follow `main`.
+GitHub app-deployment workflows require `master` or manual dispatch. Pushing
+this review branch therefore does not authorize or trigger an app deployment.
+
 ### Review publication — October 18, not deployed
 
 The owner separately authorized excluding **only**
@@ -236,7 +300,8 @@ payment requires fresh action-time approval.
 `APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED` defaults to **false**. If separately
 approved later, it requires one pre-existing business user ID, one exact Clerk
 subject from the configured production issuer, and the already-verified primary
-email `li8483@yeah.net`. Bind both `APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID` and
+email `li522903183@163.com` (the former `li8483@yeah.net` is retired for new
+payment-only access). Bind both `APP_PAYMENT_ONLY_ACCEPTANCE_USER_ID` and
 `APP_PAYMENT_ONLY_ACCEPTANCE_SUBJECT` to the existing identity after rechecking
 it; email or query strings alone never grant access. Configure the explicit
 timezone-aware `APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT` for a window at most

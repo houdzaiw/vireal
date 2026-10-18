@@ -23,6 +23,8 @@ def create_order(
     """
     if settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED:
         raise HTTPException(403, "Account setup does not permit new commerce")
+    if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
+        raise HTTPException(403, "Payment-only acceptance permits only PayPal orders")
     return crud.create_app_order(
         session=session,
         app_user=current_app_user,
