@@ -227,6 +227,86 @@ test("refreshing an invitation after the controlled gate closes cannot mount sig
   await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
 })
 
+function cnSetupConfig(overrides = {}) {
+  return {
+    ...paymentConfig, country: "CN", region_allowed: false,
+    registration_enabled: false, recharge_enabled: false,
+    controlled_registration_enabled: true, controlled_account_setup_mode: true,
+    controlled_account_setup_enabled: true,
+    controlled_account_setup_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    ...overrides,
+  }
+}
+
+test("CN account setup requires the private invitation and preserves verified-email steps", async ({ page }) => {
+  await mockControlledRegistration(page, false)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: cnSetupConfig() }))
+  await page.goto("/?controlled_registration=1&__clerk_ticket=isolated-ui-ticket")
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.getByText(/not overseas registration acceptance/)).toBeVisible()
+  await page.evaluate(() => { location.hash = "/verify-email-address" })
+  await expect(page.locator("body")).toHaveAttribute("data-signup-mounts", "1")
+  await page.reload()
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.goto("/#register")
+  await expect(page.getByRole("heading", { name: "Service unavailable in this region" })).toBeVisible()
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+})
+
+test("CN private account sign-in stays sign-in across Clerk hash steps and reload", async ({ page }) => {
+  await mockControlledRegistration(page, false)
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: cnSetupConfig() }))
+  await page.goto("/?controlled_account_setup=1#login")
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await page.evaluate(() => { location.hash = "/factor-one" })
+  await page.reload()
+  await expect(page.locator("#clerkSignIn")).toContainText("Clerk login (UI mock)")
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toHaveCount(0)
+})
+
+for (const scenario of ["no-private-url", "no-ticket", "unknown-region", "other-region", "disabled", "expired", "overlong", "invalid-expiry"]) {
+  test(`CN account setup fails closed for ${scenario}`, async ({ page }) => {
+    await mockControlledRegistration(page, false)
+    const overrides = scenario === "unknown-region" ? {country: null}
+      : scenario === "other-region" ? {country: "US", region_allowed: true}
+      : scenario === "disabled" ? {controlled_account_setup_enabled: false}
+      : scenario === "expired" ? {controlled_account_setup_expires_at: new Date(Date.now() - 1000).toISOString()}
+      : scenario === "overlong" ? {controlled_account_setup_expires_at: new Date(Date.now() + 9 * 3600_000).toISOString()}
+      : scenario === "invalid-expiry" ? {controlled_account_setup_expires_at: "not-a-date"} : {}
+    await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: cnSetupConfig(overrides) }))
+    await page.goto(scenario === "no-private-url" ? "/#login" : scenario === "no-ticket" ? "/?controlled_registration=1" : "/?controlled_registration=1&__clerk_ticket=isolated-ui-ticket")
+    await expect(page.getByRole("heading", { name: "Service unavailable in this region" })).toBeVisible()
+    await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+    await expect(page.locator("paypal-button")).toHaveCount(0)
+  })
+}
+
+test("CN account setup unmounts signup when its authorization expires", async ({ page }) => {
+  await mockControlledRegistration(page, false)
+  const config = cnSetupConfig({controlled_account_setup_expires_at: new Date(Date.now() + 2500).toISOString()})
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: config }))
+  await page.goto("/?controlled_registration=1&__clerk_ticket=isolated-ui-ticket")
+  await expect(page.getByText("Controlled Clerk signup (UI mock)", { exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Service unavailable in this region" })).toBeVisible({timeout: 7000})
+  await expect(page.locator("#clerkSignIn")).toHaveCount(0)
+})
+
+test("CN setup with an existing session and credits still cannot checkout or generate", async ({ page }) => {
+  await mockSignedInApi(page)
+  // Even inconsistent UI flags may not turn a setup session into commerce.
+  await page.route("https://api.example.com/api/v1/app/paypal/config", route => route.fulfill({ json: cnSetupConfig({region_allowed: true, recharge_enabled: true, registration_enabled: true}) }))
+  const writes: string[] = []
+  page.on("request", req => { if (/web-sdk|paypal\/orders|uploads|video-tasks/.test(req.url()) && (req.method() === "POST" || req.url().includes("web-sdk"))) writes.push(req.url()) })
+  await page.goto("/?controlled_account_setup=1#wallet")
+  await expect(page.locator(".wallet-card > strong")).toHaveText("500 ✦")
+  await expect(page.locator("paypal-button")).toHaveCount(0)
+  await page.evaluate(() => { location.hash = "generate?video=dance-1" })
+  await expect(page.getByRole("heading", { name: "Account setup only" })).toBeVisible()
+  await expect(page.locator("input[type=file]")).toHaveCount(0)
+  expect(writes).toEqual([])
+})
+
 async function mockPayPalLifecycle(page: Page, failFirst = false, environment = "sandbox") {
   await page.route(environment === "live" ? "https://www.paypal.com/web-sdk/v6/core" : "https://www.sandbox.paypal.com/web-sdk/v6/core", route => route.fulfill({
     contentType: "application/javascript",
@@ -619,7 +699,7 @@ test("expired original order offers GET-only diagnosis without mounting SDK or r
   expect(queries).toBe(1)
   expect(writes).toEqual([])
   expect(sdkRequests).toEqual([])
-  await page.locator("[data-payment-inspection]").scrollIntoViewIfNeeded()
+  // A full-page screenshot needs no scroll of a node replaced by wallet refresh.
   await page.screenshot({path: testInfo.outputPath("original-order-readonly-404.png"), fullPage: true, animations: "disabled"})
 })
 

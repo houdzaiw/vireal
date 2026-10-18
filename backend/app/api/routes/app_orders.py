@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from app import crud
 from app.api.deps import CurrentAppUser, SessionDep
+from app.core.config import settings
 from app.models import AppOrderCreate, AppOrderPublic, AppOrdersPublic
 
 router = APIRouter(prefix="/app/orders", tags=["app orders"])
@@ -20,6 +21,8 @@ def create_order(
     """
     Create an App payment order before starting platform payment.
     """
+    if settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED:
+        raise HTTPException(403, "Account setup does not permit new commerce")
     return crud.create_app_order(
         session=session,
         app_user=current_app_user,

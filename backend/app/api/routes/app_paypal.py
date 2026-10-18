@@ -16,6 +16,7 @@ from app.models import (
 )
 from app.services.commercial_access import (
     acceptance_request_allowed,
+    controlled_cn_account_setup_enabled,
     controlled_registration_enabled,
     edge_country,
     internal_acceptance_enabled,
@@ -59,6 +60,8 @@ def payment_config(
         0,
     )
     allowed = region_allowed(request)
+    cn_setup = controlled_cn_account_setup_enabled() and edge_country(request) == "CN"
+    cn_setup_mode = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
     payment_user = payment_only_user(request, session) if payment_only else None
     slot_used = bool(payment_user and payment_only_order_created(session, payment_user))
@@ -75,6 +78,11 @@ def payment_config(
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        "controlled_account_setup_mode": cn_setup_mode,
+        "controlled_account_setup_enabled": cn_setup,
+        "controlled_account_setup_expires_at": settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT
+        if cn_setup
+        else None,
         # Only lets a private login landing page mount sign-in, never signup.
         # This is not an entitlement; upload/generation authenticate again.
         "internal_sign_in_enabled": internal_acceptance_enabled()
@@ -100,13 +108,15 @@ def payment_config(
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )
         and allowed
-        and not payment_only,
+        and not payment_only
+        and not cn_setup_mode,
         # This advertises only a private invitation landing page, not signup.
         # The verified primary email is checked again by the session endpoint.
         "controlled_registration_enabled": controlled_registration_enabled()
-        and allowed
+        and (cn_setup if cn_setup_mode else allowed)
         and not payment_only,
         "recharge_enabled": settings.PAYPAL_ENABLED
+        and not cn_setup_mode
         and paypal_configured()
         and (payment_user is not None and not slot_used if payment_only else allowed)
         and identity_allowed

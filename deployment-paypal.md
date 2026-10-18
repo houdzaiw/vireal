@@ -2007,8 +2007,10 @@ Create at most one Clerk application invitation for that email with redirect
 `https://app.usevireal.com/?controlled_registration=1`, retaining Clerk's restricted
 mode. The private landing page requires a ticket and server-reported availability;
 it does not add a public signup link or enable `#register`. Mainland/unknown
-regions must not mount signup or initialize a business identity. Do not use the
-hosted portal, a proxy or forged region headers to bypass this restriction.
+regions must not mount signup or initialize a business identity in this ordinary
+mode. The separately authorized account-setup exception below is not commerce.
+Do not use the hosted portal, a proxy or forged region headers to bypass this
+restriction.
 
 The human verifies their email and personally enters/submits the password. The
 backend checks the authoritative verified primary email and production issuer,
@@ -2031,6 +2033,59 @@ disabled immediately to stop further initialization without deleting the account
 Any later Live acceptance/public opening still needs its separate authorization
 and eligible independent real buyer. Revoke an unused invitation only if asked;
 do not silently recreate, extend or forward it to another email.
+
+### Mainland account setup only (local implementation, not activated)
+
+`APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED=false` and an empty
+`APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT` are the defaults. A future, explicitly
+approved production window may combine this flag with the existing exact-email
+controlled registration. The aware UTC expiry must be at most eight hours away;
+expired windows stay closed on restart, never silently renew. Keep Clerk
+Restricted. Store the selected email only in secret/runtime configuration, not
+in Git, screenshots or public acceptance records.
+
+This exception requires genuine signed `CN`, the production Clerk issuer and the
+authoritative verified primary email. Unknown/forged regions and other emails
+fail closed. Public registration, PayPal, terms approval, payment-only/replacement,
+internal/Live acceptance, admin signup, demo and all generation gates must be off
+on both API and worker. Ordinary `region_allowed` remains false. Mixed unsafe
+configuration fails startup; the raw setup flag also blocks new commerce after
+expiry. Verified callbacks and settlement of existing paid orders are unchanged.
+
+Use at most one restricted Clerk invitation with the existing private
+`/?controlled_registration=1` landing. The human receives the invitation, verifies
+the mailbox and personally sets/enters the password. Subsequent private sign-in
+uses `/?controlled_account_setup=1#login`, not a forwarded signup ticket. Browser
+auth components close at expiry; the backend rechecks the window after waiting
+for account locks. A created account has zero credits and cannot upload, create a
+payment or generate. This does not count as overseas independent-buyer signup.
+
+Local mocks/tests are not registration or Live payment evidence. No invitation,
+configuration or deployment is authorized by this checkpoint. Before activation,
+obtain separate publishing/activation approval, check deployment triggers, use
+reviewed CI-passing source and make a fresh restore-verified production backup.
+Close the previous payment-only/terms/PayPal gates together before enabling setup;
+never disable only payment-only mode while leaving public PayPal gates open.
+Verify both services and compare financial snapshots before/after. No migration
+or ledger adjustment is required.
+
+After setup, read back the exact identity, verified email, active status and zero
+wallet; close both controlled setup and registration flags without deleting users
+or history. Changing the email must not transfer or reset the previous Live
+order, capture or one-payment authorization. The unresolved provider 404 remains
+an independent blocker, not evidence of cancellation. Any new payment binding,
+order or renewed payment window needs separate confirmation after the original
+financial uncertainty is resolved; no payment or model costs are authorized here.
+
+Local checkpoint on 2026-10-18 (`codex/controlled-account-setup`, uncommitted):
+699 isolated backend tests passed with 92% aggregate coverage; 218 Chromium/WebKit
+tests and 41 H5 contract tests passed. Ruff/format, mypy, ty and JavaScript syntax
+checks passed. Tests include legacy-order creation rejection, unique zero-credit
+initialization and old-account settlement remaining idempotent during setup.
+No real identity/invitation, payment or generation was created; CI, publishing and
+activation are still pending separate authorization. Production public config
+was read back with registration/recharge false and the expired payment-only
+window unavailable. No production setting was changed.
 
 ## Existing-account mainland internal acceptance (not Live payment)
 

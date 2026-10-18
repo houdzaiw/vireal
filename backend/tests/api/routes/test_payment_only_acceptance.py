@@ -1200,7 +1200,7 @@ def test_paypal_http_error_keeps_internal_404_without_forwarding_raw_provider_da
         client.close()
 
 
-@pytest.mark.parametrize("close", ["expiry", "disabled"])
+@pytest.mark.parametrize("close", ["expiry", "disabled", "account-setup"])
 def test_pending_existing_payment_can_complete_once_after_close(
     client, db, payment_only, monkeypatch, close
 ):
@@ -1226,6 +1226,18 @@ def test_pending_existing_payment_can_complete_once_after_close(
     else:
         monkeypatch.setattr(settings, "APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED", False)
         monkeypatch.setattr(settings, "PAYPAL_ENABLED", False)
+    if close == "account-setup":
+        monkeypatch.setattr(settings, "APP_COMMERCE_TERMS_APPROVED", False)
+        monkeypatch.setattr(settings, "APP_CONTROLLED_REGISTRATION_ENABLED", True)
+        monkeypatch.setattr(
+            settings, "APP_CONTROLLED_REGISTRATION_EMAIL", "new-setup@example.com"
+        )
+        monkeypatch.setattr(settings, "APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED", True)
+        monkeypatch.setattr(
+            settings,
+            "APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT",
+            datetime.now(UTC) + timedelta(hours=1),
+        )
     assert create(client).status_code in {403, 503}
     cap["status"] = "COMPLETED"
     event = {
