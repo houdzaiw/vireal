@@ -187,7 +187,7 @@ def test_target_existing_login_one_package_no_signup_or_identity_leak(
     ).first()
 
 
-@pytest.mark.parametrize("country", ["CN", "US"])
+@pytest.mark.parametrize("country", ["CN", "HK", "US"])
 def test_upload_and_generation_closed_even_with_credits(
     client, db, payment_only, country
 ):
@@ -255,7 +255,7 @@ def test_client_cannot_override_snapshot(client, payment_only, field):
     "proof",
     ["missing", "bare", "unknown", "invalid", "expired", "path", "method", "US"],
 )
-def test_only_genuine_signed_cn_context_can_create(client, payment_only, proof):
+def test_only_genuine_signed_permitted_context_can_create(client, payment_only, proof):
     h = headers(ORDERS, key=str(uuid.uuid4()))
     if proof in {"missing", "bare"}:
         h = {k: v for k, v in h.items() if not k.startswith("x-vireal-edge-")}
