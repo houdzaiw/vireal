@@ -3,6 +3,6 @@
 set -e
 set -x
 
-FASTAPI_ENV=development coverage run -m pytest tests/
+FASTAPI_ENV=development coverage run -m pytest tests/ isolated_tests/
 coverage report
 coverage html --title "${@-coverage}"

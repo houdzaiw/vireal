@@ -2,8 +2,9 @@ import json
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import func
+from sqlmodel import col, select
 
 from app import crud
 from app.api.deps import (
@@ -14,9 +15,13 @@ from app.api.deps import (
 from app.api.routes.app_contents import serialize_app_content
 from app.core.config import settings
 from app.models import (
+    AdminAppWalletPublic,
     AppAdminOperationLog,
     AppAdminOperationLogPublic,
     AppAdminOperationLogsPublic,
+    AppCoinAccount,
+    AppCoinLedger,
+    AppCoinLedgerPublic,
     AppConfigCreate,
     AppConfigPublic,
     AppConfigsPublic,
@@ -212,6 +217,42 @@ def read_app_users(
             for app_user, identity in app_users
         ],
         count=count,
+    )
+
+
+@router.get("/users/{app_user_id}/wallet", response_model=AdminAppWalletPublic)
+def read_app_user_wallet(
+    app_user_id: uuid.UUID,
+    session: SessionDep,
+    response: Response,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminAppWalletPublic:
+    """Inspect an existing wallet without initializing accounts or changing money."""
+    if session.get(AppUser, app_user_id) is None:
+        raise HTTPException(status_code=404, detail="App user not found")
+    response.headers["Cache-Control"] = "no-store"
+    account = session.get(AppCoinAccount, app_user_id)
+    count = session.exec(
+        select(func.count())
+        .select_from(AppCoinLedger)
+        .where(AppCoinLedger.app_user_id == app_user_id)
+    ).one()
+    ledger = session.exec(
+        select(AppCoinLedger)
+        .where(AppCoinLedger.app_user_id == app_user_id)
+        .order_by(col(AppCoinLedger.created_at).desc(), col(AppCoinLedger.id).desc())
+        .offset(skip)
+        .limit(limit)
+    ).all()
+    return AdminAppWalletPublic(
+        app_user_id=app_user_id,
+        balance=account.balance if account else 0,
+        account_initialized=account is not None,
+        ledger=[AppCoinLedgerPublic.model_validate(row) for row in ledger],
+        count=count,
+        skip=skip,
+        limit=limit,
     )
 
 

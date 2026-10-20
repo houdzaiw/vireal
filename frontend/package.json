@@ -11,7 +11,8 @@
     "generate-client": "openapi-ts",
     "test": "bunx playwright test",
     "test:ui": "bunx playwright test --ui",
-    "test:video-tasks": "bunx playwright test -c playwright.video-tasks.config.ts"
+    "test:video-tasks": "bunx playwright test -c playwright.video-tasks.config.ts",
+    "test:admin-readonly": "bunx playwright test -c playwright.admin-readonly.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

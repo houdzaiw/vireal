@@ -693,6 +693,16 @@ class AppWalletPublic(SQLModel):
     global_real_remaining: int = 0
 
 
+class AdminAppWalletPublic(SQLModel):
+    app_user_id: uuid.UUID
+    balance: int
+    account_initialized: bool
+    ledger: list[AppCoinLedgerPublic]
+    count: int
+    skip: int
+    limit: int
+
+
 class AppContent(SQLModel, table=True):
     __tablename__ = "app_content"
 

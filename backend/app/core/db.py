@@ -1,10 +1,18 @@
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine, select
 
 from app import crud
 from app.core.config import settings
 from app.models import User, UserCreate
 
-engine = create_engine(str(settings.DATABASE_URL))
+
+def create_database_engine(database_url: str) -> Engine:
+    # A managed database may terminate an idle pooled connection. Validate it
+    # before checkout; do not retry a failed transaction or external payment.
+    return create_engine(database_url, pool_pre_ping=True)
+
+
+engine = create_database_engine(str(settings.DATABASE_URL))
 
 
 # make sure all SQLModel models are imported (app.models) before initializing DB
