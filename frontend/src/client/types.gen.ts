@@ -5,6 +5,40 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminAppWalletPublic
+ */
+export type AdminAppWalletPublic = {
+    /**
+     * App User Id
+     */
+    app_user_id: string;
+    /**
+     * Balance
+     */
+    balance: number;
+    /**
+     * Account Initialized
+     */
+    account_initialized: boolean;
+    /**
+     * Ledger
+     */
+    ledger: Array<AppCoinLedgerPublic>;
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Skip
+     */
+    skip: number;
+    /**
+     * Limit
+     */
+    limit: number;
+};
+
+/**
  * AdminCategoriesPublic
  */
 export type AdminCategoriesPublic = {
@@ -4129,6 +4163,45 @@ export type adminAppReadAppUsersResponses = {
 };
 
 export type adminAppReadAppUsersResponse = adminAppReadAppUsersResponses[keyof adminAppReadAppUsersResponses];
+
+export type adminAppReadAppUserWalletData = {
+    body?: never;
+    path: {
+        /**
+         * App User Id
+         */
+        app_user_id: string;
+    };
+    query?: {
+        /**
+         * Skip
+         */
+        skip?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/admin/app/users/{app_user_id}/wallet';
+};
+
+export type adminAppReadAppUserWalletErrors = {
+    /**
+     * Validation Error
+     */
+    422: HTTPValidationError;
+};
+
+export type adminAppReadAppUserWalletError = adminAppReadAppUserWalletErrors[keyof adminAppReadAppUserWalletErrors];
+
+export type adminAppReadAppUserWalletResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminAppWalletPublic;
+};
+
+export type adminAppReadAppUserWalletResponse = adminAppReadAppUserWalletResponses[keyof adminAppReadAppUserWalletResponses];
 
 export type adminAppUpdateAppUserStatusData = {
     body: AppUserStatusUpdate;

@@ -35,6 +35,9 @@ jobs:
       - name: Test task operations against mocked APIs only
         run: bun run test:video-tasks
         working-directory: frontend
+      - name: Test read-only wallet and identity labels against mocked APIs only
+        run: bun run test:admin-readonly
+        working-directory: frontend
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

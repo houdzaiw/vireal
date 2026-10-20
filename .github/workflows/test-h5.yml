@@ -83,7 +83,7 @@ jobs:
       - name: Run 390px, 430px, and desktop browser acceptance
         env:
           BROWSER_PROJECT: ${{ matrix.browser }}
-        run: bun run test:browser --project="$BROWSER_PROJECT"
+        run: bun run test:prelaunch --project="$BROWSER_PROJECT"
       - name: Validate release check script syntax
         run: bash -n ../scripts/verify-production.sh
       - name: Upload browser evidence

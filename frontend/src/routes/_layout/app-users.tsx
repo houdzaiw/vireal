@@ -17,6 +17,7 @@ import {
   StatusBadge,
 } from "@/components/AppAdmin/common"
 import { DataTable } from "@/components/Common/DataTable"
+import { appUserLoginLabel } from "@/lib/app-user-login-label"
 
 function getAppUsersQueryOptions() {
   return {
@@ -62,10 +63,9 @@ const columns: ColumnDef<AppUserAdminPublic>[] = [
     accessorKey: "auth_providers",
     header: "Login methods",
     cell: ({ row }) => {
-      const providers = row.original.auth_providers ?? []
       return (
         <span className="text-muted-foreground">
-          {providers.length > 0 ? providers.join(", ") : "device"}
+          {appUserLoginLabel(row.original)}
         </span>
       )
     },
