@@ -33,7 +33,7 @@ function clock() {
   }
 }
 
-function runtime({ hash = "#login", search = "", config = closed, sdk = null, request, effectCatalog = catalog } = {}) {
+function runtime({ hash = "#login", search = "", config = closed, sdk = null, request, effectCatalog = catalog, language = "zh-CN" } = {}) {
   const time = clock(), documentEvents = new Map(), windowEvents = new Map(), nodes = new Map(), requests = [], observers = new Set(), storage = new Map()
   const epoch = Date.now()
   class FakeDate extends Date {
@@ -80,7 +80,7 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
   }
   const window = { VirealClerk: sdk, addEventListener(type, listener) { windowEvents.set(type, listener) } }
   const context = {
-    document, window, location, navigator: { language: "zh-CN" },
+    document, window, location, navigator: { language },
     setTimeout: time.setTimeout, clearTimeout: time.clearTimeout, AbortController,
     URL: class extends URL { static createObjectURL() { objectURLs++; return "blob:offline" } static revokeObjectURL() {} },
     URLSearchParams, Intl, Date: FakeDate, WeakSet, Map, Set,
@@ -133,6 +133,22 @@ test("missing auth bundle stops loading with durable sanitized error", async () 
   await r.time.tick(15000); assert.match(r.html, /AUTH_LOAD_TIMEOUT/); assert.match(r.html, /data-retry-auth/)
   await r.time.tick(3000); assert.match(r.html, /AUTH_LOAD_TIMEOUT/); assertNoBusiness(r)
 })
+for (const [language, downloading, mounting, ready] of [
+  ["zh-CN", "正在载入安全登录…", "正在载入登录表单…", "安全邮箱验证"],
+  ["en-US", "Loading secure sign-in…", "Loading sign-in form…", "Secure email verification"],
+]) {
+  test(`auth feedback reports exact localized loading and readiness phases: ${language}`, async () => {
+    const r = runtime({ language }); await r.settle()
+    assert.ok(r.html.includes(`<p id="clerkStatus" role="status" class="network-badge">${downloading}</p>`))
+    const sdk = signedOutSDK({ empty: true }); await r.sdkReady(sdk)
+    assert.ok(r.html.includes(`<p id="clerkStatus" role="status" class="network-badge">${mounting}</p>`))
+    r.nodes.get("clerkSignIn").innerHTML = '<input aria-label="Offline email">'
+    await r.settle()
+    assert.equal(r.nodes.get("authFeedback").innerHTML, `<p id="clerkStatus" role="status" class="network-badge">${ready}</p>`)
+    assert.equal(sdk.mounts, 1); assert.equal(r.reloads, 0)
+    assert.equal(r.requests.some(q => q.path.endsWith("/auth/session")), false); assertNoBusiness(r)
+  })
+}
 test("SDK error details are not reflected in the page", async () => {
   const r = runtime(); await r.settle(); await r.sdkError({ code: "raw-sensitive-value", message: "fake-sensitive-value" })
   assert.match(r.html, /AUTH_LOAD_FAILED/); assert.doesNotMatch(r.html, /fake-sensitive|raw-sensitive/)
@@ -292,6 +308,67 @@ const setupConfig = () => ({ ...closed, region_allowed: false, country: "CN",
   controlled_account_setup_mode: true, controlled_account_setup_enabled: true,
   controlled_registration_enabled: true,
   controlled_account_setup_expires_at: new Date(Date.now() + 3600000).toISOString() })
+
+for (const [name, override] of [
+  ["valid-private-window", {}],
+  ["expired", { generation_acceptance_expires_at: new Date(Date.now() - 1000).toISOString() }],
+  ["other-account", { generation_acceptance_allowed: false }],
+  ["used-slot", { generation_acceptance_allowed: false, generation_acceptance_task_id: "offline-existing-task" }],
+  ["HK", { country: "HK" }],
+  ["unavailable-config", {}],
+]) {
+  test(`initial signed-in private registration stays closed after session sync: ${name}`, async () => {
+    const sdk = signedInSDK()
+    const r = runtime({ hash: "#register", search: "?generation_acceptance=1", sdk,
+      config: { ...genConfig(), ...override },
+      request: path => { if (name === "unavailable-config" && path.endsWith("/config")) throw new Error("offline unavailable") } })
+    await r.settle(); assert.equal(r.state.appUser.id, "offline-app-user")
+    assert.match(r.html, /<h1[^>]*>注册暂未开放<\/h1>/)
+    assert.equal(r.context.location.hash, "#register"); assert.equal(r.nodes.has("clerkSignIn"), false)
+    assert.equal(sdk.mounts, 0); assertNoBusiness(r)
+  })
+  test(`signed-in private registration stays closed before account fallback: ${name}`, async () => {
+    const sdk = signedInSDK()
+    const r = runtime({ hash: "#generate?video=dance-1", search: "?generation_acceptance=1", sdk,
+      config: { ...genConfig(), ...override }, effectCatalog: danceCatalog,
+      request: path => { if (name === "unavailable-config" && path.endsWith("/config")) throw new Error("offline unavailable") } })
+    await r.settle(); assert.equal(r.state.appUser.id, "offline-app-user")
+    await r.visit("#register")
+    assert.match(r.html, /<h1[^>]*>注册暂未开放<\/h1>/)
+    assert.doesNotMatch(r.html, /账户与偏好/); assert.equal(r.nodes.has("clerkSignIn"), false)
+    assert.equal(r.signupAvailable(false), false); assert.equal(sdk.mounts, 0); assertNoBusiness(r)
+  })
+}
+for (const [name, hash, config, heading] of [
+  ["public-signup-closed", "#register", closed, "注册暂未开放"],
+  ["missing-invitation", "#controlled-register", { ...closed, controlled_registration_enabled: true }, "受控注册需要有效邀请"],
+  ["disallowed-region", "#register", { ...closed, region_allowed: false }, "当前地区暂未开放服务"],
+]) {
+  test(`initial signed-in account redirect cannot bypass ${name}`, async () => {
+    const sdk = signedInSDK(), r = runtime({ hash, config, sdk }); await r.settle()
+    assert.equal(r.state.appUser.id, "offline-app-user")
+    assert.match(r.html, new RegExp(`<h1[^>]*>${heading}</h1>`))
+    assert.equal(r.context.location.hash, hash); assert.equal(r.nodes.has("clerkSignIn"), false)
+    assert.equal(sdk.mounts, 0); assertNoBusiness(r)
+  })
+  test(`signed-in account fallback cannot bypass ${name}`, async () => {
+    const sdk = signedInSDK(), r = runtime({ config, sdk }); await r.settle()
+    assert.equal(r.state.appUser.id, "offline-app-user"); await r.visit(hash)
+    assert.match(r.html, new RegExp(`<h1[^>]*>${heading}</h1>`))
+    assert.doesNotMatch(r.html, /账户与偏好/); assert.equal(r.nodes.has("clerkSignIn"), false)
+    assert.equal(sdk.mounts, 0); assertNoBusiness(r)
+  })
+}
+for (const [name, hash, search, config] of [
+  ["public", "#register", "", { ...closed, registration_enabled: true }],
+  ["invited", "#controlled-register", "?controlled_registration=1&__clerk_ticket=offline-ticket", { ...closed, controlled_registration_enabled: true }],
+]) {
+  test(`permitted ${name} signup route still shows an existing user's account`, async () => {
+    const sdk = signedInSDK(), r = runtime({ search, config, sdk }); await r.settle()
+    await r.visit(hash); assert.match(r.html, /账户与偏好/)
+    assert.equal(r.nodes.has("clerkSignIn"), false); assert.equal(sdk.mounts, 0); assertNoBusiness(r)
+  })
+}
 
 for (const [search, flag, heading] of [
   ["?generation_acceptance=1", "generation_acceptance_sign_in_enabled", "一次性生成验收登录"],

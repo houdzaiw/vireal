@@ -1642,6 +1642,7 @@ test(`${entry}: signed-out Clerk notifications preserve the in-progress login fo
 }
 
 test("public browsing starts while the Clerk bundle is still downloading", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, "language", { value: "en-US" }))
   await mockPublicApi(page)
   let releaseAuth!: () => void
   const authDownload = new Promise<void>(resolve => { releaseAuth = resolve })
@@ -1669,7 +1670,7 @@ test("public browsing starts while the Clerk bundle is still downloading", async
     expect(authDelivered).toBe(false)
     expect(authRequests).toBe(0)
     await page.getByRole("button", { name: "账户", exact: true }).click()
-    await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+    await expect(page.locator("#clerkStatus")).toHaveText("Loading secure sign-in…")
     releaseAuth()
     await expect(page.getByRole("textbox", { name: "Slow-bundle QA email" })).toBeVisible()
     expect(authRequests).toBe(0)
@@ -1695,6 +1696,7 @@ test("an unavailable Clerk bundle keeps public browsing usable without a busines
 })
 
 test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, "language", { value: "en-US" }))
   await mockPublicApi(page)
   await page.route("**/assets/vireal-auth.js", async (route) => {
     await route.fulfill({
@@ -1710,10 +1712,10 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
     })
   })
   await page.goto("/#login")
-  await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+  await expect(page.locator("#clerkStatus")).toHaveText("Loading secure sign-in…")
   await page.evaluate(() => window.dispatchEvent(new Event("qa-clerk-load")))
   await expect(page.getByRole("textbox", { name: "Late QA email" })).toBeVisible()
-  await expect(page.locator("#clerkStatus")).toContainText("Secure email verification")
+  await expect(page.locator("#clerkStatus")).toHaveText("Secure email verification")
 })
 
 for (const returnToAccount of [false, true]) {

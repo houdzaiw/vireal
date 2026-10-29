@@ -585,7 +585,8 @@
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
         location.hash = afterLogin
-      } else if (["login", ...signupRoutes].includes(route().name)) {
+      } else if (route().name === "login" || (signupRoutes.includes(route().name) && signupAvailable())) {
+        // Auth success must not redirect a restricted signup past its guards.
         navigate("account")
       }
       // Clerk may already have redirected to this hash. In that case no
@@ -860,7 +861,6 @@
   }
 
   function loginPage() {
-    if (state.appUser) return accountPage()
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
@@ -868,6 +868,8 @@
     if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
+    // A session does not override signup, invitation or regional restrictions.
+    if (state.appUser) return accountPage()
     setTimeout(mountSignIn, 0)
     if (!signup && generationAcceptanceLanding && state.commerce?.generation_acceptance_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("一次性生成验收登录", "One-time generation sign-in")}</h1><p>${paymentText("仅指定既有账号。到期后仅可查看已有任务，不开放注册或充值。", "Selected existing account only. Read existing tasks after expiry. No signup or recharge.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
     if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
