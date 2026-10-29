@@ -66,7 +66,7 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
   for (const id of ["app", "overlayRoot", "toastRoot"]) nodes.set(id, node(id))
   let currentHash = hash
   const location = {
-    origin: "https://offline.invalid", search,
+    origin: "https://offline.invalid", pathname: "/", search,
     get hash() { return currentHash },
     set hash(value) { currentHash = value.startsWith("#") ? value : `#${value}` },
     reload() { reloads++ },
@@ -81,6 +81,7 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
   const window = { VirealClerk: sdk, addEventListener(type, listener) { windowEvents.set(type, listener) } }
   const context = {
     document, window, location, navigator: { language },
+    history: { replaceState(_state, _title, path) { const url = new URL(path, location.origin); location.search = url.search; currentHash = url.hash } },
     setTimeout: time.setTimeout, clearTimeout: time.clearTimeout, AbortController,
     URL: class extends URL { static createObjectURL() { objectURLs++; return "blob:offline" } static revokeObjectURL() {} },
     URLSearchParams, Intl, Date: FakeDate, WeakSet, Map, Set,
@@ -90,7 +91,7 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
     MutationObserver: class { constructor(callback) { this.callback = callback } observe(root) { this.root = root; observers.add(this) } disconnect() { observers.delete(this) } },
     fetch: async (url, options = {}) => {
       const path = new URL(url).pathname
-      requests.push({ path, method: options.method || "GET", signal: options.signal })
+      requests.push({ path, method: options.method || "GET", signal: options.signal, headers: options.headers })
       const value = request ? await request(path, options) : undefined
       const data = value === undefined ? path.endsWith("/config") ? config : path.endsWith("/effect-catalog") ? effectCatalog
         : path.endsWith("/auth/session") ? { app_user: { id: "offline-app-user", nickname: "Offline" } }
@@ -101,7 +102,7 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
   }
   vm.createContext(context)
   const end = source.lastIndexOf("})()")
-  vm.runInContext(source.slice(0, end) + `Object.assign(__test, { state, render, loginPage, generatePage, mountSignIn, loadCommerce, syncSession, authFetch, uploadsAllowed, generationAllowed, uploadImage, confirmGeneration, createTask, signInRegionAllowed, signupAvailable, selectedVariant, paymentCheckout, originalPaymentOrder, inspectPayment, paypalMounts, paymentContext });\n` + source.slice(end), context)
+  vm.runInContext(source.slice(0, end) + `Object.assign(__test, { state, render, loginPage, generatePage, mountSignIn, loadCommerce, syncSession, authFetch, uploadsAllowed, generationAllowed, uploadImage, confirmGeneration, createTask, signInRegionAllowed, signupAvailable, selectedVariant, paymentCheckout, originalPaymentOrder, inspectPayment, paypalMounts, paymentContext, stagingSignInAllowed, stagingSignInWindowOpen });\n` + source.slice(end), context)
   const api = context.__test
   return {
     ...api, time, requests, nodes, storage, context,
@@ -534,4 +535,118 @@ test("auth wrapper sanitizes vendor errors", async () => {
 test("auth wrapper publishes ready on successful isolated SDK load", async () => {
   const r = authRuntime(async () => {}); await flush(); assert.equal(r.events[0].type, "vireal:clerk-ready")
   await r.time.tick(15000); assert.equal(r.events.length, 1)
+})
+
+const stagingConfig = () => ({
+  ...closed, country: "CN", region_allowed: false,
+  controlled_registration_enabled: false, generation_acceptance_mode: false,
+  controlled_account_setup_mode: false, payment_only_acceptance_mode: false,
+  internal_sign_in_enabled: false, generation_acceptance_sign_in_enabled: false,
+  generation_acceptance_read_allowed: false, generation_acceptance_allowed: false,
+  controlled_account_setup_enabled: false, payment_only_sign_in_enabled: false,
+  payment_only_acceptance_allowed: false, payment_only_order_created: false,
+  staging_sign_in_enabled: true,
+  staging_sign_in_expires_at: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+})
+test("staging private URL is unavailable without a fresh server hint", async () => {
+  const sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", config: { ...closed, region_allowed: false }, sdk })
+  await r.settle(); assert.equal(sdk.mounts, 0)
+  assert.match(r.html, /验收入口未开放或已过期/); assertNoBusiness(r)
+})
+test("staging sign-in is separate, has no signup, and preserves routing through refresh", async () => {
+  const config = stagingConfig(), sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", config, sdk })
+  await r.settle(); assert.equal(sdk.mounts, 1)
+  assert.match(r.html, /预发布短时登录验收/)
+  assert.equal(r.signupAvailable(), false); assert.equal(sdk.options.withSignUp, false)
+  assert.match(sdk.options.signInUrl, /\?staging_login_acceptance=1#staging-login$/)
+  assert.equal(sdk.options.forceRedirectUrl, sdk.options.signInUrl)
+  const root = r.nodes.get("clerkSignIn")
+  r.render(); await r.visit("#/factor-one")
+  assert.equal(r.nodes.get("clerkSignIn"), root)
+  assert.equal(r.context.location.search, "?staging_login_acceptance=1")
+  const refreshedSDK = signedOutSDK()
+  const refreshed = runtime({ hash: "#/factor-one", search: r.context.location.search, config, sdk: refreshedSDK })
+  await refreshed.settle(); assert.equal(refreshedSDK.mounts, 1)
+  assert.match(refreshed.html, /预发布短时登录验收/)
+  assert.equal(r.uploadsAllowed(), false); assert.equal(r.generationAllowed(), false)
+  assertNoBusiness(r); assertNoBusiness(refreshed)
+})
+for (const [name, override] of [
+  ["off", { staging_sign_in_enabled: false }],
+  ["malformed hint", { staging_sign_in_enabled: "true" }],
+  ["expired", { staging_sign_in_expires_at: "2000-01-01T00:00:00Z" }],
+  ["missing expiry", { staging_sign_in_expires_at: null }],
+  ["far-future expiry", { staging_sign_in_expires_at: "2099-01-01T00:00:00Z" }],
+  ["wrong country", { country: "US" }], ["unknown country", { country: null }],
+  ["ordinary region rewritten", { region_allowed: true }],
+  ["signup open", { registration_enabled: true }],
+  ["controlled signup open", { controlled_registration_enabled: true }],
+  ["recharge open", { recharge_enabled: true }], ["uploads open", { uploads_enabled: true }],
+  ["generation open", { generation_enabled: true }],
+  ["other acceptance mode", { payment_only_acceptance_mode: true }],
+  ["missing business flag", { uploads_enabled: undefined }],
+]) {
+  test(`staging form rejects ${name} without mounting or requesting a session`, async () => {
+    const sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", sdk, config: { ...stagingConfig(), ...override } })
+    await r.settle(); assert.equal(sdk.mounts, 0); assert.equal(r.stagingSignInAllowed(), false)
+    assert.equal(r.requests.some(q => q.path.endsWith("/auth/session")), false); assertNoBusiness(r)
+  })
+}
+test("staging availability never changes ordinary login or signup region policy", async () => {
+  for (const hash of ["#login", "#register", "#controlled-register"]) {
+    const sdk = signedOutSDK(), r = runtime({ hash, config: stagingConfig(), sdk })
+    await r.settle(); assert.equal(sdk.mounts, 0)
+    assert.match(r.html, /当前地区暂未开放服务/); assert.equal(r.signInRegionAllowed(), false)
+    assertNoBusiness(r)
+  }
+})
+test("staging form closes at its absolute deadline without renewing it", async () => {
+  const config = stagingConfig(), sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", config, sdk })
+  await r.settle(); assert.equal(sdk.mounts, 1)
+  await r.time.tick(20 * 60 * 1000 + 20)
+  assert.equal(r.nodes.has("clerkSignIn"), false); assert.match(r.html, /未开放或已过期/)
+  await r.loadCommerce(); await r.settle(); assert.equal(sdk.mounts, 1)
+  assert.equal(r.stagingSignInAllowed(), false); assertNoBusiness(r)
+})
+test("a config error unmounts staging sign-in and clears stale permission", async () => {
+  const sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", config: stagingConfig(), sdk })
+  await r.settle(); assert.equal(sdk.mounts, 1)
+  r.context.fetch = async () => { throw new Error("synthetic network error") }
+  await r.loadCommerce(); await r.settle()
+  assert.equal(r.state.commerce.staging_sign_in_enabled, false)
+  assert.equal(r.state.commerce.staging_sign_in_expires_at, null)
+  assert.equal(r.nodes.has("clerkSignIn"), false); assertNoBusiness(r)
+})
+test("only staging session sync carries the non-secret marker", async () => {
+  const r = runtime({ hash: "#staging-login", config: stagingConfig(), sdk: signedInSDK() })
+  await r.settle()
+  const requests = r.requests.filter(q => q.path.endsWith("/auth/session"))
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].headers["x-vireal-staging-login-acceptance"], "1")
+  assert.equal(r.state.appUser.id, "offline-app-user")
+  assert.equal(r.context.location.hash, "#account")
+  assert.equal(r.requests.filter(q => !q.path.endsWith("/auth/session") && q.headers?.["x-vireal-staging-login-acceptance"]).length, 0)
+  assertNoBusiness(r)
+  const ordinary = runtime({ config: stagingConfig(), sdk: signedInSDK() }); await ordinary.settle()
+  assert.equal(ordinary.requests.find(q => q.path.endsWith("/auth/session")).headers["x-vireal-staging-login-acceptance"], undefined)
+})
+for (const reason of ["expiry", "leave-page"]) {
+  test(`staging request is blocked after token wait when ${reason}`, async () => {
+    const sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", config: stagingConfig(), sdk })
+    await r.settle(); const pending = deferred()
+    sdk.session = { id: "synthetic-staging-session", getToken: () => pending.promise }; sdk.user = { id: "synthetic-user" }
+    const sync = r.syncSession(); await flush()
+    if (reason === "expiry") await r.time.tick(20 * 60 * 1000 + 20)
+    else await r.visit("#home")
+    pending.resolve("synthetic-not-a-real-token"); await sync; await r.settle()
+    assert.equal(r.requests.some(q => q.path.endsWith("/auth/session")), false)
+    assert.equal(r.state.appUser, null); assertNoBusiness(r)
+  })
+}
+test("leaving staging form removes only its routing context", async () => {
+  const sdk = signedOutSDK(), r = runtime({ hash: "#staging-login", search: "?unrelated=keep", config: stagingConfig(), sdk })
+  await r.settle(); assert.match(r.context.location.search, /staging_login_acceptance=1/)
+  await r.visit("#home")
+  assert.equal(r.context.location.search, "?unrelated=keep"); assert.equal(r.stagingSignInAllowed(), false)
+  assert.equal(r.requests.some(q => q.path.endsWith("/auth/session")), false); assertNoBusiness(r)
 })

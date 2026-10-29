@@ -13,6 +13,9 @@
   const paymentOnlyLanding = new URLSearchParams(location.search).get("payment_only_acceptance") === "1"
   const generationAcceptanceLanding = new URLSearchParams(location.search).get("generation_acceptance") === "1"
   const accountSetupLoginLanding = new URLSearchParams(location.search).get("controlled_account_setup") === "1"
+  const stagingLoginLanding = location.hash.split("?")[0].replace(/\/+$/, "") === "#staging-login"
+    || new URLSearchParams(location.search).get("staging_login_acceptance") === "1"
+  const stagingLoginHeader = "x-vireal-staging-login-acceptance"
   // A private URL can only restrict UI; server identity checks grant payment.
   const paymentOnlyRestricted = () => paymentOnlyLanding || state.commerce?.payment_only_acceptance_mode === true
   const accountSetupRestricted = () => state.commerce?.controlled_account_setup_mode === true
@@ -68,7 +71,7 @@
     commerce: null,
     commerceStatus: "loading",
     commerceError: "",
-    authView: invitationLanding ? "controlled-register" : "login",
+    authView: stagingLoginLanding ? "staging-login" : invitationLanding ? "controlled-register" : "login",
     rechargeOrders: [],
     rechargeProduct: "coins_100",
     paymentPolling: null,
@@ -77,6 +80,7 @@
     paymentRecoveryBusy: null,
     accountSetupTimer: null,
     generationAcceptanceTimer: null,
+    stagingLoginTimer: null,
   }
   const observedClerks = new WeakSet()
   let authLoadTimer
@@ -120,6 +124,37 @@
   function navigate(name, params = {}) {
     const query = new URLSearchParams(params).toString()
     location.hash = `${name}${query ? `?${query}` : ""}`
+  }
+
+  function stagingLoginView() { return route().name === "staging-login" }
+
+  function syncStagingLoginURL() {
+    // Non-secret routing context survives a refresh on Clerk's #/factor steps.
+    // It is never an authorization: the API checks the token and exact identity.
+    if (typeof history === "undefined") return
+    const query = new URLSearchParams(location.search)
+    const before = query.toString()
+    if (stagingLoginView()) query.set("staging_login_acceptance", "1")
+    else query.delete("staging_login_acceptance")
+    if (query.toString() !== before) history.replaceState(null, "", `${location.pathname || "/"}${query.toString() ? `?${query}` : ""}${location.hash}`)
+  }
+
+  function stagingSignInWindowOpen() {
+    const config = state.commerce
+    const remaining = Date.parse(config?.staging_sign_in_expires_at) - Date.now()
+    return Boolean(config?.staging_sign_in_enabled === true && config.country === "CN"
+      && config.region_allowed === false && remaining > 0 && remaining <= 30 * 60 * 1000
+      && ["registration_enabled", "controlled_registration_enabled", "recharge_enabled",
+        "uploads_enabled", "generation_enabled", "generation_acceptance_mode",
+        "controlled_account_setup_mode", "payment_only_acceptance_mode",
+        "internal_sign_in_enabled", "generation_acceptance_sign_in_enabled",
+        "generation_acceptance_read_allowed", "generation_acceptance_allowed",
+        "controlled_account_setup_enabled", "payment_only_sign_in_enabled",
+        "payment_only_acceptance_allowed", "payment_only_order_created"].every(key => config[key] === false))
+  }
+
+  function stagingSignInAllowed() {
+    return stagingLoginView() && state.commerceStatus === "ready" && stagingSignInWindowOpen()
   }
 
   function toast(message, error = false) {
@@ -177,7 +212,7 @@
   function generationAllowed() { return capabilityAllowed("generation_enabled") }
 
   function authViewVisible() {
-    return ["login", ...signupRoutes].includes(route().name)
+    return ["login", "staging-login", ...signupRoutes].includes(route().name)
       || (!state.appUser && ["generation", "works", "wallet", "account"].includes(route().name))
   }
 
@@ -193,6 +228,8 @@
     const sessionId = window.VirealClerk?.session?.id
     const sessionToken = await token()
     if (options.signal?.aborted || window.VirealClerk?.session?.id !== sessionId) throw new Error("REQUEST_CANCELLED")
+    if (path === "/api/v1/app/auth/session" && options.headers?.[stagingLoginHeader]
+      && !stagingSignInAllowed()) throw new Error("REQUEST_CANCELLED")
     // Availability can change while token acquisition is in flight. Recheck
     // at the request boundary, not just when the old button was rendered.
     if (options.method === "POST" && (
@@ -270,6 +307,7 @@
     const version = ++commerceVersion
     clearTimeout(state.accountSetupTimer)
     clearTimeout(state.generationAcceptanceTimer)
+    clearTimeout(state.stagingLoginTimer)
     // Keep restrictions and SDK-owned checkout while revalidating. New
     // uploads/generation and new auth mounts fail closed on loading status.
     state.commerceStatus = "loading"
@@ -290,6 +328,9 @@
         Math.max(0, Date.parse(state.commerce.controlled_account_setup_expires_at) - Date.now()) + 10)
       if (generationAcceptanceAllowed()) state.generationAcceptanceTimer = setTimeout(() => render(),
         Math.max(0, Date.parse(state.commerce.generation_acceptance_expires_at) - Date.now()) + 10)
+      if (stagingSignInWindowOpen()) state.stagingLoginTimer = setTimeout(() => {
+        if (stagingLoginView()) render()
+      }, Math.max(0, Date.parse(state.commerce.staging_sign_in_expires_at) - Date.now()) + 10)
     } catch (_) {
       if (version !== commerceVersion) return
       // Retain kill-switch modes on failure, never their stale action grants.
@@ -297,7 +338,8 @@
         registration_enabled: false, controlled_registration_enabled: false,
         controlled_account_setup_enabled: false, recharge_enabled: false,
         uploads_enabled: false, generation_enabled: false, internal_sign_in_enabled: false,
-        payment_only_acceptance_allowed: false, generation_acceptance_allowed: false } : null
+        payment_only_acceptance_allowed: false, generation_acceptance_allowed: false,
+        staging_sign_in_enabled: false, staging_sign_in_expires_at: null } : null
       state.commerceStatus = "error"
       state.commerceError = paymentText("暂时无法确认服务地区和充值状态", "Service availability could not be confirmed")
     }
@@ -552,10 +594,14 @@
     syncingSessionId = sessionId
     state.authSyncing = true
     state.authErrorCode = ""
+    const stagingAttempt = stagingLoginView()
     if (authViewVisible()) render()
     try {
+      if (stagingAttempt && state.commerceStatus !== "ready") await loadCommerce(false)
+      if (stagingAttempt && !stagingSignInAllowed()) throw new Error("STAGING_SIGN_IN_UNAVAILABLE")
       const payload = await withDeadline(async (signal) => parseResponse(await authFetch("/api/v1/app/auth/session", {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal,
+        method: "POST", headers: { "Content-Type": "application/json",
+          ...(stagingAttempt ? { [stagingLoginHeader]: "1" } : {}) }, signal,
       })), CONFIG_WAIT_MS)
       if (version !== authSyncVersion || window.VirealClerk?.session?.id !== sessionId) return
       if (!payload?.app_user?.id) throw new Error("INVALID_AUTH_RESPONSE")
@@ -585,7 +631,7 @@
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
         location.hash = afterLogin
-      } else if (route().name === "login" || (signupRoutes.includes(route().name) && signupAvailable())) {
+      } else if (["login", "staging-login"].includes(route().name) || (signupRoutes.includes(route().name) && signupAvailable())) {
         // Auth success must not redirect a restricted signup past its guards.
         navigate("account")
       }
@@ -656,6 +702,7 @@
   }
 
   function signInRegionAllowed() {
+    if (stagingLoginView()) return stagingSignInAllowed()
     if (accountSetupRestricted()) return controlledAccountSetupAllowed()
     return Boolean(state.commerce && (state.commerce.region_allowed === true
       || (generationAcceptanceLanding && state.commerce.generation_acceptance_sign_in_enabled === true)
@@ -864,6 +911,12 @@
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
+    if (stagingLoginView()) {
+      if (!stagingSignInAllowed()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("预发布登录验收", "Staging sign-in acceptance")}</h1><p class="screen-copy" role="status">${state.commerceStatus === "loading" ? paymentText("正在核对验收状态…", "Checking acceptance availability…") : paymentText("验收入口未开放或已过期。普通地区与业务限制保持不变。", "Acceptance is unavailable or expired. Ordinary region and business restrictions remain unchanged.")}</p><button data-route="home">${paymentText("浏览效果", "Browse effects")}</button></section>`)
+      if (state.appUser) return accountPage()
+      setTimeout(mountSignIn, 0)
+      return shell(`<section class="page screen-page"><h1 class="screen-title">${paymentText("预发布短时登录验收", "Temporary staging sign-in acceptance")}</h1><p class="screen-copy">${paymentText("仅指定既有测试账号，由本人输入密码和验证码。不开放注册、充值、上传或生成。", "Only the existing approved test account. Enter your own password and verification code. No signup, recharge, uploads or generation.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.staging_sign_in_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div><button data-route="home">${paymentText("结束验收并返回浏览", "Leave acceptance and browse")}</button></section>`)
+    }
     if (signup && generationAcceptanceRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("注册暂未开放", "Registration is not yet open")}</h1><button data-route="login">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
@@ -885,13 +938,14 @@
   function render() {
     const current = route()
     const loginRoot = document.getElementById("clerkSignIn")
-    const showsLogin = ["login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
+    const showsLogin = ["login", "staging-login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
     const canSignup = signupAvailable(current.name === "controlled-register")
     const keepLogin = loginRoot?.dataset.clerkMounted && showsLogin && !state.appUser
       && !state.authErrorCode && ((state.commerceStatus === "ready" && signInRegionAllowed())
         // Preserve entered sign-in data during revalidation, never mount a new
         // form or preserve signup on unknown availability. Errors/denial unmount.
-        || (state.commerceStatus === "loading" && loginRoot.dataset.clerkKind === "login"))
+        || (state.commerceStatus === "loading" && loginRoot.dataset.clerkKind === "login"
+          && (!stagingLoginView() || stagingSignInWindowOpen())))
       && (!signupRoutes.includes(current.name) || canSignup)
       && loginRoot.dataset.clerkKind === (signupRoutes.includes(current.name) ? "register" : "login")
     if (keepLogin) { updateAuthFeedback(); return }
@@ -908,6 +962,7 @@
       wallet: walletPage,
       account: accountPage,
       login: loginPage,
+      "staging-login": loginPage,
       register: loginPage,
       "controlled-register": loginPage,
       terms: () => legalPage("terms"),
@@ -935,11 +990,13 @@
     if (signup && !signupAvailable(controlled)) return
     try {
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
-      state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
+      const stagingSignIn = stagingLoginView()
+      state.authView = stagingSignIn ? "staging-login" : controlled ? "controlled-register" : signup ? "register" : "login"
       const internalQuery = generationAcceptanceLanding ? "?generation_acceptance=1" : paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : (invitationLanding || accountSetupLoginLanding) && accountSetupRestricted() ? "?controlled_account_setup=1" : ""
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
-      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", withSignUp: false, signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { elements: !signup && !signupAvailable(false) ? { footerAction: { display: "none" } } : {}, variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      const stagingURL = `${location.origin}/?staging_login_acceptance=1#staging-login`
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", withSignUp: false, signInUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}${afterLogin}`, appearance: { elements: !signup && !signupAvailable(false) ? { footerAction: { display: "none" } } : {}, variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       watchAuthMount(root)
     } catch (_) {
       state.authErrorCode = "AUTH_MOUNT_FAILED"
@@ -1268,7 +1325,8 @@
     stopTaskPolling()
     clearTimeout(state.playbackTimer)
     const current = route()
-    if (["login", ...signupRoutes].includes(current.name)) state.authView = current.name
+    if (["login", "staging-login", ...signupRoutes].includes(current.name)) state.authView = current.name
+    syncStagingLoginURL()
     if (current.name !== "wallet") clearTimeout(state.paymentPolling)
     if (current.name === "works") void loadTasks(false).then(render)
     else if (current.name === "wallet") void refreshPayments()
@@ -1310,6 +1368,7 @@
     }
   }, AUTH_WAIT_MS)
 
+  syncStagingLoginURL()
   render()
   void loadCatalog()
   void loadCommerce()

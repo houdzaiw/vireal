@@ -26,6 +26,7 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         setup_mode=False,
         window_open=False,
         country=None,
+        staging_login=False,
     ):
         path = (
             Path(__file__).resolve().parents[2] / "backend/app/api/routes/app_paypal.py"
@@ -54,6 +55,7 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             APP_GENERATION_ACCEPTANCE_EXPIRES_AT=None,
             APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT=None,
             APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT=None,
+            APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT=datetime.now(UTC) + timedelta(minutes=20),
         )
         response = SimpleNamespace(headers={})
         namespace = {
@@ -62,6 +64,7 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             "settings": settings,
             "global_real_count": lambda **_: 0,
             "region_allowed": lambda _: region,
+            "staging_sign_in_enabled": lambda _: staging_login,
             "acceptance_request_allowed": lambda _: identity,
             "edge_country": lambda _: country or ("US" if region else None),
             "controlled_cn_account_setup_enabled": lambda: window_open,
@@ -152,6 +155,19 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         self.assertIs(data["generation_acceptance_allowed"], False)
         self.assertIs(data["uploads_enabled"], False)
         self.assertIs(data["generation_enabled"], False)
+
+    def test_staging_sign_in_hint_never_opens_registration_or_commerce(self):
+        data = self.config(staging_login=True, country="CN", region=False)
+        self.assertIs(data["staging_sign_in_enabled"], True)
+        self.assertIsNotNone(data["staging_sign_in_expires_at"])
+        self.assertIs(data["region_allowed"], False)
+        for key in ("registration_enabled", "controlled_registration_enabled", "recharge_enabled", "uploads_enabled", "generation_enabled"):
+            self.assertIs(data[key], False)
+
+    def test_disabled_staging_hint_never_exposes_an_expiry(self):
+        data = self.config()
+        self.assertIs(data["staging_sign_in_enabled"], False)
+        self.assertIsNone(data["staging_sign_in_expires_at"])
 
 
 if __name__ == "__main__":
