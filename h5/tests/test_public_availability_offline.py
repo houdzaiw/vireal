@@ -55,7 +55,8 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             APP_GENERATION_ACCEPTANCE_EXPIRES_AT=None,
             APP_PAYMENT_ONLY_ACCEPTANCE_EXPIRES_AT=None,
             APP_CONTROLLED_CN_ACCOUNT_SETUP_EXPIRES_AT=None,
-            APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT=datetime.now(UTC) + timedelta(minutes=20),
+            APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT=datetime.now(UTC)
+            + timedelta(minutes=20),
         )
         response = SimpleNamespace(headers={})
         namespace = {
@@ -161,7 +162,13 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         self.assertIs(data["staging_sign_in_enabled"], True)
         self.assertIsNotNone(data["staging_sign_in_expires_at"])
         self.assertIs(data["region_allowed"], False)
-        for key in ("registration_enabled", "controlled_registration_enabled", "recharge_enabled", "uploads_enabled", "generation_enabled"):
+        for key in (
+            "registration_enabled",
+            "controlled_registration_enabled",
+            "recharge_enabled",
+            "uploads_enabled",
+            "generation_enabled",
+        ):
             self.assertIs(data[key], False)
 
     def test_disabled_staging_hint_never_exposes_an_expiry(self):
