@@ -89,11 +89,23 @@ def payment_config(
         else False
     )
     identity_allowed = not settings.APP_LIVE_ACCEPTANCE_ENABLED or acceptance_allowed
+    # Ordinary availability hints, never an entitlement or quota grant. Raw
+    # private-mode switches still restrict commerce after expiry or invalidity.
+    submissions_enabled = bool(
+        settings.APP_VIDEO_SUBMISSIONS_ENABLED
+        and allowed
+        and identity_allowed
+        and not generation_mode
+        and not payment_only
+        and not cn_setup_mode
+    )
     return {
         "environment": settings.PAYPAL_ENVIRONMENT,
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        "uploads_enabled": submissions_enabled,
+        "generation_enabled": submissions_enabled,
         "generation_acceptance_mode": generation_mode,
         "generation_acceptance_sign_in_enabled": generation_acceptance_mode_safe()
         and edge_country(request) == "CN",

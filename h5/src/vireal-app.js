@@ -4,6 +4,8 @@
   const apiOrigin = (document.querySelector('meta[name="vireal-api-base-url"]')?.content || "").replace(/\/+$/, "")
   const API = apiOrigin.startsWith("__VIREAL_") ? "http://localhost:8000" : apiOrigin
   const POLL_MS = 3500
+  const AUTH_WAIT_MS = 15000
+  const CONFIG_WAIT_MS = 10000
   const terminalStatuses = new Set(["succeeded", "failed", "canceled", "expired"])
   const invitationLanding = new URLSearchParams(location.search).get("controlled_registration") === "1"
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
@@ -46,6 +48,8 @@
     appUser: null,
     internalGenerationAllowed: false,
     authReady: false,
+    authErrorCode: "",
+    authSyncing: false,
     authSyncedSessionId: "",
     uploads: [],
     selectedVariants: {},
@@ -62,6 +66,7 @@
     playbackRetryUrl: new Map(),
     savingTaskId: null,
     commerce: null,
+    commerceStatus: "loading",
     commerceError: "",
     authView: invitationLanding ? "controlled-register" : "login",
     rechargeOrders: [],
@@ -74,13 +79,22 @@
     generationAcceptanceTimer: null,
   }
   const observedClerks = new WeakSet()
+  let authLoadTimer
+  let authMountTimer
+  let authMountObserver
+  let commerceVersion = 0
+  let authSyncVersion = 0
+  let syncingSessionId = ""
 
   function observeClerk(clerk) {
+    clearTimeout(authLoadTimer)
+    state.authErrorCode = ""
     if (!observedClerks.has(clerk)) {
       observedClerks.add(clerk)
       clerk.addListener(() => void syncSession())
     }
     void syncSession()
+    if (authViewVisible()) render()
   }
 
   const app = () => document.getElementById("app")
@@ -129,6 +143,44 @@
     throw new Error(detail)
   }
 
+  async function withDeadline(action, milliseconds) {
+    const controller = new AbortController()
+    let timer
+    try {
+      return await Promise.race([
+        action(controller.signal),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort()
+            reject(new Error("REQUEST_TIMEOUT"))
+          }, milliseconds)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  // Ordinary hints cannot override raw private-mode restrictions. Special
+  // generation uses only the previously accepted server identity/window grant.
+  function capabilityAllowed(field) {
+    if (state.commerceStatus !== "ready" || paymentOnlyRestricted() || accountSetupRestricted()) return false
+    if (generationAcceptanceRestricted()) return generationAcceptanceAllowed()
+      && !state.commerce.generation_acceptance_task_id
+      && Boolean(selectedVariant(effectBySlug(route().params.get("video")) || allEffects()[0]))
+    if (state.internalGenerationAllowed && state.appUser && state.commerce?.country === "CN"
+      && state.commerce.internal_sign_in_enabled === true) return true
+    return state.commerce?.region_allowed === true && state.commerce[field] === true
+  }
+
+  function uploadsAllowed() { return capabilityAllowed("uploads_enabled") }
+  function generationAllowed() { return capabilityAllowed("generation_enabled") }
+
+  function authViewVisible() {
+    return ["login", ...signupRoutes].includes(route().name)
+      || (!state.appUser && ["generation", "works", "wallet", "account"].includes(route().name))
+  }
+
   async function token() {
     const current = window.VirealClerk?.session
     if (!current) throw new Error("请先登录")
@@ -138,11 +190,20 @@
   }
 
   async function authFetch(path, options = {}) {
+    const sessionId = window.VirealClerk?.session?.id
+    const sessionToken = await token()
+    if (options.signal?.aborted || window.VirealClerk?.session?.id !== sessionId) throw new Error("REQUEST_CANCELLED")
+    // Availability can change while token acquisition is in flight. Recheck
+    // at the request boundary, not just when the old button was rendered.
+    if (options.method === "POST" && (
+      (path === "/api/v1/app/uploads/images" && !uploadsAllowed())
+      || (path === "/api/v1/app/video-tasks" && !generationAllowed())
+    )) throw new Error("New uploads or generation are unavailable")
     const response = await fetch(apiUrl(path), {
       ...options,
-      headers: { ...options.headers, Authorization: `Bearer ${await token()}` },
+      headers: { ...options.headers, Authorization: `Bearer ${sessionToken}` },
     })
-    if (response.status === 401 || (response.status === 403 && path === "/api/v1/app/auth/session")) state.appUser = null
+    if (window.VirealClerk?.session?.id === sessionId && (response.status === 401 || (response.status === 403 && path === "/api/v1/app/auth/session"))) state.appUser = null
     return response
   }
 
@@ -206,11 +267,23 @@
   }
 
   async function loadCommerce(redraw = true) {
+    const version = ++commerceVersion
     clearTimeout(state.accountSetupTimer)
     clearTimeout(state.generationAcceptanceTimer)
+    // Keep restrictions and SDK-owned checkout while revalidating. New
+    // uploads/generation and new auth mounts fail closed on loading status.
+    state.commerceStatus = "loading"
+    if (route().name === "generate") render()
     try {
-      const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
-      state.commerce = await parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers }))
+      const config = await withDeadline(async (signal) => {
+        const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
+        return parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers, signal }))
+      }, CONFIG_WAIT_MS)
+      if (version !== commerceVersion) return
+      if (!config || typeof config !== "object" || Array.isArray(config)
+        || typeof config.region_allowed !== "boolean") throw new Error("INVALID_CONFIG")
+      state.commerce = config
+      state.commerceStatus = "ready"
       if (state.commerce.payment_only_acceptance_mode) state.rechargeProduct = "coins_100"
       state.commerceError = ""
       if (controlledAccountSetupAllowed()) state.accountSetupTimer = setTimeout(() => render(),
@@ -218,16 +291,27 @@
       if (generationAcceptanceAllowed()) state.generationAcceptanceTimer = setTimeout(() => render(),
         Math.max(0, Date.parse(state.commerce.generation_acceptance_expires_at) - Date.now()) + 10)
     } catch (_) {
-      state.commerce = null
+      if (version !== commerceVersion) return
+      // Retain kill-switch modes on failure, never their stale action grants.
+      state.commerce = state.commerce ? { ...state.commerce, region_allowed: false,
+        registration_enabled: false, controlled_registration_enabled: false,
+        controlled_account_setup_enabled: false, recharge_enabled: false,
+        uploads_enabled: false, generation_enabled: false, internal_sign_in_enabled: false,
+        payment_only_acceptance_allowed: false, generation_acceptance_allowed: false } : null
+      state.commerceStatus = "error"
       state.commerceError = paymentText("暂时无法确认服务地区和充值状态", "Service availability could not be confirmed")
     }
-    if (redraw) render()
+    // Even a non-wallet redraw refresh must continue a login waiting for config.
+    if (redraw || authViewVisible() || route().name === "generate") render()
   }
 
   async function loadRechargeOrders() {
     if (!state.appUser) return
+    const owner = state.appUser.id
+    const version = authSyncVersion
     try {
       const result = await parseResponse(await authFetch("/api/v1/app/orders?limit=20"))
+      if (version !== authSyncVersion || state.appUser?.id !== owner) return
       state.rechargeOrders = result.data.filter(order => order.provider === "paypal")
     } catch (_) {}
   }
@@ -433,6 +517,9 @@
   async function syncSession() {
     const clerk = window.VirealClerk
     if (!clerk?.session || !clerk.user) {
+      ++authSyncVersion
+      syncingSessionId = ""
+      state.authSyncing = false
       // Clerk also notifies while the signed-out form is being edited. Only
       // redraw on an auth transition; remounting would reset email/OTP state.
       const authChanged = !state.authReady || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
@@ -459,9 +546,19 @@
       return
     }
     if (state.authSyncedSessionId === clerk.session.id && state.appUser) return
+    const sessionId = clerk.session.id
+    if (syncingSessionId === sessionId) return
+    const version = ++authSyncVersion
+    syncingSessionId = sessionId
+    state.authSyncing = true
+    state.authErrorCode = ""
+    if (authViewVisible()) render()
     try {
-      const response = await authFetch("/api/v1/app/auth/session", { method: "POST", headers: { "Content-Type": "application/json" } })
-      const payload = await parseResponse(response)
+      const payload = await withDeadline(async (signal) => parseResponse(await authFetch("/api/v1/app/auth/session", {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal,
+      })), CONFIG_WAIT_MS)
+      if (version !== authSyncVersion || window.VirealClerk?.session?.id !== sessionId) return
+      if (!payload?.app_user?.id) throw new Error("INVALID_AUTH_RESPONSE")
       if (state.appUser?.id !== payload.app_user.id) {
         state.rechargeOrders = []
         state.paymentRecovery.clear()
@@ -479,11 +576,17 @@
       state.internalGenerationAllowed = payload.internal_generation_allowed === true
       state.authSyncedSessionId = clerk.session.id
       state.authReady = true
-      await Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders(), loadCommerce(false)])
+      state.authSyncing = false
+      // Ancillary reads must not hold an authenticated visitor on an empty form.
+      void Promise.all([loadWallet(false), loadTasks(false), loadRechargeOrders(), loadCommerce(false)]).then(() => {
+        if (version === authSyncVersion) render()
+      })
       const afterLogin = sessionStorage.getItem("vireal-after-login")
       if (afterLogin) {
         sessionStorage.removeItem("vireal-after-login")
         location.hash = afterLogin
+      } else if (["login", ...signupRoutes].includes(route().name)) {
+        navigate("account")
       }
       // Clerk may already have redirected to this hash. In that case no
       // hashchange event fires, so render the newly authenticated state here.
@@ -491,9 +594,15 @@
       if (route().name === "wallet") void refreshPayments()
       else if (route().name === "generation" && route().params.get("id")) startPolling(route().params.get("id"))
     } catch (error) {
+      if (version !== authSyncVersion) return
       state.authReady = true
-      toast(`登录同步失败：${errorDetail(error)}`, true)
+      state.authErrorCode = error?.message === "REQUEST_TIMEOUT" ? "AUTH_SYNC_TIMEOUT" : "AUTH_SYNC_FAILED"
       render()
+    } finally {
+      if (version === authSyncVersion) {
+        syncingSessionId = ""
+        state.authSyncing = false
+      }
     }
   }
 
@@ -506,15 +615,24 @@
 
   async function loadWallet(shouldRender = true) {
     if (!state.appUser) return
-    try { state.wallet = await parseResponse(await authFetch("/api/v1/app/wallet")) }
+    const owner = state.appUser.id
+    const version = authSyncVersion
+    try {
+      const wallet = await parseResponse(await authFetch("/api/v1/app/wallet"))
+      if (version !== authSyncVersion || state.appUser?.id !== owner) return
+      state.wallet = wallet
+    }
     catch (error) { if (shouldRender) toast(errorDetail(error), true) }
     if (shouldRender) render()
   }
 
   async function loadTasks(shouldRender = true) {
     if (!state.appUser) return
+    const owner = state.appUser.id
+    const version = authSyncVersion
     try {
       const payload = await parseResponse(await authFetch("/api/v1/app/video-tasks?skip=0&limit=50"))
+      if (version !== authSyncVersion || state.appUser?.id !== owner) return
       state.tasks = payload.data
     } catch (error) { if (shouldRender) toast(errorDetail(error), true) }
     if (shouldRender) render()
@@ -601,6 +719,9 @@
     const category = categoryFor(effect)
     const variant = selectedVariant(effect)
     if (generationAcceptanceRestricted() && !variant) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("仅单人舞蹈 5 秒可验收", "Only dance-1 / 5 seconds is permitted")}</h1><button data-effect="dance-1" class="primary-button">${paymentText("前往验收效果", "Open acceptance effect")}</button></section>`)
+    if (!uploadsAllowed() || !generationAllowed()) {
+      return shell(`<section class="page screen-page page-enter" data-service-closed>${header()}<h1 class="screen-title">${esc(effect.title_zh)}</h1><div class="empty-panel"><h2>${paymentText("暂未开放，仅供浏览", "Preview only — creation is unavailable")}</h2><p>${paymentText("上传和生成当前不可用。注册与充值状态单独控制，请勿提交照片或重复操作。", "Uploads and generation are unavailable. Registration and recharge are controlled separately.")}</p>${state.commerceStatus === "loading" ? `<p role="status">${paymentText("正在确认服务状态…", "Checking availability…")}</p>` : ""}<button class="secondary-button" data-refresh-availability>${paymentText("重新查询服务状态", "Check availability again")}</button></div><button class="primary-button" data-route="home">${paymentText("返回浏览效果", "Browse effects")}</button></section>`, "")
+    }
     const enough = state.wallet && variant && state.wallet.balance >= variant.coin_cost
     const uploaded = state.uploads.filter((entry) => entry?.id).length
     const uploading = state.uploads.some((entry) => entry?.pending)
@@ -693,7 +814,53 @@
     return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${esc(title)}</h1><div class="profile-card"><p class="screen-copy">${esc(copy)}</p><p class="screen-copy">${paymentText("客服", "Support")}: <a href="mailto:${esc(support)}">${esc(support)}</a></p><p class="screen-copy">2026-10-13</p></div><button class="secondary-button" data-route="home">${paymentText("返回首页", "Back to home")}</button></section>`)
   }
 
+  function stopAuthMountWatch() {
+    clearTimeout(authMountTimer)
+    authMountObserver?.disconnect()
+    authMountObserver = null
+  }
+
+  function authFeedback() {
+    const root = document.getElementById("clerkSignIn")
+    const code = state.authErrorCode || (state.commerceStatus === "error" ? "AVAILABILITY_UNAVAILABLE" : "")
+      || (window.VirealClerk?.session && state.authReady && !state.authSyncing && !state.appUser ? "AUTH_SYNC_FAILED" : "")
+    if (code) return `<p role="alert" class="inline-error" data-auth-error>${paymentText("安全登录暂不可用，请稍后重试。", "Secure sign-in is unavailable. Please retry.")} (${esc(code)})</p><button class="secondary-button" data-retry-auth>${paymentText("重新载入登录", "Reload sign-in")}</button>`
+    const message = state.authSyncing || window.VirealClerk?.session ? paymentText("正在同步登录状态…", "Synchronizing sign-in…")
+      : !window.VirealClerk ? paymentText("正在载入安全登录…", "Loading secure sign-in…")
+      : state.commerceStatus !== "ready" ? paymentText("正在确认服务状态…", "Checking availability…")
+      : root?.dataset.clerkUiReady ? paymentText("安全邮箱验证", "Secure email verification")
+      : paymentText("正在载入登录表单…", "Loading sign-in form…")
+    return `<p id="clerkStatus" role="status" class="network-badge">${message}</p>`
+  }
+
+  function updateAuthFeedback() {
+    const feedback = document.getElementById("authFeedback")
+    if (feedback) feedback.innerHTML = authFeedback()
+  }
+
+  function watchAuthMount(root) {
+    stopAuthMountWatch()
+    const inspect = () => {
+      if (!root.isConnected) { stopAuthMountWatch(); return }
+      if (!root.querySelector("input, button")) return
+      root.dataset.clerkUiReady = "true"
+      stopAuthMountWatch()
+      updateAuthFeedback()
+    }
+    authMountObserver = new MutationObserver(inspect)
+    authMountObserver.observe(root, { childList: true, subtree: true })
+    authMountTimer = setTimeout(() => {
+      stopAuthMountWatch()
+      if (root.isConnected && !root.dataset.clerkUiReady) {
+        state.authErrorCode = "AUTH_FORM_TIMEOUT"
+        render()
+      }
+    }, AUTH_WAIT_MS)
+    inspect()
+  }
+
   function loginPage() {
+    if (state.appUser) return accountPage()
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     const internalSignIn = !signup && internalAcceptanceLanding && state.commerce?.internal_sign_in_enabled === true
@@ -701,13 +868,12 @@
     if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
-    const ready = Boolean(window.VirealClerk)
     setTimeout(mountSignIn, 0)
-    if (!signup && generationAcceptanceLanding && state.commerce?.generation_acceptance_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("一次性生成验收登录", "One-time generation sign-in")}</h1><p>${paymentText("仅指定既有账号。到期后仅可查看已有任务，不开放注册或充值。", "Selected existing account only. Read existing tasks after expiry. No signup or recharge.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus">${paymentText("安全邮箱验证", "Secure email verification")}</p></section>`)
-    if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
-    if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
-    if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p></section>`)
-    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><p id="clerkStatus" class="network-badge">${ready ? paymentText("安全邮箱验证", "Secure email verification") : "正在载入安全登录…"}</p>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
+    if (!signup && generationAcceptanceLanding && state.commerce?.generation_acceptance_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("一次性生成验收登录", "One-time generation sign-in")}</h1><p>${paymentText("仅指定既有账号。到期后仅可查看已有任务，不开放注册或充值。", "Selected existing account only. Read existing tasks after expiry. No signup or recharge.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
+    if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
+    if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
+    if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
+    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
 
   function shell(content, activeNav = null) {
@@ -719,12 +885,19 @@
     const loginRoot = document.getElementById("clerkSignIn")
     const showsLogin = ["login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
     const canSignup = signupAvailable(current.name === "controlled-register")
-    if (loginRoot && (!signInRegionAllowed() || (signupRoutes.includes(current.name) && !canSignup) || loginRoot.dataset.clerkKind !== (signupRoutes.includes(current.name) ? "register" : "login"))) {
-      window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
-      loginRoot.remove()
+    const keepLogin = loginRoot?.dataset.clerkMounted && showsLogin && !state.appUser
+      && !state.authErrorCode && ((state.commerceStatus === "ready" && signInRegionAllowed())
+        // Preserve entered sign-in data during revalidation, never mount a new
+        // form or preserve signup on unknown availability. Errors/denial unmount.
+        || (state.commerceStatus === "loading" && loginRoot.dataset.clerkKind === "login"))
+      && (!signupRoutes.includes(current.name) || canSignup)
+      && loginRoot.dataset.clerkKind === (signupRoutes.includes(current.name) ? "register" : "login")
+    if (keepLogin) { updateAuthFeedback(); return }
+    stopAuthMountWatch()
+    if (loginRoot?.dataset.clerkMounted) {
+      try { window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot) } catch (_) {}
     }
-    if (loginRoot?.isConnected && showsLogin) { mountSignIn(); return }
-    if (loginRoot?.isConnected) window.VirealClerk?.[loginRoot.dataset.clerkKind === "register" ? "unmountSignUp" : "unmountSignIn"]?.(loginRoot)
+    if (!generationAllowed()) document.getElementById("overlayRoot").innerHTML = ""
     const pages = {
       home: homePage,
       generate: () => generatePage(current.params),
@@ -753,7 +926,8 @@
   function mountSignIn() {
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
-    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || !signInRegionAllowed()) return
+    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || state.authErrorCode
+      || state.commerceStatus !== "ready" || !signInRegionAllowed()) return
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
     if (signup && !signupAvailable(controlled)) return
@@ -761,15 +935,18 @@
       const afterLogin = sessionStorage.getItem("vireal-after-login") || "#account"
       state.authView = controlled ? "controlled-register" : signup ? "register" : "login"
       const internalQuery = generationAcceptanceLanding ? "?generation_acceptance=1" : paymentOnlyLanding ? "?payment_only_acceptance=1" : internalAcceptanceLanding ? "?internal_acceptance=1" : (invitationLanding || accountSetupLoginLanding) && accountSetupRestricted() ? "?controlled_account_setup=1" : ""
-      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
-      const status = document.getElementById("clerkStatus")
-      if (status) status.textContent = paymentText("安全邮箱验证", "Secure email verification")
-    } catch (_) {}
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", withSignUp: false, signInUrl: `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: `${location.origin}/${internalQuery}${afterLogin}`, appearance: { elements: !signup && !signupAvailable(false) ? { footerAction: { display: "none" } } : {}, variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      watchAuthMount(root)
+    } catch (_) {
+      state.authErrorCode = "AUTH_MOUNT_FAILED"
+      render()
+    }
   }
 
   async function uploadImage(index, file) {
+    if (!uploadsAllowed()) return toast(paymentText("上传暂未开放", "Uploads are unavailable"), true)
     if (paymentOnlyRestricted() || accountSetupRestricted()) return
     if (generationAcceptanceRestricted() && (!generationAcceptanceAllowed() || index !== 0 || !selectedVariant(effectBySlug(route().params.get("video")) || allEffects()[0]))) return
     if (!requireAuth(location.hash)) return
@@ -793,11 +970,13 @@
   }
 
   function confirmGeneration(effect, variant) {
+    if (!generationAllowed()) return
     const root = document.getElementById("overlayRoot")
     root.innerHTML = `<div class="drawer-root" data-close-drawer><section class="drawer" role="dialog" aria-modal="true"><h2>确认生成</h2><p>价格和模型配置将由服务端再次校验，客户端不能修改实际扣币金额。</p><div class="confirm-detail"><span>${esc(effect.title_zh)} · ${variant.duration_seconds} 秒</span><strong>本次消耗 ${variant.coin_cost} ✦</strong><span>生成后可在“作品”中查看进度。</span></div><div class="drawer-actions"><button class="secondary-button" data-close-drawer>取消</button><button class="primary-button" data-confirm-generation>确认并生成</button></div></section></div>`
   }
 
   async function createTask() {
+    if (!generationAllowed()) return toast(paymentText("生成暂未开放", "Generation is unavailable"), true)
     if (paymentOnlyRestricted() || accountSetupRestricted()) return
     if (generationAcceptanceRestricted() && !generationAcceptanceAllowed()) return
     if (state.isSubmitting) return
@@ -979,6 +1158,12 @@
   }
 
   document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-retry-auth]")) {
+      // Explicit resource reload, never a business-operation replay.
+      if (authViewVisible() && !state.isSubmitting && !state.checkoutActive) location.reload()
+      return
+    }
+    if (event.target.closest("[data-refresh-availability]")) { void loadCommerce(); return }
     const inspect = event.target.closest("[data-inspect-payment]")
     if (inspect) { void inspectPayment(inspect.dataset.inspectPayment); return }
     const product = event.target.closest("[data-recharge-product]")
@@ -1030,6 +1215,7 @@
       return
     }
     if (event.target.closest("[data-generate]")) {
+      if (!generationAllowed()) return toast(paymentText("生成暂未开放", "Generation is unavailable"), true)
       if (generationAcceptanceRestricted() && !generationAcceptanceAllowed()) return
       if (!requireAuth(location.hash)) return
       const effect = effectBySlug(route().params.get("video")) || allEffects()[0]
@@ -1106,7 +1292,21 @@
   window.addEventListener("vireal:clerk-ready", (event) => {
     observeClerk(event.detail)
   })
-  window.addEventListener("vireal:clerk-error", (event) => { state.authReady = true; toast(event.detail?.message || "登录组件加载失败", true); render() })
+  window.addEventListener("vireal:clerk-error", (event) => {
+    clearTimeout(authLoadTimer)
+    state.authReady = true
+    state.authErrorCode = ["AUTH_NOT_CONFIGURED", "AUTH_LOAD_TIMEOUT"].includes(event.detail?.code)
+      ? event.detail.code : "AUTH_LOAD_FAILED"
+    if (authViewVisible()) render()
+  })
+
+  // Also covers a missing/blocked auth bundle which cannot emit an SDK event.
+  authLoadTimer = setTimeout(() => {
+    if (!window.VirealClerk) {
+      state.authErrorCode = "AUTH_LOAD_TIMEOUT"
+      if (authViewVisible()) render()
+    }
+  }, AUTH_WAIT_MS)
 
   render()
   void loadCatalog()
