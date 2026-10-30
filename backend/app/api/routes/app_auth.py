@@ -30,6 +30,11 @@ from app.services.commercial_access import (
     require_region,
 )
 from app.services.generation_acceptance import generation_acceptance_user
+from app.services.staging_login_acceptance import (
+    STAGING_LOGIN_HEADER,
+    require_staging_sign_in_context,
+    require_staging_sign_in_identity,
+)
 
 router = APIRouter(prefix="/app/auth", tags=["app auth"])
 
@@ -87,8 +92,31 @@ def initialize_clerk_session(
 ) -> AppAuthSessionResponse:
     """Create or refresh the local App identity for a verified Clerk session."""
     cn_setup_request = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+    staging_request = STAGING_LOGIN_HEADER in request.headers
+    staging_identity: AppUserIdentity | None = None
+    staging_user: AppUser | None = None
+    if staging_request:
+        # Reject wrong subjects/contexts before even querying the provider profile.
+        require_staging_sign_in_context(request, clerk_session)
+        identities = session.exec(
+            select(AppUserIdentity).where(
+                AppUserIdentity.issuer == clerk_session.issuer,
+                AppUserIdentity.subject == clerk_session.subject,
+            )
+        ).all()
+        if len(identities) == 1:
+            staging_identity = identities[0]
+            staging_user = session.get(AppUser, staging_identity.app_user_id)
+        require_staging_sign_in_identity(
+            request, clerk_session, staging_identity, staging_user
+        )
 
     def require_current_setup_authorization() -> None:
+        if staging_request:
+            # Recheck after provider calls/locks and immediately before commit.
+            require_staging_sign_in_identity(
+                request, clerk_session, staging_identity, staging_user
+            )
         if cn_setup_request and not controlled_cn_account_setup_profile_allowed(
             request, profile=profile, issuer=clerk_session.issuer
         ):
@@ -111,6 +139,12 @@ def initialize_clerk_session(
         )
     ).first()
     is_new_user = identity is None
+    if staging_request and (
+        identity is None
+        or staging_identity is None
+        or identity.id != staging_identity.id
+    ):
+        raise HTTPException(403, "Staging sign-in requires the existing test identity")
     now = datetime.now(UTC)
     session_id_hash = hash_clerk_session_id(clerk_session.session_id)
 

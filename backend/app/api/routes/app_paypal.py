@@ -50,6 +50,7 @@ from app.services.paypal_replacement import (
     valid_grant,
     verify_voided,
 )
+from app.services.staging_login_acceptance import staging_sign_in_enabled
 from app.services.video_quota import global_real_count, utc_day_bounds
 
 router = APIRouter(prefix="/app/paypal", tags=["app paypal"])
@@ -67,6 +68,7 @@ def payment_config(
         0,
     )
     allowed = region_allowed(request)
+    staging_sign_in = staging_sign_in_enabled(request)
     cn_setup = controlled_cn_account_setup_enabled() and edge_country(request) == "CN"
     cn_setup_mode = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
@@ -89,11 +91,28 @@ def payment_config(
         else False
     )
     identity_allowed = not settings.APP_LIVE_ACCEPTANCE_ENABLED or acceptance_allowed
+    # Ordinary availability hints, never an entitlement or quota grant. Raw
+    # private-mode switches still restrict commerce after expiry or invalidity.
+    submissions_enabled = bool(
+        settings.APP_VIDEO_SUBMISSIONS_ENABLED
+        and allowed
+        and identity_allowed
+        and not generation_mode
+        and not payment_only
+        and not cn_setup_mode
+    )
     return {
         "environment": settings.PAYPAL_ENVIRONMENT,
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        # A form hint only: subject/identity are checked by the session endpoint.
+        "staging_sign_in_enabled": staging_sign_in,
+        "staging_sign_in_expires_at": settings.APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT
+        if staging_sign_in
+        else None,
+        "uploads_enabled": submissions_enabled,
+        "generation_enabled": submissions_enabled,
         "generation_acceptance_mode": generation_mode,
         "generation_acceptance_sign_in_enabled": generation_acceptance_mode_safe()
         and edge_country(request) == "CN",
