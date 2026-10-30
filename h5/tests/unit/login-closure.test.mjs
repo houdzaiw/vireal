@@ -64,16 +64,21 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
     }
   }
   for (const id of ["app", "overlayRoot", "toastRoot"]) nodes.set(id, node(id))
-  let currentHash = hash
+  let currentHash = hash, nativeHashEvents = false
   const location = {
     origin: "https://offline.invalid", pathname: "/", search,
+    get href() { return this.origin + this.pathname + this.search + currentHash },
     get hash() { return currentHash },
-    set hash(value) { currentHash = value.startsWith("#") ? value : `#${value}` },
+    set hash(value) {
+      const old = currentHash
+      currentHash = value ? value.startsWith("#") ? value : `#${value}` : ""
+      if (nativeHashEvents && old !== currentHash) time.setTimeout(() => windowEvents.get("hashchange")?.({ type: "hashchange" }), 0)
+    },
     reload() { reloads++ },
   }
   const document = {
     hidden: false,
-    querySelector(selector) { return selector.includes("vireal-api-base-url") ? { content: "https://api.offline.invalid" } : null },
+    querySelector(selector) { return selector.includes("vireal-api-base-url") ? { content: "https://api.offline.invalid" } : selector.includes("clerk-publishable-key") ? { content: "pk_test_synthetic_offline_only" } : null },
     getElementById: id => nodes.get(id) || null,
     querySelectorAll: () => [],
     addEventListener(type, listener) { documentEvents.set(type, listener) },
@@ -112,6 +117,16 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
     async sdkError(detail) { windowEvents.get("vireal:clerk-error")({ detail }); await this.settle() },
     async visit(value) { location.hash = value; windowEvents.get("hashchange")(); await this.settle() },
     async click(selector) { documentEvents.get("click")({ target: { closest: s => s === selector ? {} : null } }); await this.settle() },
+    async loadAuthScript(Clerk) {
+      nativeHashEvents = true
+      context.Clerk = Clerk; context.ui = {}
+      context.CustomEvent = class { constructor(type, options) { this.type = type; this.detail = options?.detail } }
+      context.HashChangeEvent = class { constructor(type, options) { this.type = type; Object.assign(this, options) } }
+      window.location = location; window.history = context.history
+      window.dispatchEvent = event => { windowEvents.get(event.type)?.(event); return true }
+      vm.runInContext(authSource.replace(/^import .*\n/gm, ""), context)
+      await this.settle()
+    },
   }
 }
 
@@ -127,6 +142,42 @@ function signedOutSDK({ empty = false, fail = false } = {}) {
   }
 }
 function signedInSDK() { return { ...signedOutSDK(), session: { id: "offline-session", getToken: async () => "synthetic-not-a-real-token" }, user: { id: "offline-user" } } }
+
+// Match the installed 6.32.1 lifecycle: clear/emit resources before navigation,
+// skip the final active-resource emit if the default window-navigation path
+// marks the document as leaving. A fragment-only move does not reload the app.
+function navigationSDK(r, { legacyWindowNavigation = false } = {}) {
+  return class {
+    constructor() {
+      Object.assign(this, signedOutSDK())
+      this.session = null; this.user = null
+      const subscribe = this.addListener.bind(this)
+      this.addListener = listener => { subscribe(listener); listener({ session: this.session, user: this.user }) }
+      this.fullNavigations = []
+    }
+    async load(options) { this.loadOptions = legacyWindowNavigation ? { ui: options.ui } : options }
+    async navigate(to, replace = false) {
+      const next = new URL(to, r.context.location.href)
+      const windowNavigate = destination => {
+        const target = new URL(destination, r.context.location.href)
+        this.fullNavigations.push(target.href)
+        if (target.origin === r.context.location.origin && target.pathname === r.context.location.pathname
+          && target.search === r.context.location.search) r.context.location.hash = target.hash
+      }
+      const router = this.loadOptions[replace ? "routerReplace" : "routerPush"]
+      return router ? router(next.href, { windowNavigate }) : windowNavigate(next)
+    }
+    async finishSignIn(to = "#account", replace = false) {
+      this.session = null; this.user = null
+      this.notify({ session: null, user: null })
+      await this.navigate(to, replace)
+      if (this.fullNavigations.length) return
+      const active = signedInSDK()
+      this.session = active.session; this.user = active.user
+      this.notify({ session: this.session, user: this.user })
+    }
+  }
+}
 function assertNoBusiness(r) {
   assert.equal(r.requests.filter(q => q.method !== "GET" && /uploads|video-tasks|paypal\/orders/.test(q.path)).length, 0)
   assert.equal(r.objectURLs, 0)
@@ -223,6 +274,81 @@ test("existing session visiting login renders account without an empty form", as
   const r = runtime({ sdk: signedInSDK() }); await r.settle(); r.render()
   assert.equal(r.state.appUser.id, "offline-app-user"); assert.match(r.html, /账户与偏好/)
   assert.doesNotMatch(r.html, /id="clerkSignIn"/); assertNoBusiness(r)
+})
+for (const hash of ["#login", "#account"]) {
+  test(`real auth initializer completes SDK navigation without a reload from ${hash}`, async () => {
+    const r = runtime({ hash }); await r.settle()
+    await r.loadAuthScript(navigationSDK(r))
+    const sdk = r.context.window.VirealClerk
+    assert.equal(sdk.mounts, 1)
+    assert.equal(typeof sdk.loadOptions.routerPush, "function")
+    assert.equal(typeof sdk.loadOptions.routerReplace, "function")
+    await sdk.finishSignIn(); await r.settle()
+    assert.equal(sdk.fullNavigations.length, 0)
+    assert.match(r.html, /账户与偏好/)
+    assert.equal(r.state.appUser.id, "offline-app-user")
+    assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1)
+    assert.equal(r.reloads, 0); assertNoBusiness(r)
+  })
+}
+test("real auth initializer completes replace navigation and emits its hash change", async () => {
+  const r = runtime(); await r.settle(); await r.loadAuthScript(navigationSDK(r))
+  const sdk = r.context.window.VirealClerk
+  await sdk.finishSignIn("#account", true); await r.settle()
+  assert.equal(sdk.fullNavigations.length, 0)
+  assert.equal(r.context.location.hash, "#account")
+  assert.match(r.html, /账户与偏好/); assertNoBusiness(r)
+})
+test("legacy full-window hash return reproduces the unchanged-form failure", async () => {
+  const r = runtime(); await r.settle()
+  await r.loadAuthScript(navigationSDK(r, { legacyWindowNavigation: true }))
+  const sdk = r.context.window.VirealClerk
+  await sdk.finishSignIn(); await r.settle()
+  assert.equal(r.context.location.hash, "#account")
+  assert.equal(sdk.fullNavigations.length, 1)
+  assert.equal(r.state.appUser, null)
+  assert.doesNotMatch(r.html, /账户与偏好/)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 0)
+  assertNoBusiness(r)
+})
+for (const replace of [false, true]) {
+  for (const target of ["https://other.offline.invalid/#account", "/other-page#account", "/?invitation=synthetic#account"]) {
+    test(`auth ${replace ? "replace" : "push"} delegates document changes intact: ${target}`, async () => {
+      const r = runtime(); await r.settle(); await r.loadAuthScript(navigationSDK(r))
+      const sdk = r.context.window.VirealClerk
+      await sdk.navigate(target, replace); await r.settle()
+      assert.deepEqual(sdk.fullNavigations, [new URL(target, "https://offline.invalid/").href])
+      assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 0)
+      assertNoBusiness(r)
+    })
+  }
+}
+test("same-document auth return preserves existing query context", async () => {
+  const r = runtime({ search: "?campaign=offline" }); await r.settle(); await r.loadAuthScript(navigationSDK(r))
+  const sdk = r.context.window.VirealClerk
+  await sdk.finishSignIn("/?campaign=offline#account"); await r.settle()
+  assert.equal(r.context.location.search, "?campaign=offline")
+  assert.equal(sdk.fullNavigations.length, 0)
+  assert.match(r.html, /账户与偏好/); assertNoBusiness(r)
+})
+test("hash replace notifies the App router even with an already synchronized session", async () => {
+  const r = runtime(); await r.settle(); await r.loadAuthScript(navigationSDK(r))
+  const sdk = r.context.window.VirealClerk
+  await sdk.finishSignIn(); await r.settle()
+  await sdk.navigate("#works", true); await r.settle()
+  assert.match(r.html, /我的作品/)
+  assert.equal(sdk.fullNavigations.length, 0)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1)
+  assertNoBusiness(r)
+})
+test("auth navigation refuses malformed targets or missing document-navigation metadata safely", async () => {
+  const r = runtime(); await r.settle(); await r.loadAuthScript(navigationSDK(r))
+  const sdk = r.context.window.VirealClerk
+  for (const method of [sdk.loadOptions.routerPush, sdk.loadOptions.routerReplace]) {
+    assert.throws(() => method("https://[SYNTHETIC_PRIVATE]", {}), error => error.message === "AUTH_NAVIGATION_UNAVAILABLE")
+    assert.throws(() => method("/other-page"), error => error.message === "AUTH_NAVIGATION_UNAVAILABLE")
+  }
+  assert.equal(sdk.fullNavigations.length, 0); assertNoBusiness(r)
 })
 test("signed-in resource emission restores account even before SDK getters publish", async () => {
   const sdk = signedOutSDK(), r = runtime({ hash: "#account" })

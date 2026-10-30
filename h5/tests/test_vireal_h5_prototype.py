@@ -353,7 +353,9 @@ class VirealH5ProductionTests(unittest.TestCase):
     def test_clerk_is_bundled(self) -> None:
         self.assertIn('name="clerk-publishable-key"', self.html)
         self.assertIn('import { Clerk } from "@clerk/clerk-js"', self.auth_entry)
-        self.assertIn("await clerk.load({ ui })", self.auth_entry)
+        self.assertRegex(self.auth_entry, r"await clerk\.load\(\{\s*ui,")
+        self.assertIn("routerPush:", self.auth_entry)
+        self.assertIn("routerReplace:", self.auth_entry)
 
     def test_public_app_runs_before_the_larger_auth_bundle(self) -> None:
         self.assertLess(

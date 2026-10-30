@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
+import { readFileSync } from "node:fs"
+
+// Execute the real initializer as well as the real built App. Only the vendor
+// lifecycle/API are synthetic; no Clerk account, key or network is exercised.
+const initializer = readFileSync(new URL("../../outputs/vireal-wan-video-h5/prototype/vireal-auth.js", import.meta.url), "utf8").replace(/^import .*\n/gm, "")
 
 test.use({ locale: "zh-CN" })
 
@@ -21,7 +26,8 @@ const config = (overrides = {}) => ({
 })
 
 async function isolated(page: Page, options: { denied?: boolean; empty?: boolean; enabled?: boolean; expiry?: string;
-  ordinaryHandoff?: boolean; pendingSync?: Promise<void>; signOutDuringSync?: boolean } = {}) {
+  ordinaryHandoff?: boolean; pendingSync?: Promise<void>; signOutDuringSync?: boolean;
+  sdkNavigation?: "push" | "replace" } = {}) {
   let current = config({ staging_sign_in_enabled: options.enabled !== false,
     ...(options.expiry ? { staging_sign_in_expires_at: options.expiry } : {}),
     ...(options.ordinaryHandoff ? { country: "US", region_allowed: true, staging_sign_in_enabled: false } : {}) })
@@ -40,7 +46,37 @@ async function isolated(page: Page, options: { denied?: boolean; empty?: boolean
     if (path.endsWith("/wallet")) return route.fulfill({ json: { balance: 0, ledger: [] } })
     return route.fulfill({ json: { data: [] } })
   })
-  await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: `
+  const lifecycle = `
+    const ui = {};
+    class Clerk {
+      constructor() { this.session = null; this.user = null; this.listeners = []; }
+      async load(options) { this.options = options; }
+      addListener(fn) { this.listeners.push(fn); fn({ session: this.session, user: this.user }); }
+      emit() { for (const fn of this.listeners) fn({ session: this.session, user: this.user }); }
+      unmountSignIn(root) { root.innerHTML = ''; }
+      mountSignIn(root) {
+        root.innerHTML = '<label>Offline email<input aria-label="Offline email"></label><button type="button">模拟本人登录</button>';
+        root.querySelector('button').onclick = async () => {
+          this.session = null; this.user = null; this.emit();
+          let unloading = false;
+          const target = new URL(location.href); target.hash = 'account';
+          const windowNavigate = to => {
+            unloading = true;
+            document.documentElement.dataset.testWindowNavigations = '1';
+            location.href = new URL(to, location.href).href;
+          };
+          const router = this.options[${JSON.stringify(options.sdkNavigation === "replace" ? "routerReplace" : "routerPush")}];
+          if (router) await router(target.href, { windowNavigate });
+          else windowNavigate(target);
+          if (unloading) return;
+          this.session = { id: 'synthetic-session', getToken: async () => 'synthetic-not-a-real-token' };
+          this.user = { id: 'synthetic-clerk-user' }; this.emit();
+        };
+      }
+    }
+    ${initializer}
+  `
+  await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: options.sdkNavigation ? lifecycle : `
     const listeners = [];
     const clerk = {
       addListener(fn) {
@@ -223,4 +259,39 @@ test("signed-out emission cancels an in-flight handoff and restores sign-in", as
     await expect(page.getByRole("heading", { name: "账户与偏好" })).toHaveCount(0)
     expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
   } finally { release() }
+})
+
+for (const scenario of [
+  { route: "login", navigation: "push" as const },
+  { route: "account", navigation: "push" as const },
+  { route: "login", navigation: "replace" as const },
+]) {
+  test(`real initializer completes SDK ${scenario.navigation} handoff from ${scenario.route} without reload`, async ({ page }) => {
+    const api = await isolated(page, { ordinaryHandoff: true, sdkNavigation: scenario.navigation })
+    let documents = 0
+    page.on("request", request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents++ })
+    await page.goto(`/#${scenario.route}`)
+    await page.getByRole("button", { name: "模拟本人登录" }).click()
+    await expect(page.getByRole("heading", { name: "账户与偏好", exact: true })).toBeVisible()
+    await expect(page.getByText("synthetic-staging-user", { exact: true })).toBeVisible()
+    await expect(page.getByRole("textbox")).toHaveCount(0)
+    await expect(page.locator("html")).not.toHaveAttribute("data-test-window-navigations", "1")
+    expect(documents).toBe(1)
+    expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
+    await page.goto(page.url().split("#")[0] + "#works")
+    await page.goto(page.url().split("#")[0] + "#account")
+    await expect(page.getByRole("heading", { name: "账户与偏好", exact: true })).toBeVisible()
+    expect(api.writes).toHaveLength(1)
+    await expect(page.locator("[data-upload-index], [data-generate], [data-confirm-generation]")).toHaveCount(0)
+  })
+}
+
+test("real initializer handoff cannot bypass App session rejection", async ({ page }) => {
+  const api = await isolated(page, { ordinaryHandoff: true, sdkNavigation: "push", denied: true })
+  await page.goto("/#login")
+  await page.getByRole("button", { name: "模拟本人登录" }).click()
+  await expect(page.getByText(/AUTH_SYNC_FAILED/)).toBeVisible()
+  await expect(page.getByRole("heading", { name: "账户与偏好", exact: true })).toHaveCount(0)
+  await expect(page.getByText("SYNTHETIC_PRIVATE_ACCOUNT_DETAIL")).toHaveCount(0)
+  expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
 })
