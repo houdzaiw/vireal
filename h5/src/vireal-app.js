@@ -83,6 +83,7 @@
     stagingLoginTimer: null,
   }
   const observedClerks = new WeakSet()
+  const clerkResources = new WeakMap()
   let authLoadTimer
   let authMountTimer
   let authMountObserver
@@ -90,12 +91,25 @@
   let authSyncVersion = 0
   let syncingSessionId = ""
 
+  function currentAuth() {
+    const clerk = window.VirealClerk
+    // Listener emissions are a coherent SDK snapshot. Do not mix their session
+    // with getters that may still describe the previous authentication state.
+    return clerkResources.get(clerk) || { session: clerk?.session, user: clerk?.user }
+  }
+
   function observeClerk(clerk) {
     clearTimeout(authLoadTimer)
     state.authErrorCode = ""
     if (!observedClerks.has(clerk)) {
       observedClerks.add(clerk)
-      clerk.addListener(() => void syncSession())
+      clerk.addListener((resources) => {
+        if (window.VirealClerk !== clerk) return
+        if (resources && Object.hasOwn(resources, "session")) {
+          clerkResources.set(clerk, { session: resources.session, user: resources.user })
+        }
+        void syncSession()
+      })
     }
     void syncSession()
     if (authViewVisible()) render()
@@ -217,7 +231,7 @@
   }
 
   async function token() {
-    const current = window.VirealClerk?.session
+    const current = currentAuth().session
     if (!current) throw new Error("请先登录")
     const value = await current.getToken()
     if (!value) throw new Error("登录状态已失效")
@@ -225,9 +239,9 @@
   }
 
   async function authFetch(path, options = {}) {
-    const sessionId = window.VirealClerk?.session?.id
+    const sessionId = currentAuth().session?.id
     const sessionToken = await token()
-    if (options.signal?.aborted || window.VirealClerk?.session?.id !== sessionId) throw new Error("REQUEST_CANCELLED")
+    if (options.signal?.aborted || currentAuth().session?.id !== sessionId) throw new Error("REQUEST_CANCELLED")
     if (path === "/api/v1/app/auth/session" && options.headers?.[stagingLoginHeader]
       && !stagingSignInAllowed()) throw new Error("REQUEST_CANCELLED")
     // Availability can change while token acquisition is in flight. Recheck
@@ -240,7 +254,7 @@
       ...options,
       headers: { ...options.headers, Authorization: `Bearer ${sessionToken}` },
     })
-    if (window.VirealClerk?.session?.id === sessionId && (response.status === 401 || (response.status === 403 && path === "/api/v1/app/auth/session"))) state.appUser = null
+    if (currentAuth().session?.id === sessionId && (response.status === 401 || (response.status === 403 && path === "/api/v1/app/auth/session"))) state.appUser = null
     return response
   }
 
@@ -314,7 +328,7 @@
     if (route().name === "generate") render()
     try {
       const config = await withDeadline(async (signal) => {
-        const headers = window.VirealClerk?.session ? { Authorization: `Bearer ${await token()}` } : {}
+        const headers = currentAuth().session ? { Authorization: `Bearer ${await token()}` } : {}
         return parseResponse(await fetch(apiUrl("/api/v1/app/paypal/config"), { cache: "no-store", headers, signal }))
       }, CONFIG_WAIT_MS)
       if (version !== commerceVersion) return
@@ -556,46 +570,52 @@
     }
   }
 
+  function clearAppSession() {
+    state.appUser = null
+    state.internalGenerationAllowed = false
+    state.wallet = null
+    state.tasks = []
+    state.rechargeOrders = []
+    state.paymentRecovery.clear()
+    state.paymentRecoveryBusy = null
+    clearTimeout(state.paymentPolling)
+    state.checkoutActive = false
+    state.currentTask = null
+    state.generationAttempt = null
+    state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
+    state.uploads = []
+    stopTaskPolling()
+    state.authSyncedSessionId = ""
+    clearTimeout(state.playbackTimer)
+  }
+
   async function syncSession() {
-    const clerk = window.VirealClerk
-    if (!clerk?.session || !clerk.user) {
+    const { session, user } = currentAuth()
+    if (!session || !user) {
+      // Clerk also notifies while the signed-out form is being edited. Only
+      // redraw on an auth transition; remounting would reset email/OTP state.
+      const authChanged = !state.authReady || state.authSyncing || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
       ++authSyncVersion
       syncingSessionId = ""
       state.authSyncing = false
-      // Clerk also notifies while the signed-out form is being edited. Only
-      // redraw on an auth transition; remounting would reset email/OTP state.
-      const authChanged = !state.authReady || Boolean(state.appUser || state.wallet || state.authSyncedSessionId)
-      state.appUser = null
-      state.internalGenerationAllowed = false
-      state.wallet = null
-      state.tasks = []
-      state.rechargeOrders = []
-      state.paymentRecovery.clear()
-      state.paymentRecoveryBusy = null
-      clearTimeout(state.paymentPolling)
-      state.checkoutActive = false
-      state.currentTask = null
-      state.generationAttempt = null
-      state.uploads.forEach((item) => item?.preview && URL.revokeObjectURL(item.preview))
-      state.uploads = []
-      stopTaskPolling()
-      state.authSyncedSessionId = ""
+      clearAppSession()
       state.authReady = true
-      stopTaskPolling()
-      clearTimeout(state.playbackTimer)
+      if (authChanged) state.authErrorCode = ""
       if (authChanged) void loadCommerce(false)
       if (authChanged) render()
       return
     }
-    if (state.authSyncedSessionId === clerk.session.id && state.appUser) return
-    const sessionId = clerk.session.id
+    if (state.authSyncedSessionId === session.id && state.appUser) return
+    const sessionId = session.id
     if (syncingSessionId === sessionId) return
+    const changingSession = Boolean(state.authSyncedSessionId && state.authSyncedSessionId !== sessionId)
+    if (changingSession) clearAppSession()
     const version = ++authSyncVersion
     syncingSessionId = sessionId
     state.authSyncing = true
     state.authErrorCode = ""
     const stagingAttempt = stagingLoginView()
-    if (authViewVisible()) render()
+    if (changingSession || authViewVisible()) render()
     try {
       if (stagingAttempt && state.commerceStatus !== "ready") await loadCommerce(false)
       if (stagingAttempt && !stagingSignInAllowed()) throw new Error("STAGING_SIGN_IN_UNAVAILABLE")
@@ -603,7 +623,7 @@
         method: "POST", headers: { "Content-Type": "application/json",
           ...(stagingAttempt ? { [stagingLoginHeader]: "1" } : {}) }, signal,
       })), CONFIG_WAIT_MS)
-      if (version !== authSyncVersion || window.VirealClerk?.session?.id !== sessionId) return
+      if (version !== authSyncVersion || currentAuth().session?.id !== sessionId) return
       if (!payload?.app_user?.id) throw new Error("INVALID_AUTH_RESPONSE")
       if (state.appUser?.id !== payload.app_user.id) {
         state.rechargeOrders = []
@@ -620,7 +640,7 @@
       }
       state.appUser = payload.app_user
       state.internalGenerationAllowed = payload.internal_generation_allowed === true
-      state.authSyncedSessionId = clerk.session.id
+      state.authSyncedSessionId = sessionId
       state.authReady = true
       state.authSyncing = false
       // Ancillary reads must not hold an authenticated visitor on an empty form.
@@ -871,9 +891,9 @@
   function authFeedback() {
     const root = document.getElementById("clerkSignIn")
     const code = state.authErrorCode || (state.commerceStatus === "error" ? "AVAILABILITY_UNAVAILABLE" : "")
-      || (window.VirealClerk?.session && state.authReady && !state.authSyncing && !state.appUser ? "AUTH_SYNC_FAILED" : "")
+      || (currentAuth().session && state.authReady && !state.authSyncing && !state.appUser ? "AUTH_SYNC_FAILED" : "")
     if (code) return `<p role="alert" class="inline-error" data-auth-error>${paymentText("安全登录暂不可用，请稍后重试。", "Secure sign-in is unavailable. Please retry.")} (${esc(code)})</p><button class="secondary-button" data-retry-auth>${paymentText("重新载入登录", "Reload sign-in")}</button>`
-    const message = state.authSyncing || window.VirealClerk?.session ? paymentText("正在同步登录状态…", "Synchronizing sign-in…")
+    const message = state.authSyncing || currentAuth().session ? paymentText("正在同步登录状态…", "Synchronizing sign-in…")
       : !window.VirealClerk ? paymentText("正在载入安全登录…", "Loading secure sign-in…")
       : state.commerceStatus !== "ready" ? paymentText("正在确认服务状态…", "Checking availability…")
       : root?.dataset.clerkUiReady ? paymentText("安全邮箱验证", "Secure email verification")
@@ -941,7 +961,7 @@
     const showsLogin = ["login", "staging-login", ...signupRoutes].includes(current.name) || (!state.appUser && ["generation", "works", "wallet", "account"].includes(current.name))
     const canSignup = signupAvailable(current.name === "controlled-register")
     const keepLogin = loginRoot?.dataset.clerkMounted && showsLogin && !state.appUser
-      && !state.authErrorCode && ((state.commerceStatus === "ready" && signInRegionAllowed())
+      && !currentAuth().session && !state.authErrorCode && ((state.commerceStatus === "ready" && signInRegionAllowed())
         // Preserve entered sign-in data during revalidation, never mount a new
         // form or preserve signup on unknown availability. Errors/denial unmount.
         || (state.commerceStatus === "loading" && loginRoot.dataset.clerkKind === "login"
@@ -983,7 +1003,7 @@
   function mountSignIn() {
     const root = document.getElementById("clerkSignIn")
     const clerk = window.VirealClerk
-    if (!root || !clerk || clerk.session || root.dataset.clerkMounted || state.authErrorCode
+    if (!root || !clerk || currentAuth().session || root.dataset.clerkMounted || state.authErrorCode
       || state.commerceStatus !== "ready" || !signInRegionAllowed()) return
     const controlled = route().name === "controlled-register"
     const signup = signupRoutes.includes(route().name)
@@ -1309,8 +1329,12 @@
     if (event.target.closest("[data-logout]")) {
       void (async () => {
         try { await authFetch("/api/v1/app/auth/logout", { method: "POST" }) } catch (_) {}
-        await window.VirealClerk?.signOut()
-      state.appUser = null; state.wallet = null; state.tasks = []; state.currentTask = null; state.authSyncedSessionId = ""
+        const clerk = window.VirealClerk
+        await clerk?.signOut()
+        if (clerk && window.VirealClerk === clerk) {
+          clerkResources.set(clerk, { session: null, user: null })
+          await syncSession()
+        }
         navigate("home")
       })()
     }
@@ -1327,6 +1351,9 @@
     const current = route()
     if (["login", "staging-login", ...signupRoutes].includes(current.name)) state.authView = current.name
     syncStagingLoginURL()
+    // The SDK may redirect an existing session before its listener runs. Resume
+    // App synchronization without starting another sign-in or selecting a session.
+    if (currentAuth().session && !state.appUser && authViewVisible()) void syncSession()
     if (current.name !== "wallet") clearTimeout(state.paymentPolling)
     if (current.name === "works") void loadTasks(false).then(render)
     else if (current.name === "wallet") void refreshPayments()

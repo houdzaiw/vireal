@@ -467,8 +467,16 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn("FormData", self.app)
 
     def test_auth_session_is_initialized(self) -> None:
-        self.assertIn("/api/v1/app/auth/session", self.app)
-        self.assertIn("clerk.session.id", self.app)
+        sync = self.app[
+            self.app.index("async function syncSession()") : self.app.index(
+                "function requireAuth("
+            )
+        ]
+        self.assertIn("/api/v1/app/auth/session", sync)
+        self.assertIn('method: "POST"', sync)
+        self.assertIn("version !== authSyncVersion", sync)
+        self.assertIn("currentAuth().session?.id !== sessionId", sync)
+        self.assertIn("state.authSyncedSessionId = sessionId", sync)
         self.assertNotIn("device-login", self.app)
 
     def test_logout_revokes_backend_before_clerk(self) -> None:
@@ -477,7 +485,12 @@ class VirealH5ProductionTests(unittest.TestCase):
         ]
         self.assertLess(
             logout.index("/api/v1/app/auth/logout"),
-            logout.index("VirealClerk?.signOut"),
+            logout.index("await clerk?.signOut()"),
+        )
+        self.assertIn("const clerk = window.VirealClerk", logout)
+        self.assertLess(
+            logout.index("await clerk?.signOut()"),
+            logout.index("clerkResources.set(clerk, { session: null, user: null })"),
         )
 
     def test_confirmed_operator_and_exact_media_retention_are_disclosed(self) -> None:

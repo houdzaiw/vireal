@@ -210,6 +210,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "h5/tests/browser/staging-login-acceptance.spec.ts",
                 "h5/playwright.staging-login.config.ts",
                 "h5/tests/unit/login-closure.test.mjs",
+                "h5/tests/test_vireal_h5_prototype.py",
                 "h5/tests/test_public_availability_offline.py",
                 "h5/tests/test_accepted_integration_offline.py",
             },

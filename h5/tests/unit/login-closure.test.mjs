@@ -116,11 +116,14 @@ function runtime({ hash = "#login", search = "", config = closed, sdk = null, re
 }
 
 function signedOutSDK({ empty = false, fail = false } = {}) {
+  const listeners = []
   return {
-    addListener() {}, mounts: 0, options: null,
+    addListener(listener) { listeners.push(listener) },
+    notify(resources) { for (const listener of listeners) listener(resources) },
+    mounts: 0, unmounts: 0, options: null,
     mountSignIn(root, options) { this.mounts++; this.options = options; if (fail) throw new Error("fake credential must never be shown"); if (!empty) root.innerHTML = '<input value="offline typed value"><button>Sign in</button>' },
     mountSignUp(root, options) { this.mountSignIn(root, options) },
-    unmountSignIn() {}, unmountSignUp() {},
+    unmountSignIn() { this.unmounts++ }, unmountSignUp() { this.unmounts++ },
   }
 }
 function signedInSDK() { return { ...signedOutSDK(), session: { id: "offline-session", getToken: async () => "synthetic-not-a-real-token" }, user: { id: "offline-user" } } }
@@ -220,6 +223,136 @@ test("existing session visiting login renders account without an empty form", as
   const r = runtime({ sdk: signedInSDK() }); await r.settle(); r.render()
   assert.equal(r.state.appUser.id, "offline-app-user"); assert.match(r.html, /账户与偏好/)
   assert.doesNotMatch(r.html, /id="clerkSignIn"/); assertNoBusiness(r)
+})
+test("signed-in resource emission restores account even before SDK getters publish", async () => {
+  const sdk = signedOutSDK(), r = runtime({ hash: "#account" })
+  await r.settle(); await r.sdkReady(sdk)
+  const resources = signedInSDK()
+  sdk.notify({ session: resources.session, user: resources.user })
+  await r.settle()
+  assert.match(r.html, /账户与偏好/)
+  assert.equal(r.state.appUser.id, "offline-app-user")
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1)
+  assert.doesNotMatch(r.html, /id="clerkSignIn"/); assertNoBusiness(r)
+})
+test("new active session unmounts old form while App synchronization is pending", async () => {
+  const pending = deferred(), sdk = signedOutSDK()
+  const r = runtime({ request: path => path.endsWith("/auth/session") ? pending.promise : undefined })
+  await r.settle(); await r.sdkReady(sdk)
+  const oldRoot = r.nodes.get("clerkSignIn"), resources = signedInSDK()
+  sdk.session = resources.session; sdk.user = resources.user
+  sdk.notify({ session: sdk.session, user: sdk.user }); await r.settle()
+  assert.equal(oldRoot.isConnected, false)
+  assert.equal(sdk.unmounts, 1)
+  assert.doesNotMatch(r.nodes.get("clerkSignIn")?.innerHTML || "", /offline typed value/)
+  assert.match(r.html, /正在同步登录状态/)
+  pending.resolve({ app_user: { id: "offline-app-user", nickname: "Offline" } }); await r.settle()
+  assert.match(r.html, /账户与偏好/); assert.equal(sdk.mounts, 1); assertNoBusiness(r)
+})
+test("Clerk account redirect resumes a published session without another sign-in", async () => {
+  const sdk = signedOutSDK(), r = runtime()
+  await r.settle(); await r.sdkReady(sdk)
+  const resources = signedInSDK()
+  sdk.session = resources.session; sdk.user = resources.user
+  await r.visit("#account")
+  assert.match(r.html, /账户与偏好/)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1)
+  assert.equal(sdk.mounts, 1); assertNoBusiness(r)
+})
+test("signed-out resource emission discards pending result while SDK getters lag", async () => {
+  const pending = deferred(), sdk = signedOutSDK()
+  const r = runtime({ request: path => path.endsWith("/auth/session") ? pending.promise : undefined })
+  await r.settle(); await r.sdkReady(sdk)
+  const resources = signedInSDK()
+  sdk.session = resources.session; sdk.user = resources.user
+  sdk.notify({ session: sdk.session, user: sdk.user }); await r.settle()
+  sdk.notify({ session: null, user: null }); await r.settle()
+  pending.resolve({ app_user: { id: "must-not-restore-old-owner" } }); await r.settle()
+  assert.equal(r.state.appUser, null)
+  assert.doesNotMatch(r.html, /账户与偏好|must-not-restore-old-owner/); assertNoBusiness(r)
+})
+test("duplicate resource emissions during handoff remain one App sync", async () => {
+  const pending = deferred(), sdk = signedOutSDK()
+  const r = runtime({ request: path => path.endsWith("/auth/session") ? pending.promise : undefined })
+  await r.settle(); await r.sdkReady(sdk)
+  const resources = signedInSDK()
+  sdk.session = resources.session; sdk.user = resources.user
+  for (let n = 0; n < 5; n++) sdk.notify({ session: sdk.session, user: sdk.user })
+  await r.settle()
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1)
+  pending.resolve({ app_user: { id: "offline-app-user" } }); await r.settle()
+  sdk.notify({ session: sdk.session, user: sdk.user }); await r.settle()
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 1); assertNoBusiness(r)
+})
+test("sign-out during handoff restores a usable form and cancels token-wait requests", async () => {
+  const token = deferred(), sdk = signedOutSDK(), resources = signedInSDK()
+  resources.session.getToken = () => token.promise
+  const r = runtime(); await r.settle(); await r.sdkReady(sdk)
+  sdk.notify({ session: resources.session, user: resources.user }); await r.settle()
+  assert.equal(r.state.authSyncing, true)
+  sdk.notify({ session: null, user: null }); await r.settle()
+  assert.equal(r.state.authSyncing, false)
+  assert.equal(r.nodes.get("clerkSignIn").dataset.clerkUiReady, "true")
+  token.resolve("synthetic-obsolete-token"); await r.settle()
+  assert.equal(r.state.appUser, null)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, 0)
+  assertNoBusiness(r)
+})
+test("a signed-out snapshot cannot be resurrected by a redirect with stale getters", async () => {
+  const sdk = signedInSDK(), r = runtime({ sdk }); await r.settle()
+  sdk.notify({ session: sdk.session, user: sdk.user }); await r.settle()
+  sdk.notify({ session: null, user: null }); await r.settle()
+  const before = r.requests.filter(q => q.path.endsWith("/auth/session")).length
+  await r.visit("#account")
+  assert.equal(r.state.appUser, null)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, before)
+  assert.doesNotMatch(r.html, /账户与偏好/); assertNoBusiness(r)
+})
+test("resource emissions from a replaced SDK cannot restore its old account", async () => {
+  const oldSDK = signedInSDK(), r = runtime({ sdk: oldSDK }); await r.settle()
+  const nextSDK = signedOutSDK(); await r.sdkReady(nextSDK)
+  const before = r.requests.filter(q => q.path.endsWith("/auth/session")).length
+  oldSDK.notify({ session: oldSDK.session, user: oldSDK.user }); await r.settle()
+  assert.equal(r.state.appUser, null)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, before)
+  assertNoBusiness(r)
+})
+test("an account switch hides old owner data before the new App sync completes", async () => {
+  const pending = deferred(), sdk = signedInSDK()
+  let syncs = 0
+  const r = runtime({ hash: "#account", sdk,
+    request: path => path.endsWith("/auth/session") && ++syncs === 2 ? pending.promise : undefined })
+  await r.settle()
+  r.state.wallet = { balance: 777 }; r.state.tasks = [{ id: "old-task" }]
+  r.state.rechargeOrders = [{ id: "old-order" }]; r.state.internalGenerationAllowed = true
+  const session = { id: "offline-other-session", getToken: async () => "synthetic-other-token" }
+  sdk.notify({ session, user: { id: "offline-other-user" } }); await r.settle()
+  assert.equal(r.state.appUser, null); assert.equal(r.state.wallet, null)
+  assert.equal(r.state.tasks.length, 0); assert.equal(r.state.rechargeOrders.length, 0)
+  assert.equal(r.state.internalGenerationAllowed, false)
+  assert.doesNotMatch(r.html, /账户与偏好|offline-app-user/)
+  pending.resolve({ app_user: { id: "offline-other-app-user" } }); await r.settle()
+  assert.equal(r.state.appUser.id, "offline-other-app-user"); assertNoBusiness(r)
+})
+test("explicit logout clears the emitted snapshot even if SDK getters remain stale", async () => {
+  const sdk = signedInSDK(), r = runtime({ sdk }); await r.settle()
+  sdk.notify({ session: sdk.session, user: sdk.user }); await r.settle()
+  sdk.signOut = async () => {}
+  await r.click("[data-logout]")
+  assert.equal(r.state.appUser, null)
+  const before = r.requests.filter(q => q.path.endsWith("/auth/session")).length
+  await r.visit("#account")
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, before)
+  assert.equal(r.nodes.get("clerkSignIn").dataset.clerkUiReady, "true")
+  assertNoBusiness(r)
+})
+test("session emission without a user fails closed instead of borrowing stale user getters", async () => {
+  const sdk = signedInSDK(), r = runtime({ sdk }); await r.settle()
+  const before = r.requests.filter(q => q.path.endsWith("/auth/session")).length
+  sdk.notify({ session: { id: "offline-incomplete-session" } }); await r.settle()
+  assert.equal(r.state.appUser, null)
+  assert.equal(r.requests.filter(q => q.path.endsWith("/auth/session")).length, before)
+  assertNoBusiness(r)
 })
 test("slow ancillary reads cannot hold an authenticated visitor on login", async () => {
   const r = runtime({ sdk: signedInSDK(), request: path => /wallet|video-tasks|orders/.test(path) ? new Promise(() => {}) : undefined }); await r.settle()

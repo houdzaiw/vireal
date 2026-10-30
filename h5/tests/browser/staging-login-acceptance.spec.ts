@@ -20,9 +20,11 @@ const config = (overrides = {}) => ({
   ...overrides,
 })
 
-async function isolated(page: Page, options: { denied?: boolean; empty?: boolean; enabled?: boolean; expiry?: string } = {}) {
+async function isolated(page: Page, options: { denied?: boolean; empty?: boolean; enabled?: boolean; expiry?: string;
+  ordinaryHandoff?: boolean; pendingSync?: Promise<void>; signOutDuringSync?: boolean } = {}) {
   let current = config({ staging_sign_in_enabled: options.enabled !== false,
-    ...(options.expiry ? { staging_sign_in_expires_at: options.expiry } : {}) })
+    ...(options.expiry ? { staging_sign_in_expires_at: options.expiry } : {}),
+    ...(options.ordinaryHandoff ? { country: "US", region_allowed: true, staging_sign_in_enabled: false } : {}) })
   const writes: { path: string; marker: string | undefined }[] = []
   await page.route(/https:\/\/(?!api\.example\.com).*/, route => route.abort())
   await page.route("https://api.example.com/**", async route => {
@@ -31,6 +33,7 @@ async function isolated(page: Page, options: { denied?: boolean; empty?: boolean
     if (path.endsWith("/paypal/config")) return route.fulfill({ json: current })
     if (path.endsWith("/effect-catalog")) return route.fulfill({ json: { categories: [] } })
     if (path.endsWith("/auth/session")) {
+      if (options.pendingSync) await options.pendingSync
       if (options.denied) return route.fulfill({ status: 403, json: { detail: "SYNTHETIC_PRIVATE_ACCOUNT_DETAIL" } })
       return route.fulfill({ json: { app_user: { id: "synthetic-staging-user", nickname: "QA" }, is_new_user: false } })
     }
@@ -40,12 +43,25 @@ async function isolated(page: Page, options: { denied?: boolean; empty?: boolean
   await page.route("**/assets/vireal-auth.js", route => route.fulfill({ contentType: "application/javascript", body: `
     const listeners = [];
     const clerk = {
-      addListener(fn) { listeners.push(fn) },
+      addListener(fn) {
+        listeners.push(fn);
+        if (${Boolean(options.ordinaryHandoff)}) fn({ session: null, user: null });
+      },
       unmountSignIn(root) { root.innerHTML = '' },
       mountSignIn(root) {
         if (${Boolean(options.empty)}) return;
         root.innerHTML = '<label>Offline email<input aria-label="Offline email"></label><button type="button">模拟本人登录</button>';
         root.querySelector('button').onclick = () => {
+          if (${Boolean(options.ordinaryHandoff)}) {
+            const session = { id: 'synthetic-session', getToken: async () => 'synthetic-not-a-real-token' };
+            const user = { id: 'synthetic-clerk-user' };
+            for (let n = 0; n < 3; n++) for (const listener of listeners) listener({ session, user });
+            location.hash = 'account';
+            if (${Boolean(options.signOutDuringSync)}) setTimeout(() => {
+              for (const listener of listeners) listener({ session: null, user: null });
+            }, 50);
+            return;
+          }
           clerk.session = { id: 'synthetic-session', getToken: async () => 'synthetic-not-a-real-token' };
           clerk.user = { id: 'synthetic-clerk-user' };
           for (const listener of listeners) listener();
@@ -157,4 +173,54 @@ test.describe("English staging form", () => {
     await expect(page.locator("[data-upload-index], [data-generate], [data-confirm-generation]")).toHaveCount(0)
     expect(api.writes).toEqual([])
   })
+})
+
+test("ordinary login hands emitted session to account without publishing SDK getters", async ({ page }) => {
+  const api = await isolated(page, { ordinaryHandoff: true })
+  await page.goto("/#login")
+  await page.getByRole("textbox", { name: "Offline email" }).fill("synthetic@example.test")
+  await page.getByRole("button", { name: "模拟本人登录" }).click()
+  await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
+  await expect(page.getByRole("textbox")).toHaveCount(0)
+  await page.goto(page.url().split("#")[0] + "#works")
+  await page.goto(page.url().split("#")[0] + "#account")
+  await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
+  expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
+  await expect(page.locator("[data-upload-index], [data-generate], [data-confirm-generation]")).toHaveCount(0)
+})
+
+test("slow App handoff removes the obsolete form without repeated sync on navigation", async ({ page }) => {
+  let release!: () => void
+  const pendingSync = new Promise<void>(resolve => { release = resolve })
+  const api = await isolated(page, { ordinaryHandoff: true, pendingSync })
+  try {
+    await page.goto("/#login")
+    await page.getByRole("button", { name: "模拟本人登录" }).click()
+    await expect(page.getByText("正在同步登录状态…")).toBeVisible()
+    await expect(page.getByRole("textbox")).toHaveCount(0)
+    await page.goto(page.url().split("#")[0] + "#login")
+    await page.goto(page.url().split("#")[0] + "#account")
+    await expect.poll(() => api.writes.length).toBe(1)
+    release()
+    await expect(page.getByRole("heading", { name: "账户与偏好" })).toBeVisible()
+    expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
+  } finally { release() }
+})
+
+test("signed-out emission cancels an in-flight handoff and restores sign-in", async ({ page }) => {
+  let release!: () => void
+  const pendingSync = new Promise<void>(resolve => { release = resolve })
+  const api = await isolated(page, { ordinaryHandoff: true, pendingSync, signOutDuringSync: true })
+  try {
+    await page.goto("/#login")
+    await page.getByRole("button", { name: "模拟本人登录" }).click()
+    await expect.poll(() => api.writes.length).toBe(1)
+    await expect(page.getByRole("textbox", { name: "Offline email" })).toBeVisible()
+    const finished = page.waitForResponse(response => response.url().endsWith("/auth/session"))
+    release(); await finished
+    await page.goto(page.url().split("#")[0] + "#account")
+    await expect(page.getByRole("textbox", { name: "Offline email" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "账户与偏好" })).toHaveCount(0)
+    expect(api.writes).toEqual([{ path: "/api/v1/app/auth/session", marker: undefined }])
+  } finally { release() }
 })
