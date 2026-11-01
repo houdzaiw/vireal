@@ -8,6 +8,7 @@
   const CONFIG_WAIT_MS = 10000
   const terminalStatuses = new Set(["succeeded", "failed", "canceled", "expired"])
   const invitationLanding = new URLSearchParams(location.search).get("controlled_registration") === "1"
+  const pilotLanding = new URLSearchParams(location.search).get("pilot") === "1"
   const invitationPresent = invitationLanding && new URLSearchParams(location.search).has("__clerk_ticket")
   const internalAcceptanceLanding = new URLSearchParams(location.search).get("internal_acceptance") === "1"
   const paymentOnlyLanding = new URLSearchParams(location.search).get("payment_only_acceptance") === "1"
@@ -214,6 +215,7 @@
   // generation uses only the previously accepted server identity/window grant.
   function capabilityAllowed(field) {
     if (state.commerceStatus !== "ready" || paymentOnlyRestricted() || accountSetupRestricted()) return false
+    if (!pilotCommerceAllowed()) return false
     if (generationAcceptanceRestricted()) return generationAcceptanceAllowed()
       && !state.commerce.generation_acceptance_task_id
       && Boolean(selectedVariant(effectBySlug(route().params.get("video")) || allEffects()[0]))
@@ -224,6 +226,11 @@
 
   function uploadsAllowed() { return capabilityAllowed("uploads_enabled") }
   function generationAllowed() { return capabilityAllowed("generation_enabled") }
+
+  function pilotCommerceAllowed() {
+    return state.commerce?.pilot_mode !== true
+      || Boolean(state.appUser && state.commerce.pilot_access_allowed === true)
+  }
 
   function authViewVisible() {
     return ["login", "staging-login", ...signupRoutes].includes(route().name)
@@ -296,6 +303,7 @@
   }
 
   function paymentCheckout() {
+    if (!pilotCommerceAllowed()) return null
     if (generationAcceptanceRestricted()) return null
     if (accountSetupRestricted() || !state.appUser || state.wallet?.payment_hold) return null
     const resumeOrder = originalPaymentOrder()
@@ -739,6 +747,9 @@
 
   function signupAvailable(controlled = route().name === "controlled-register") {
     if (generationAcceptanceRestricted()) return false
+    if (state.commerce?.pilot_mode === true) return Boolean(!controlled && pilotLanding
+      && !accountSetupRestricted() && state.commerce?.region_allowed === true
+      && state.commerce.pilot_registration_enabled === true)
     if (controlled) return Boolean(invitationPresent && state.commerce?.controlled_registration_enabled === true
       && (accountSetupRestricted() ? controlledAccountSetupAllowed() : state.commerce.region_allowed === true))
     return !accountSetupRestricted() && state.commerce?.region_allowed === true && state.commerce.registration_enabled === true
@@ -847,7 +858,7 @@
     const config = state.commerce
     const paymentOnly = config?.payment_only_acceptance_mode === true
     const offeredProducts = (config?.products || []).filter(product => !paymentOnly || (product.product_id === "coins_100" && product.coins === 100 && product.amount === 599 && product.currency === "USD"))
-    const available = !accountSetupRestricted() && config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
+    const available = pilotCommerceAllowed() && !accountSetupRestricted() && config?.recharge_enabled && !wallet?.payment_hold && (!paymentOnly || (config.payment_only_acceptance_allowed && !config.payment_only_order_created && offeredProducts.length === 1))
     const resumeOrder = originalPaymentOrder()
     const replacementReady = Boolean(paymentCheckout()?.replacementOf)
     const privateOrderNotice = replacementReady
@@ -940,7 +951,7 @@
     if (signup && generationAcceptanceRestricted()) return shell(`<section class="page screen-page">${header()}<h1>${paymentText("注册暂未开放", "Registration is not yet open")}</h1><button data-route="login">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     if ((state.commerce?.region_allowed === false || accountSetupRestricted()) && (signup ? !signupAvailable(controlled) : !signInRegionAllowed())) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("当前地区暂未开放服务", "Service unavailable in this region")}</h1><p class="screen-copy">${paymentText("你仍可浏览公开效果。", "You can still browse public effects.")}</p><button data-route="home" class="primary-button">${paymentText("浏览效果", "Browse effects")}</button></section>`)
     if (controlled && !signupAvailable(true)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("受控注册需要有效邀请", "A valid controlled invitation is required")}</h1><p class="screen-copy">${paymentText("仅限获授权邮箱，且必须在已开放地区完成。公众注册和充值仍未开放。", "Only the approved email may register in a supported region. Public signup and recharge remain closed.")}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
-    if (signup && !controlled && !state.commerce?.registration_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("注册与充值将在收款验收后一起开放。", "Registration and recharge will open together after payment verification."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
+    if (signup && !controlled && !signupAvailable(false)) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("注册暂未开放", "Registration is not yet open")}</h1><p class="screen-copy">${esc(state.commerceError || paymentText("请通过获授权的受邀入口继续。", "Continue through an authorized invitation entry."))}</p><button data-route="login" class="secondary-button">${paymentText("已有账号登录", "Sign in")}</button></section>`)
     // A session does not override signup, invitation or regional restrictions.
     if (state.appUser) return accountPage()
     setTimeout(mountSignIn, 0)
@@ -948,7 +959,7 @@
     if (accountSetupRestricted()) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : paymentText("受控账号登录", "Controlled account sign-in")}</h1><p class="screen-copy">${paymentText("仅指定邮箱的短时账号初始化验收，初始余额为零。请本人验证邮箱并设置密码。不开放支付、上传或生成，不代表海外真实注册验收通过。", "Temporary account setup for the approved email only, with zero initial credits. Personally verify your email and set your password. No payment, uploads or generation; not overseas registration acceptance.")}</p><p class="screen-copy">${paymentText("授权截止", "Authorization expires")}: ${esc(new Date(state.commerce.controlled_account_setup_expires_at).toLocaleString())}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
     if (!signup && paymentOnlyLanding && state.commerce?.payment_only_sign_in_enabled) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("支付专用验收登录", "Payment-only acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅指定既有账号可进行一笔支付到账验收。不开放注册、上传或生成。不要共享密码或验证码。", "One payment/credit check for the selected existing account only. No signup, uploads or generation. Never share passwords or verification codes.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
     if (internalSignIn) return shell(`<section class="page screen-page">${header()}<h1 class="screen-title">${paymentText("内部验收登录", "Internal acceptance sign-in")}</h1><p class="screen-copy">${paymentText("仅已授权的既有账号可进行内部上传和生成验收，不创建账号、不开放充值、不免除费用与限额。请本人设置密码。", "Only the approved existing account may test uploads and generation. No account creation, recharge, free credits or quota exemption. Set your own password.")}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div></section>`)
-    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.") : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
+    return shell(`<section class="page screen-page page-enter"><header><button class="icon-button" data-route="home">${icons.back}</button><span class="brand-mark">VIREAL</span></header><h1 class="screen-title">${signup ? paymentText("验证邮箱，创建账号", "Verify your email to register") : "登录后继续创作"}</h1><p class="screen-copy">${controlled ? paymentText("仅限获授权邮箱受控注册，初始余额为零。请本人验证邮箱并设置密码；公众注册和充值仍关闭。", "Controlled signup for the approved email only, with zero initial credits. Verify your email and set your own password. Public signup and recharge remain closed.") : signup ? (state.commerce?.pilot_mode === true ? paymentText("仅限最多5位受邀用户。请使用受邀邮箱完成验证；注册不赠币，充值和生成仍受各自开关及额度限制。", "Limited to five invited users. Verify your invited email. No signup credits; payment and generation keep their own switches and quotas.") : paymentText("无需邀请，注册不赠币。请先阅读服务条款与隐私说明。", "No invitation required. No signup credits. Please read the terms and privacy notice.")) : "登录用于同步金币、额度、任务状态和作品记录。"}</p><div id="clerkSignIn" class="clerk-mount"></div><div id="authFeedback" aria-live="polite">${authFeedback()}</div>${state.commerce?.registration_enabled ? `<button class="secondary-button" data-route="${signup ? "login" : "register"}">${signup ? paymentText("已有账号登录", "Sign in") : paymentText("没有账号？免费注册", "New here? Register")}</button>` : ""}<p class="screen-copy"><a href="#terms">${paymentText("服务条款", "Terms")}</a> · <a href="#privacy">${paymentText("隐私说明", "Privacy")}</a></p></section>`)
   }
 
   function shell(content, activeNav = null) {
@@ -1016,7 +1027,7 @@
       root.dataset.clerkKind = signup ? "register" : "login"
       root.dataset.clerkMounted = "true"
       const stagingURL = `${location.origin}/?staging_login_acceptance=1#staging-login`
-      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", withSignUp: false, signInUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : `${location.origin}/#register`, forceRedirectUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}${afterLogin}`, appearance: { elements: !signup && !signupAvailable(false) ? { footerAction: { display: "none" } } : {}, variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
+      clerk[signup ? "mountSignUp" : "mountSignIn"](root, { routing: "hash", withSignUp: false, signInUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}#login`, signUpUrl: controlled ? `${location.origin}/?controlled_registration=1` : pilotLanding ? `${location.origin}/?pilot=1#register` : `${location.origin}/#register`, forceRedirectUrl: stagingSignIn ? stagingURL : `${location.origin}/${internalQuery}${afterLogin}`, appearance: { elements: !signup && !signupAvailable(false) ? { footerAction: { display: "none" } } : {}, variables: { colorPrimary: "#71d8ed", colorBackground: "#151a1d", colorText: "#f7fbfc", colorInputBackground: "#0d1113", colorInputText: "#f7fbfc", borderRadius: "0.9rem" } } })
       watchAuthMount(root)
     } catch (_) {
       state.authErrorCode = "AUTH_MOUNT_FAILED"

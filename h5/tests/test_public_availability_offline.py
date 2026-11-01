@@ -27,6 +27,8 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         window_open=False,
         country=None,
         staging_login=False,
+        pilot_mode=False,
+        pilot_member=False,
     ):
         path = (
             Path(__file__).resolve().parents[2] / "backend/app/api/routes/app_paypal.py"
@@ -42,6 +44,8 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             arg.annotation = None
         settings = SimpleNamespace(
             APP_GLOBAL_DAILY_REAL_SUBMISSIONS=30,
+            APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS=1,
+            APP_PILOT_ENABLED=pilot_mode,
             APP_VIDEO_SUBMISSIONS_ENABLED=enabled,
             APP_LIVE_ACCEPTANCE_ENABLED=acceptance,
             PAYPAL_ENVIRONMENT="sandbox",
@@ -63,6 +67,8 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             "datetime": datetime,
             "UTC": UTC,
             "settings": settings,
+            "pilot_enabled": lambda: pilot_mode,
+            "pilot_user": lambda *_: object() if pilot_member else None,
             "global_real_count": lambda **_: 0,
             "region_allowed": lambda _: region,
             "staging_sign_in_enabled": lambda _: staging_login,
@@ -175,6 +181,28 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         data = self.config()
         self.assertIs(data["staging_sign_in_enabled"], False)
         self.assertIsNone(data["staging_sign_in_expires_at"])
+
+    def test_pilot_hints_do_not_open_switches_or_publish_invitations(self):
+        data = self.config(pilot_mode=True, pilot_member=True)
+        self.assertTrue(data["pilot_registration_enabled"])
+        self.assertTrue(data["pilot_access_allowed"])
+        self.assertEqual(data["global_concurrent_limit"], 1)
+        for key in (
+            "registration_enabled",
+            "recharge_enabled",
+            "uploads_enabled",
+            "generation_enabled",
+        ):
+            self.assertFalse(data[key])
+        data = self.config(pilot_mode=True, enabled=True, recharge=True, signup=True)
+        for key in (
+            "registration_enabled",
+            "recharge_enabled",
+            "uploads_enabled",
+            "generation_enabled",
+        ):
+            self.assertFalse(data[key])
+        self.assertFalse(any("invited" in key or "subject" in key for key in data))
 
 
 if __name__ == "__main__":

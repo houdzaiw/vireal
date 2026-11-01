@@ -183,6 +183,73 @@ function assertNoBusiness(r) {
   assert.equal(r.objectURLs, 0)
 }
 
+test("pilot admission uses a private landing and preserves the normal sign-in handoff", async () => {
+  const config = { ...closed, pilot_mode: true, pilot_registration_enabled: true }
+  const sdk = signedOutSDK()
+  const r = runtime({ hash: "#register", search: "?pilot=1", config, sdk })
+  await r.settle()
+  assert.equal(r.signupAvailable(false), true)
+  assert.equal(sdk.mounts, 1)
+  assert.match(r.html, /最多5位受邀用户/)
+  await r.visit("#login")
+  assert.match(sdk.options.signUpUrl, /\?pilot=1#register$/)
+  assert.equal(r.uploadsAllowed(), false)
+  assert.equal(r.generationAllowed(), false)
+  assertNoBusiness(r)
+})
+
+for (const variant of ["no_marker", "wrong_marker", "CN", "missing_hint", "private_acceptance"]) {
+  test(`pilot landing cannot expand signup: ${variant}`, async () => {
+    const config = { ...closed, registration_enabled: true, pilot_mode: true, pilot_registration_enabled: true }
+    let search = "?pilot=1"
+    if (variant === "no_marker") search = ""
+    if (variant === "wrong_marker") search = "?pilot=yes"
+    if (variant === "CN") config.region_allowed = false
+    if (variant === "missing_hint") delete config.pilot_registration_enabled
+    if (variant === "private_acceptance") config.generation_acceptance_mode = true
+    const sdk = signedOutSDK(), r = runtime({ hash: "#register", search, config, sdk })
+    await r.settle()
+    assert.equal(r.signupAvailable(false), false)
+    assert.equal(sdk.mounts, 0)
+    assertNoBusiness(r)
+  })
+}
+
+test("pilot membership and individual switches both gate all new UI actions", async () => {
+  const config = { ...closed, pilot_mode: true, pilot_access_allowed: false, uploads_enabled: true, generation_enabled: true, recharge_enabled: true }
+  const r = runtime({ config, sdk: signedInSDK() }); await r.settle()
+  r.state.appUser = { id: "offline-app-user" }
+  r.state.wallet = { balance: 100, payment_hold: false }
+  assert.equal(r.uploadsAllowed(), false)
+  assert.equal(r.generationAllowed(), false)
+  assert.equal(r.paymentCheckout(), null)
+  r.state.commerce.pilot_access_allowed = true
+  assert.equal(r.uploadsAllowed(), true)
+  assert.equal(r.generationAllowed(), true)
+  assert.ok(r.paymentCheckout())
+  r.state.commerce.region_allowed = false
+  assert.equal(r.uploadsAllowed(), false)
+  assert.equal(r.generationAllowed(), false)
+  r.state.commerce = { ...closed, pilot_mode: true, pilot_access_allowed: true }
+  assert.equal(r.uploadsAllowed(), false)
+  assert.equal(r.generationAllowed(), false)
+  assert.equal(r.paymentCheckout(), null)
+  r.state.commerce = { ...config, pilot_access_allowed: true }
+  r.state.appUser = null
+  assert.equal(r.uploadsAllowed(), false)
+  assert.equal(r.paymentCheckout(), null)
+  assertNoBusiness(r)
+})
+
+test("a removed invite cannot resume checkout even when an old order is resumable", async () => {
+  const r = runtime({ config: { ...closed, pilot_mode: true, pilot_access_allowed: false }, sdk: signedInSDK() })
+  await r.settle()
+  r.state.appUser = { id: "offline-app-user" }
+  r.state.rechargeOrders = [{ id: "old", app_user_id: "offline-app-user", provider: "paypal", provider_order_id: "offline-order", status: "created", amount: 599, coin_quantity: 100, currency: "USD", product_id: "coins_100" }]
+  assert.equal(r.paymentCheckout(), null)
+  assertNoBusiness(r)
+})
+
 test("missing auth bundle stops loading with durable sanitized error", async () => {
   const r = runtime(); await r.settle(); assert.match(r.html, /正在载入安全登录/)
   await r.time.tick(15000); assert.match(r.html, /AUTH_LOAD_TIMEOUT/); assert.match(r.html, /data-retry-auth/)

@@ -121,6 +121,14 @@ def test_database_url_is_normalized_and_email_defaults_are_computed() -> None:
         ({"VIDEO_CLEANUP_INTERVAL_SECONDS": 0}, "INTERVAL_SECONDS must be positive"),
         ({"APP_USER_DAILY_REAL_SUBMISSIONS": 0}, "SUBMISSIONS must be positive"),
         ({"APP_USER_MAX_CONCURRENT_VIDEO_TASKS": 0}, "TASKS must be positive"),
+        (
+            {"APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS": 0},
+            "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS must be positive",
+        ),
+        (
+            {"APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS": -1},
+            "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS must be positive",
+        ),
         ({"APP_WAN_DAILY_GLOBAL_SUBMISSIONS": 0}, "SUBMISSIONS must be positive"),
         ({"APP_EFFECT_MAX_DURATION_SECONDS": 12}, "APP_EFFECT_MAX_DURATION_SECONDS"),
         ({"MAX_CATALOG_IMAGE_BYTES": 0}, "IMAGE_BYTES must be positive"),
@@ -165,6 +173,17 @@ def test_complete_external_service_configuration_is_accepted() -> None:
     )
     assert configured.REPLICATE_ENABLED is True
     assert configured.APP_AUTH_MODE == "clerk"
+
+
+def test_global_concurrency_defaults_to_one_and_is_independent() -> None:
+    configured = _settings(APP_USER_MAX_CONCURRENT_VIDEO_TASKS=3)
+    assert configured.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS == 1
+    assert (
+        _settings(
+            APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS=2
+        ).APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS
+        == 2
+    )
 
 
 def test_effect_duration_release_gate_defaults_to_ten_seconds() -> None:

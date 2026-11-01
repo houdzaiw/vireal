@@ -9,7 +9,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = "7fce8165de7658eee31ed2e6e7e42c0a47e0f790"
+BASE = "b017fccf2373b40508aec9bcafa4cac5adfd5830"
 
 
 def accepted(path):
@@ -32,119 +32,140 @@ def js_function(text, name):
 
 class AcceptedIntegrationOfflineTests(unittest.TestCase):
     def test_backend_only_adds_public_config_hints(self):
+        # The accepted local integration now also authorizes pilot admission at
+        # customer order/capture boundaries. Undo only those explicit additions;
+        # reconciliation, fulfillment, recovery and all other code stay exact.
         path = "backend/app/api/routes/app_paypal.py"
         old, new = ast.parse(accepted(path)), ast.parse(current(path))
-        for tree in (old, new):
-            tree.body = [
-                node
-                for node in tree.body
-                if not (
-                    isinstance(node, ast.FunctionDef) and node.name == "payment_config"
-                )
-                and not (
-                    isinstance(node, ast.ImportFrom)
-                    and node.module == "app.services.staging_login_acceptance"
-                    and [alias.name for alias in node.names]
-                    == ["staging_sign_in_enabled"]
-                )
-            ]
+
+        class UndoPilot(ast.NodeTransformer):
+            def visit_ImportFrom(self, node):
+                return None if node.module == "app.services.pilot_access" else node
+
+            def visit_Expr(self, node):
+                if (
+                    isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name)
+                    and node.value.func.id == "require_pilot_commerce"
+                ):
+                    return None
+                return self.generic_visit(node)
+
+            def visit_Call(self, node):
+                if (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id == "require_new_commerce_user"
+                ):
+                    self_outer.assertEqual(
+                        {kw.arg for kw in node.keywords},
+                        {"session", "user", "verify_profile"},
+                    )
+                    node.keywords = []
+                return node
+
+            def visit_FunctionDef(self, node):
+                if node.name == "payment_config":
+                    return None
+                if node.name == "capture_paypal_order":
+                    node.args.args = [
+                        arg for arg in node.args.args if arg.arg != "request"
+                    ]
+                return self.generic_visit(node)
+
+        self_outer = self
+        old.body = [
+            n
+            for n in old.body
+            if not isinstance(n, ast.FunctionDef) or n.name != "payment_config"
+        ]
+        new = UndoPilot().visit(new)
         self.assertEqual(ast.dump(old), ast.dump(new))
 
     def test_accepted_config_only_adds_explicit_staging_configuration(self):
+        # Preserve the already accepted staging login guards, adding only the
+        # default-off pilot and positive global cap, and rejecting mixed modes.
         path = "backend/app/core/config.py"
         old, new = ast.parse(accepted(path)), ast.parse(current(path))
-        additions = {
-            "STAGING_LOGIN_ACCEPTANCE_ISSUER",
-            "STAGING_LOGIN_ACCEPTANCE_ORIGIN",
-        }
-        new.body = [
-            node
-            for node in new.body
-            if not (
-                isinstance(node, ast.Assign)
-                and any(
-                    isinstance(target, ast.Name) and target.id in additions
-                    for target in node.targets
-                )
-            )
-        ]
-        settings = next(
-            node
-            for node in new.body
-            if isinstance(node, ast.ClassDef) and node.name == "Settings"
-        )
-        settings.body = [
-            node
-            for node in settings.body
-            if not (
-                isinstance(node, ast.AnnAssign)
-                and isinstance(node.target, ast.Name)
-                and node.target.id.startswith("APP_STAGING_LOGIN_ACCEPTANCE_")
-            )
-            and not (
-                isinstance(node, ast.FunctionDef)
-                and node.name == "staging_login_acceptance_configuration_safe"
-            )
-        ]
-        validator = next(
-            node
-            for node in settings.body
-            if isinstance(node, ast.FunctionDef)
-            and node.name == "_validate_commerce_configuration"
-        )
-        self.assertIn(
-            "APP_STAGING_LOGIN_ACCEPTANCE_ENABLED", ast.unparse(validator.body[0].test)
-        )
-        validator.body.pop(0)
+
+        class UndoPilot(ast.NodeTransformer):
+            def visit_AnnAssign(self, node):
+                if isinstance(node.target, ast.Name) and node.target.id in {
+                    "APP_PILOT_ENABLED",
+                    "APP_PILOT_INVITED_EMAILS",
+                    "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS",
+                }:
+                    return None
+                return node
+
+            def visit_FunctionDef(self, node):
+                if node.name in {"_validate_pilot_emails", "pilot_configuration_safe"}:
+                    return None
+                return self.generic_visit(node)
+
+            def visit_If(self, node):
+                test = ast.unparse(node.test)
+                if test in {
+                    "self.APP_PILOT_ENABLED and (not self.pilot_configuration_safe())",
+                    "self.APP_PILOT_ENABLED and not self.pilot_configuration_safe()",
+                    "self.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS < 1",
+                }:
+                    return None
+                return self.generic_visit(node)
+
+            def visit_BoolOp(self, node):
+                node.values = [
+                    v
+                    for v in node.values
+                    if ast.unparse(v) != "not self.APP_PILOT_ENABLED"
+                ]
+                return self.generic_visit(node)
+
+        new = UndoPilot().visit(new)
         self.assertEqual(ast.dump(old), ast.dump(new))
+        source = current(path)
+        self.assertIn("APP_PILOT_ENABLED: bool = False", source)
+        self.assertIn("APP_PILOT_INVITED_EMAILS: list[EmailStr] = []", source)
+        self.assertIn("APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS: int = 1", source)
 
     def test_accepted_session_logic_is_preserved_around_staging_guards(self):
         path = "backend/app/api/routes/app_auth.py"
         old, new = ast.parse(accepted(path)), ast.parse(current(path))
-        new.body = [
-            node
-            for node in new.body
-            if not (
-                isinstance(node, ast.ImportFrom)
-                and node.module == "app.services.staging_login_acceptance"
-            )
-        ]
-        session = next(
-            node
-            for node in new.body
-            if isinstance(node, ast.FunctionDef)
-            and node.name == "initialize_clerk_session"
-        )
 
-        def added_guard(node):
-            if isinstance(node, ast.Assign):
-                return any(
-                    isinstance(target, ast.Name) and target.id == "staging_request"
-                    for target in node.targets
-                )
-            if isinstance(node, ast.AnnAssign):
-                return isinstance(node.target, ast.Name) and node.target.id in {
-                    "staging_identity",
-                    "staging_user",
-                }
-            return isinstance(node, ast.If) and (
-                isinstance(node.test, ast.Name)
-                and node.test.id == "staging_request"
-                or isinstance(node.test, ast.BoolOp)
-                and isinstance(node.test.values[0], ast.Name)
-                and node.test.values[0].id == "staging_request"
-            )
+        class UndoPilot(ast.NodeTransformer):
+            def visit_ImportFrom(self, node):
+                return None if node.module == "app.services.pilot_access" else node
 
-        session.body = [node for node in session.body if not added_guard(node)]
-        guard = next(
-            node
-            for node in session.body
-            if isinstance(node, ast.FunctionDef)
-            and node.name == "require_current_setup_authorization"
-        )
-        self.assertTrue(added_guard(guard.body[0]))
-        guard.body.pop(0)
-        self.assertEqual(ast.dump(old), ast.dump(new))
+            def visit_Assign(self, node):
+                if any(
+                    isinstance(t, ast.Name)
+                    and t.id in {"pilot_requested", "pilot_admission"}
+                    for t in node.targets
+                ):
+                    return None
+                return node
+
+            def visit_If(self, node):
+                if (
+                    isinstance(node.test, ast.BoolOp)
+                    and isinstance(node.test.values[0], ast.Name)
+                    and node.test.values[0].id == "pilot_admission"
+                ):
+                    return None
+                if (
+                    isinstance(node.test, ast.BoolOp)
+                    and isinstance(node.test.op, ast.Or)
+                    and "pilot_requested" in ast.unparse(node.test)
+                ):
+                    return None
+                return self.generic_visit(node)
+
+            def visit_BoolOp(self, node):
+                node.values = [
+                    v for v in node.values if ast.unparse(v) != "not pilot_admission"
+                ]
+                return self.generic_visit(node)
+
+        self.assertEqual(ast.dump(old), ast.dump(UndoPilot().visit(new)))
 
     def test_existing_payment_and_special_mode_functions_are_verbatim(self):
         path = "h5/src/vireal-app.js"
@@ -180,10 +201,22 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
         for name in protected:
             with self.subTest(function=name):
                 candidate = js_function(new, name)
-                if name == "signInRegionAllowed":
+                if name == "paymentCheckout":
                     candidate = candidate.replace(
-                        "    if (stagingLoginView()) return stagingSignInAllowed()\n",
+                        "    if (!pilotCommerceAllowed()) return null\n", "", 1
+                    )
+                elif name == "signupAvailable":
+                    candidate = candidate.replace(
+                        "    if (state.commerce?.pilot_mode === true) return Boolean(!controlled && pilotLanding\n"
+                        "      && !accountSetupRestricted() && state.commerce?.region_allowed === true\n"
+                        "      && state.commerce.pilot_registration_enabled === true)\n",
                         "",
+                        1,
+                    )
+                elif name == "walletPage":
+                    candidate = candidate.replace(
+                        "const available = pilotCommerceAllowed() && ",
+                        "const available = ",
                         1,
                     )
                 self.assertEqual(js_function(old, name), candidate)
@@ -198,9 +231,16 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
             changed,
             {
                 ".env.example",
+                "README.md",
                 "backend/app/api/routes/app_paypal.py",
                 "backend/app/api/routes/app_auth.py",
                 "backend/app/core/config.py",
+                "backend/app/api/routes/app_video_tasks.py",
+                "backend/app/services/video_quota.py",
+                "backend/app/services/commercial_access.py",
+                "backend/app/services/generation_acceptance.py",
+                "backend/tests/core/test_config_v12.py",
+                "backend/tests/api/routes/test_app_video_tasks.py",
                 "backend/app/services/staging_login_acceptance.py",
                 "backend/tests/api/routes/test_staging_login_acceptance.py",
                 "h5/src/vireal-app.js",
