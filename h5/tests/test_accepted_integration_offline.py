@@ -10,11 +10,12 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = "b017fccf2373b40508aec9bcafa4cac5adfd5830"
+INTEGRATED_BASE = "9e30a0fc98202a9cc0e3e967e089fa02adb68df9"
 
 
-def accepted(path):
+def accepted(path, ref=BASE):
     return subprocess.check_output(
-        ["git", "show", f"{BASE}:{path}"], cwd=ROOT, text=True
+        ["git", "show", f"{ref}:{path}"], cwd=ROOT, text=True
     )
 
 
@@ -221,6 +222,55 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                     )
                 self.assertEqual(js_function(old, name), candidate)
 
+    def test_legacy_order_route_only_adds_the_hosted_write_rejection(self):
+        path = "backend/app/api/routes/app_orders.py"
+        old, new = ast.parse(accepted(path)), ast.parse(current(path))
+        function = next(
+            node
+            for node in new.body
+            if isinstance(node, ast.FunctionDef) and node.name == "create_order"
+        )
+        guard = ast.parse(
+            'if settings.ENVIRONMENT != "local":\n'
+            '    raise HTTPException(403, "Legacy mobile payment orders are unavailable")'
+        ).body[0]
+        self.assertEqual(ast.dump(function.body[-2]), ast.dump(guard))
+        self.assertEqual(
+            ast.dump(function.body[-1].value.func),
+            ast.dump(ast.parse("crud.create_app_order", mode="eval").body),
+        )
+        del function.body[-2]
+        # Retain every historical read and special-mode branch verbatim in AST.
+        self.assertEqual(ast.dump(old), ast.dump(new))
+
+    def test_previously_accepted_pilot_additions_remain_exact(self):
+        # These additions were untracked in the original local-only check.
+        # Pin them to the reviewed integration instead of broadly allowing edits.
+        for path in (
+            "backend/app/services/pilot_access.py",
+            "backend/tests/api/routes/test_global_video_concurrency.py",
+            "backend/tests/api/routes/test_pilot_admission.py",
+            "h5/tests/browser/pilot-admission.spec.ts",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(accepted(path, INTEGRATED_BASE), current(path))
+
+    def test_h5_workflow_only_adds_history_and_complete_offline_regression(self):
+        path = ".github/workflows/test-h5.yml"
+        old, new = accepted(path), current(path)
+        additions = (
+            "          # Offline provenance checks compare against accepted historical commits.\n"
+            "          fetch-depth: 0\n",
+            "      - name: Run H5 offline regression tests\n"
+            "        run: bun run test:offline\n",
+        )
+        self.assertLess(new.index("run: bun ci"), new.index(additions[1]))
+        self.assertLess(new.index(additions[1]), new.index("run: bun run test\n"))
+        for addition in additions:
+            self.assertEqual(new.count(addition), 1)
+            new = new.replace(addition, "", 1)
+        self.assertEqual(old, new)
+
     def test_no_other_accepted_tracked_paths_changed(self):
         changed = set(
             subprocess.check_output(
@@ -231,7 +281,9 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
             changed,
             {
                 ".env.example",
+                ".github/workflows/test-h5.yml",
                 "README.md",
+                "backend/app/api/routes/app_orders.py",
                 "backend/app/api/routes/app_paypal.py",
                 "backend/app/api/routes/app_auth.py",
                 "backend/app/core/config.py",
@@ -239,6 +291,10 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "backend/app/services/video_quota.py",
                 "backend/app/services/commercial_access.py",
                 "backend/app/services/generation_acceptance.py",
+                "backend/app/services/pilot_access.py",
+                "backend/tests/api/routes/test_global_video_concurrency.py",
+                "backend/tests/api/routes/test_pilot_admission.py",
+                "backend/tests/api/routes/test_legacy_order_gate.py",
                 "backend/tests/core/test_config_v12.py",
                 "backend/tests/api/routes/test_app_video_tasks.py",
                 "backend/app/services/staging_login_acceptance.py",
@@ -248,6 +304,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "h5/package.json",
                 "h5/tests/browser/vireal-v1.2.spec.ts",
                 "h5/tests/browser/staging-login-acceptance.spec.ts",
+                "h5/tests/browser/pilot-admission.spec.ts",
                 "h5/playwright.staging-login.config.ts",
                 "h5/tests/unit/login-closure.test.mjs",
                 "h5/tests/test_vireal_h5_prototype.py",
