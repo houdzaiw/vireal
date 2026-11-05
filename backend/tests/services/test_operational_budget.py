@@ -283,19 +283,15 @@ def test_reads_do_not_create_or_reset_period(
     assert (window.id, window.starts_at, window.ends_at) == original
 
 
-def _child_admission(database_url, index, frozen_now, queue):
+def _child_admission(index, frozen_now, queue):
     from datetime import datetime
 
-    from sqlmodel import Session, create_engine
-
-    from app.core.config import settings
     from app.services import operational_budget
 
     settings.APP_BUDGET_GUARD_ENABLED = True
     operational_budget.utc_now = lambda: datetime.fromisoformat(frozen_now)
-    local_engine = create_engine(database_url)
     try:
-        with Session(local_engine) as session:
+        with Session(engine) as session:
             try:
                 operational_budget.reserve_cost(
                     session, key=f"process:{index}", source="r2", price_key="upload"
@@ -305,7 +301,7 @@ def _child_admission(database_url, index, frozen_now, queue):
             except HTTPException:
                 queue.put(False)
     finally:
-        local_engine.dispose()
+        engine.dispose()
 
 
 def test_cross_process_reservations_are_serialized(db: Session) -> None:
@@ -318,7 +314,7 @@ def test_cross_process_reservations_are_serialized(db: Session) -> None:
     processes = [
         context.Process(
             target=_child_admission,
-            args=(str(engine.url), i, staffed_now().isoformat(), queue),
+            args=(i, staffed_now().isoformat(), queue),
         )
         for i in range(3)
     ]
