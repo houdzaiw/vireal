@@ -35,6 +35,11 @@ from app.services.generation_acceptance import (
     generation_acceptance_user,
     generation_acceptance_window_open,
 )
+from app.services.operational_budget import (
+    new_business_available,
+    require_budget,
+    reserve_cost,
+)
 from app.services.paypal_client import (
     PRODUCTS,
     PayPalError,
@@ -69,6 +74,7 @@ def payment_config(
         0,
     )
     allowed = region_allowed(request)
+    budget_open = new_business_available(session)
     staging_sign_in = staging_sign_in_enabled(request)
     cn_setup = controlled_cn_account_setup_enabled() and edge_country(request) == "CN"
     cn_setup_mode = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
@@ -98,7 +104,8 @@ def payment_config(
     # Ordinary availability hints, never an entitlement or quota grant. Raw
     # private-mode switches still restrict commerce after expiry or invalidity.
     submissions_enabled = bool(
-        settings.APP_VIDEO_SUBMISSIONS_ENABLED
+        budget_open
+        and settings.APP_VIDEO_SUBMISSIONS_ENABLED
         and allowed
         and identity_allowed
         and not generation_mode
@@ -165,6 +172,7 @@ def payment_config(
         "registration_enabled": (
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )
+        and budget_open
         and allowed
         and not payment_only
         and not cn_setup_mode
@@ -177,7 +185,8 @@ def payment_config(
         and (cn_setup if cn_setup_mode else allowed)
         and not payment_only
         and not generation_mode,
-        "recharge_enabled": settings.PAYPAL_ENABLED
+        "recharge_enabled": budget_open
+        and settings.PAYPAL_ENABLED
         and not cn_setup_mode
         and not generation_mode
         and paypal_configured()
@@ -269,7 +278,7 @@ def create_paypal_order(
                     409, "Original order has a replacement grant; do not pay it"
                 )
             return AppOrderPublic.model_validate(order)
-        if payment_only:
+        if order.provider_order_id is None:
             # A committed reservation with no provider ID may already have
             # created an order. Never rely on an unbounded provider dedup window
             # or resubmit it, even under the same application idempotency key.
@@ -323,6 +332,9 @@ def create_paypal_order(
             currency="USD",
             coin_quantity=coins,
             next_reconcile_at=now,
+        )
+        reserve_cost(
+            session, key=f"payment:{order.id}", source="other", price_key="payment"
         )
         session.add(order)
         session.commit()
@@ -407,6 +419,7 @@ def resume_paypal_checkout(
             503, "Payment service is unavailable; check the original order"
         )
     _require_resumable_acceptance_order(session, order)
+    require_budget(session)
     client = get_paypal_client()
     try:
         grant = grant_for_user(session, order.app_user_id)
@@ -438,6 +451,7 @@ def resume_paypal_checkout(
         if order.app_user_id != current_app_user.id or order.provider != "paypal":
             raise HTTPException(404, "Payment order not found")
         _require_resumable_acceptance_order(session, order)
+        require_budget(session)
         validate_order(order, data)
         return AppOrderPublic.model_validate(order)
     except PayPalError as exc:

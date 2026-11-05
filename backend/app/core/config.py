@@ -99,6 +99,13 @@ class Settings(BaseSettings):
     APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 30
     APP_GLOBAL_DAILY_REAL_SUBMISSIONS: int = 30
     APP_PUBLIC_REGISTRATION_ENABLED: bool = False
+    # Production always requires durable USD evidence; this also enables staged
+    # acceptance with synthetic budgets. It never opens existing business gates.
+    APP_BUDGET_GUARD_ENABLED: bool = False
+    APP_OPERATIONAL_ALERT_DELIVERY_ENABLED: bool = False
+    OPS_RESEND_API_KEY: str | None = None
+    OPS_ALERT_FROM: str | None = None
+    OPS_MONITOR_READ_TOKEN: str | None = None
     # Separate pilot admission. Never enables payment, generation or regions.
     APP_PILOT_ENABLED: bool = False
     APP_PILOT_INVITED_EMAILS: list[EmailStr] = []

@@ -162,6 +162,9 @@ def require_new_generation(request: Request, session: Session, user: AppUser) ->
         raise HTTPException(
             503, "New uploads and video submissions are temporarily paused"
         )
+    from app.services.operational_budget import require_budget
+
+    require_budget(session)
 
 
 def require_acceptance_variant(

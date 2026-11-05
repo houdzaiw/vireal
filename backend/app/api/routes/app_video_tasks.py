@@ -481,6 +481,14 @@ async def create_video_task(
         next_attempt_at=now if is_demo else None,
         expires_at=now + timedelta(hours=settings.APP_MEDIA_RETENTION_HOURS),
     )
+    from app.services.operational_budget import reserve_cost
+
+    reserve_cost(
+        session,
+        key=f"video:{task.id}",
+        source="replicate" if not is_demo else "railway",
+        price_key=f"video:{model}:{resolved_duration}:720p:image-only",
+    )
     session.add(task)
     session.flush()
     if charged_coin_cost:

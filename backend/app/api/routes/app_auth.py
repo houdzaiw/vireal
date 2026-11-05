@@ -238,6 +238,14 @@ def initialize_clerk_session(
                 is_new_user = False
     if identity is None:
         require_current_setup_authorization()
+        from app.services.operational_budget import reserve_cost
+
+        reserve_cost(
+            session,
+            key=f"registration:{clerk_session.issuer}:{clerk_session.subject}",
+            source="clerk",
+            price_key="registration",
+        )
         email_name = profile.primary_email.split("@", 1)[0].strip()
         app_user = AppUser(
             account_type="clerk",

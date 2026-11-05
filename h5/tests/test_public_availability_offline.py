@@ -29,6 +29,7 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         staging_login=False,
         pilot_mode=False,
         pilot_member=False,
+        budget=True,
     ):
         path = (
             Path(__file__).resolve().parents[2] / "backend/app/api/routes/app_paypal.py"
@@ -67,6 +68,7 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
             "datetime": datetime,
             "UTC": UTC,
             "settings": settings,
+            "new_business_available": lambda _: budget,
             "pilot_enabled": lambda: pilot_mode,
             "pilot_user": lambda *_: object() if pilot_member else None,
             "global_real_count": lambda **_: 0,
@@ -181,6 +183,17 @@ class PublicAvailabilityOfflineTests(unittest.TestCase):
         data = self.config()
         self.assertIs(data["staging_sign_in_enabled"], False)
         self.assertIsNone(data["staging_sign_in_expires_at"])
+
+    def test_budget_pause_reuses_existing_closed_hints(self):
+        data = self.config(enabled=True, signup=True, recharge=True, budget=False)
+        for key in (
+            "registration_enabled",
+            "recharge_enabled",
+            "uploads_enabled",
+            "generation_enabled",
+        ):
+            self.assertIs(data[key], False)
+        self.assertFalse(any("budget" in key or "cost" in key for key in data))
 
     def test_pilot_hints_do_not_open_switches_or_publish_invitations(self):
         data = self.config(pilot_mode=True, pilot_member=True)

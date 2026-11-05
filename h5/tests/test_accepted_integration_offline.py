@@ -41,15 +41,28 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
 
         class UndoPilot(ast.NodeTransformer):
             def visit_ImportFrom(self, node):
-                return None if node.module == "app.services.pilot_access" else node
+                return (
+                    None
+                    if node.module
+                    in {"app.services.pilot_access", "app.services.operational_budget"}
+                    else node
+                )
 
             def visit_Expr(self, node):
                 if (
                     isinstance(node.value, ast.Call)
                     and isinstance(node.value.func, ast.Name)
-                    and node.value.func.id == "require_pilot_commerce"
+                    and node.value.func.id
+                    in {"require_pilot_commerce", "require_budget", "reserve_cost"}
                 ):
                     return None
+                return self.generic_visit(node)
+
+            def visit_If(self, node):
+                # Approved conservative retry protection: an unknown provider
+                # submission no longer gets another paid create attempt.
+                if ast.unparse(node.test) == "order.provider_order_id is None":
+                    node.test = ast.Name(id="payment_only", ctx=ast.Load())
                 return self.generic_visit(node)
 
             def visit_Call(self, node):
@@ -94,6 +107,11 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                     "APP_PILOT_ENABLED",
                     "APP_PILOT_INVITED_EMAILS",
                     "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS",
+                    "APP_BUDGET_GUARD_ENABLED",
+                    "APP_OPERATIONAL_ALERT_DELIVERY_ENABLED",
+                    "OPS_RESEND_API_KEY",
+                    "OPS_ALERT_FROM",
+                    "OPS_MONITOR_READ_TOKEN",
                 }:
                     return None
                 return node
@@ -134,7 +152,21 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
 
         class UndoPilot(ast.NodeTransformer):
             def visit_ImportFrom(self, node):
-                return None if node.module == "app.services.pilot_access" else node
+                return (
+                    None
+                    if node.module
+                    in {"app.services.pilot_access", "app.services.operational_budget"}
+                    else node
+                )
+
+            def visit_Expr(self, node):
+                if (
+                    isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name)
+                    and node.value.func.id == "reserve_cost"
+                ):
+                    return None
+                return self.generic_visit(node)
 
             def visit_Assign(self, node):
                 if any(
@@ -263,12 +295,25 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
             "          fetch-depth: 0\n",
             "      - name: Run H5 offline regression tests\n"
             "        run: bun run test:offline\n",
+            "      - name: Test independent operations monitor with synthetic transports\n"
+            "        run: node --test ../edge/operations-monitor/monitor.test.mjs\n",
         )
         self.assertLess(new.index("run: bun ci"), new.index(additions[1]))
         self.assertLess(new.index(additions[1]), new.index("run: bun run test\n"))
         for addition in additions:
             self.assertEqual(new.count(addition), 1)
             new = new.replace(addition, "", 1)
+        # Required checks now run on backend-only and docs-only changes as well.
+        path_filter = (
+            "    paths:\n"
+            "      - h5/**\n"
+            "      - edge/**\n"
+            "      - scripts/verify-production.sh\n"
+            "      - scripts/verify-release-contract.py\n"
+            "      - .github/workflows/test-h5.yml\n"
+        )
+        self.assertEqual(old.count(path_filter), 2)
+        old = old.replace(path_filter, "")
         self.assertEqual(old, new)
 
     def test_no_other_accepted_tracked_paths_changed(self):
@@ -284,6 +329,26 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 ".github/workflows/test-h5.yml",
                 "README.md",
                 "backend/app/api/routes/app_orders.py",
+                "backend/app/api/main.py",
+                "backend/app/api/routes/operations.py",
+                "backend/app/api/routes/payment_webhooks.py",
+                "backend/app/api/routes/replicate_webhooks.py",
+                "backend/app/api/routes/app_uploads.py",
+                "backend/app/models.py",
+                "backend/app/models_operations.py",
+                "backend/app/alembic/versions/d6e7f8a9b0c1_add_operational_budget.py",
+                "backend/app/services/operational_budget.py",
+                "backend/app/services/operational_alerts.py",
+                "backend/app/services/paypal_replacement.py",
+                "backend/app/workers/video_tasks.py",
+                "backend/tests/conftest.py",
+                "backend/tests/api/routes/test_operational_controls.py",
+                "backend/tests/api/routes/test_paypal_commerce.py",
+                "backend/tests/api/routes/test_video_launch_convergence.py",
+                "backend/tests/services/test_operational_budget.py",
+                "backend/tests/utils/operations.py",
+                "edge/operations-monitor/monitor.mjs",
+                "edge/operations-monitor/monitor.test.mjs",
                 "backend/app/api/routes/app_paypal.py",
                 "backend/app/api/routes/app_auth.py",
                 "backend/app/core/config.py",
