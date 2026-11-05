@@ -164,10 +164,10 @@ def test_defaults_off_and_expired_config_can_boot():
         {"APP_STAGING_LOGIN_ACCEPTANCE_SUBJECT": None},
         {"APP_STAGING_LOGIN_ACCEPTANCE_SUBJECT": " user_other "},
         {"APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT": None},
-        {
-            "APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT": datetime.now(UTC)
-            + timedelta(minutes=31)
-        },
+        pytest.param(
+            {"APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT": timedelta(minutes=31)},
+            id="expiry-beyond-30-minutes",
+        ),
         {
             "APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT": datetime.now().replace(
                 tzinfo=None
@@ -178,6 +178,12 @@ def test_defaults_off_and_expired_config_can_boot():
     ],
 )
 def test_unsafe_configuration_never_boots(overrides):
+    expiry = overrides.get("APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT")
+    if isinstance(expiry, timedelta):
+        overrides = {
+            **overrides,
+            "APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT": datetime.now(UTC) + expiry,
+        }
     with pytest.raises(ValidationError):
         configured(**overrides)
 
