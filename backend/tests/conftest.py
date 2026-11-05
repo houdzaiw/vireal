@@ -138,3 +138,23 @@ def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]
     return authentication_token_from_email(
         client=client, email=settings.EMAIL_TEST_USER, db=db
     )
+
+
+@pytest.fixture(autouse=True)
+def synthetic_operational_evidence(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None]:
+    """Legacy positive-production cases still satisfy the new, real USD gate.
+
+    No gate is patched out. New operational tests explicitly vary these records.
+    All data and clocks belong only to the guarded local test cluster.
+    """
+    from app.services import operational_budget
+    from tests.utils.operations import clear_operations, seed_operations, staffed_now
+
+    now = staffed_now()
+    monkeypatch.setattr(operational_budget, "utc_now", lambda: now)
+    seed_operations(db, now)
+    yield
+    db.rollback()
+    clear_operations(db)

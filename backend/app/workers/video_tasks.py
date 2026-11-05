@@ -462,6 +462,7 @@ def _reconciliation_loop(
 
 
 def run_worker() -> None:
+    from app.services.operational_alerts import operational_tick, record_worker_progress
     from app.services.paypal_orders import reconcile_paypal_orders
 
     logger.info("Video task worker started")
@@ -475,6 +476,7 @@ def run_worker() -> None:
             "Payment",
         ),
         (reconcile_video_tasks, 60.0, "Video"),
+        (operational_tick, 20.0, "Operations"),
     ):
         threading.Thread(
             target=_reconciliation_loop,
@@ -494,6 +496,7 @@ def run_worker() -> None:
                 )
             if not processed:
                 stop.wait(settings.VIDEO_WORKER_POLL_SECONDS)
+            record_worker_progress()
     finally:
         stop.set()
 

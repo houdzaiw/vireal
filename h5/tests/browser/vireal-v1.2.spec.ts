@@ -68,7 +68,7 @@ async function mockPublicApi(page: Page) {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) })
   })
   await page.route("https://api.example.com/api/v1/app/paypal/config", async (route) => {
-    await route.fulfill({ json: { region_allowed: true, registration_enabled: false, recharge_enabled: false, products: [], global_real_limit: 30, global_real_remaining: 30, support_email: "li522903183@gmail.com" } })
+    await route.fulfill({ json: { region_allowed: true, registration_enabled: false, recharge_enabled: false, uploads_enabled: true, generation_enabled: true, products: [], global_real_limit: 30, global_real_remaining: 30, support_email: "li522903183@gmail.com" } })
   })
   await page.route(/https:\/\/(?!api\.example\.com).*/, async (route) => route.abort())
 }
@@ -100,6 +100,7 @@ async function mockSignedInApi(page: Page) {
 
 const paymentConfig = {
   region_allowed: true, registration_enabled: true, recharge_enabled: true,
+  uploads_enabled: true, generation_enabled: true,
   client_id: "qa-sandbox-public", environment: "sandbox", global_real_limit: 30,
   global_real_remaining: 30, resets_at: "2026-10-09T00:00:00Z",
   support_email: "li522903183@gmail.com",
@@ -113,6 +114,7 @@ const paymentConfig = {
 const generationAcceptanceConfig = () => ({
   ...paymentConfig, country: "CN", region_allowed: false,
   registration_enabled: false, recharge_enabled: false,
+  uploads_enabled: false, generation_enabled: false,
   generation_acceptance_mode: true, generation_acceptance_sign_in_enabled: true,
   generation_acceptance_read_allowed: true, generation_acceptance_allowed: true,
   generation_acceptance_task_id: null,
@@ -330,6 +332,7 @@ function cnSetupConfig(overrides = {}) {
   return {
     ...paymentConfig, country: "CN", region_allowed: false,
     registration_enabled: false, recharge_enabled: false,
+    uploads_enabled: false, generation_enabled: false,
     controlled_registration_enabled: true, controlled_account_setup_mode: true,
     controlled_account_setup_enabled: true,
     controlled_account_setup_expires_at: new Date(Date.now() + 60_000).toISOString(),
@@ -432,6 +435,7 @@ function paymentOnlyConfig(overrides = {}) {
   return {
     ...paymentConfig, environment: "live", country: "CN", region_allowed: false,
     registration_enabled: false, controlled_registration_enabled: false,
+    uploads_enabled: false, generation_enabled: false,
     payment_only_acceptance_mode: true, payment_only_sign_in_enabled: true,
     payment_only_acceptance_allowed: true, payment_only_order_created: false,
     payment_only_expires_at: "2099-01-01T01:00:00Z", ...overrides,
@@ -1638,6 +1642,7 @@ test(`${entry}: signed-out Clerk notifications preserve the in-progress login fo
 }
 
 test("public browsing starts while the Clerk bundle is still downloading", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, "language", { value: "en-US" }))
   await mockPublicApi(page)
   let releaseAuth!: () => void
   const authDownload = new Promise<void>(resolve => { releaseAuth = resolve })
@@ -1665,7 +1670,7 @@ test("public browsing starts while the Clerk bundle is still downloading", async
     expect(authDelivered).toBe(false)
     expect(authRequests).toBe(0)
     await page.getByRole("button", { name: "账户", exact: true }).click()
-    await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+    await expect(page.locator("#clerkStatus")).toHaveText("Loading secure sign-in…")
     releaseAuth()
     await expect(page.getByRole("textbox", { name: "Slow-bundle QA email" })).toBeVisible()
     expect(authRequests).toBe(0)
@@ -1691,6 +1696,7 @@ test("an unavailable Clerk bundle keeps public browsing usable without a busines
 })
 
 test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, "language", { value: "en-US" }))
   await mockPublicApi(page)
   await page.route("**/assets/vireal-auth.js", async (route) => {
     await route.fulfill({
@@ -1706,10 +1712,10 @@ test("login mounts when Clerk becomes ready after the H5 shell", async ({ page }
     })
   })
   await page.goto("/#login")
-  await expect(page.locator("#clerkStatus")).toContainText("正在载入")
+  await expect(page.locator("#clerkStatus")).toHaveText("Loading secure sign-in…")
   await page.evaluate(() => window.dispatchEvent(new Event("qa-clerk-load")))
   await expect(page.getByRole("textbox", { name: "Late QA email" })).toBeVisible()
-  await expect(page.locator("#clerkStatus")).toContainText("Secure email verification")
+  await expect(page.locator("#clerkStatus")).toHaveText("Secure email verification")
 })
 
 for (const returnToAccount of [false, true]) {

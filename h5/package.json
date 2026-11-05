@@ -6,7 +6,8 @@
     "build": "bash scripts/build-vireal-pages.sh",
     "test": "python3 -m unittest tests/test_vireal_h5_prototype.py",
     "test:browser": "playwright test -c playwright.config.ts",
-    "test:prelaunch": "playwright test -c playwright.prelaunch.config.ts"
+    "test:prelaunch": "playwright test -c playwright.prelaunch.config.ts",
+    "test:offline": "node --test tests/unit/*.test.mjs && python3 -I -B tests/test_public_availability_offline.py && python3 -I -B tests/test_accepted_integration_offline.py"
   },
   "dependencies": {
     "@clerk/clerk-js": "^6.32.1",

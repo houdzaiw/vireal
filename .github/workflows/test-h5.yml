@@ -4,19 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - h5/**
-      - edge/**
-      - scripts/verify-production.sh
-      - scripts/verify-release-contract.py
-      - .github/workflows/test-h5.yml
   pull_request:
-    paths:
-      - h5/**
-      - edge/**
-      - scripts/verify-production.sh
-      - scripts/verify-release-contract.py
-      - .github/workflows/test-h5.yml
 
 permissions:
   contents: read
@@ -43,6 +31,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Offline provenance checks compare against accepted historical commits.
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -55,10 +45,14 @@ jobs:
           python-version-file: .python-version
       - name: Install H5 dependencies
         run: bun ci
+      - name: Run H5 offline regression tests
+        run: bun run test:offline
       - name: Run H5 contract tests
         run: bun run test
       - name: Test signed region proxy
         run: node --test ../edge/test/worker.test.js
+      - name: Test independent operations monitor with synthetic transports
+        run: node --test ../edge/operations-monitor/monitor.test.mjs
       - name: Build production H5
         run: bun run build
         env:

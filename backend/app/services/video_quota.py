@@ -59,6 +59,25 @@ def global_real_count(*, session: Session, now: datetime) -> int:
     )
 
 
+def global_active_real_count(*, session: Session) -> int:
+    """Count reservations through delivery, across users and UTC day boundaries.
+
+    Admission callers must hold the transaction budget lock until the new task
+    reservation is committed. A provider success still in `saving`, or an old
+    unknown submission, must not release capacity before it is actually settled.
+    """
+    return int(
+        session.exec(
+            select(func.count())
+            .select_from(AppVideoTask)
+            .where(
+                col(AppVideoTask.execution_type).in_(REAL_EXECUTION_TYPES),
+                col(AppVideoTask.status).in_(ACTIVE_REAL_STATUSES),
+            )
+        ).one()
+    )
+
+
 def quota_counts(
     *, session: Session, app_user_id: uuid.UUID, now: datetime
 ) -> tuple[int, int, int, datetime]:
