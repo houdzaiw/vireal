@@ -277,6 +277,10 @@ def test_alert_opt_in_and_uncertain_send_never_retries(
     monkeypatch.setattr(settings, "APP_OPERATIONAL_ALERT_DELIVERY_ENABLED", True)
     monkeypatch.setattr(settings, "OPS_RESEND_API_KEY", "synthetic-resend")
     monkeypatch.setattr(settings, "OPS_ALERT_FROM", "ops@example.invalid")
+    monkeypatch.setattr(operational_alerts, "utc_now", staffed_now)
+    monkeypatch.setattr(
+        settings, "OPS_EMAIL_QUOTA_VERIFIED_UNTIL", staffed_now() + timedelta(hours=1)
+    )
     calls = []
 
     class Client:

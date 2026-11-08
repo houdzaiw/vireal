@@ -29,6 +29,9 @@ jobs:
           version: "0.11.18"
       - name: Prepare CI environment
         run: cp .env.example .env
+      - name: Test owner tools using public synthetic inputs only
+        run: uv run python -I -B ../tools/operations/test_local_tools.py
+        working-directory: backend
       - run: docker compose down -v --remove-orphans
       - run: docker compose up -d db mailpit
       - name: Migrate DB

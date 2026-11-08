@@ -4,10 +4,11 @@ A timed-out send may already have delivered: no automatic resend of an uncertain
 attempt. An independent monitor and a real delivery test remain release gates.
 """
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlmodel import Session, select
+from sqlalchemy import func, text
+from sqlmodel import Session, col, select
 
 from app.core.config import settings
 from app.core.db import engine
@@ -19,6 +20,69 @@ from app.services.operational_budget import (
     evaluate,
     utc_now,
 )
+
+# Persist quota receipts in the existing outbox. They are acknowledged internal
+# records, never customer incidents; no fifth table or historical DDL change.
+RECEIPT_PREFIX = "send-receipt:"
+DAILY_SEND_LIMIT = 20
+MONTHLY_SEND_LIMIT = 600
+SEND_COOLDOWN = timedelta(minutes=10)
+
+
+def claim_send(session: Session, now: datetime) -> AppOperationalAlert | None:
+    # One account-wide lock, including across worker processes/budget windows.
+    # Hosted operation uses PostgreSQL; fail closed for unsupported databases.
+    if session.get_bind().dialect.name != "postgresql":
+        return None
+    session.connection().execute(text("SELECT pg_advisory_xact_lock(914731062)"))
+    prefix = col(AppOperationalAlert.event_key).startswith(RECEIPT_PREFIX)
+    day = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    month = day.replace(day=1)
+    for beginning, limit in ((day, DAILY_SEND_LIMIT), (month, MONTHLY_SEND_LIMIT)):
+        count = session.exec(
+            select(func.count())
+            .select_from(AppOperationalAlert)
+            .where(
+                prefix,
+                AppOperationalAlert.created_at >= beginning,
+            )
+        ).one()
+        if count >= limit:
+            return None
+    latest = session.exec(
+        select(AppOperationalAlert)
+        .where(prefix)
+        .order_by(col(AppOperationalAlert.created_at).desc())
+        .limit(1)
+    ).first()
+    if latest is not None and now - latest.created_at < SEND_COOLDOWN:
+        return None
+    row = session.exec(
+        select(AppOperationalAlert)
+        .where(
+            AppOperationalAlert.delivered_at == None,  # noqa: E711
+            AppOperationalAlert.attempts == 0,
+            ~prefix,
+        )
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    row.attempts = 1
+    row.last_error_code = "send_outcome_unknown"
+    session.add(row)
+    session.add(
+        AppOperationalAlert(
+            window_id=row.window_id,
+            event_key=RECEIPT_PREFIX + row.id.hex,
+            created_at=now,
+            acknowledged_at=now,
+            attempts=1,
+        )
+    )
+    session.commit()  # Claim/count before I/O; timeouts and crashes count too.
+    return row
 
 
 def record_worker_progress() -> None:
@@ -64,23 +128,18 @@ def send_one_alert() -> bool:
         return False
     if not settings.OPS_RESEND_API_KEY or not settings.OPS_ALERT_FROM:
         return False
+    now = utc_now()
+    quota_until = settings.OPS_EMAIL_QUOTA_VERIFIED_UNTIL
+    tomorrow = now.astimezone(UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    if quota_until is None or not now < quota_until <= tomorrow:
+        return False
     with Session(engine) as session:
-        row = session.exec(
-            select(AppOperationalAlert)
-            .where(
-                AppOperationalAlert.delivered_at == None,  # noqa: E711
-                AppOperationalAlert.attempts == 0,
-            )
-            .with_for_update(skip_locked=True)
-            .limit(1)
-        ).first()
+        row = claim_send(session, now)
         if row is None:
             return False
-        row.attempts = 1
-        row.last_error_code = "send_outcome_unknown"
         identifier, event_key = row.id, row.event_key
-        session.add(row)
-        session.commit()  # Claim durably before I/O; process crash cannot resend.
     succeeded = False
     try:
         with httpx.Client(

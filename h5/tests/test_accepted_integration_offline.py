@@ -111,6 +111,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                     "APP_OPERATIONAL_ALERT_DELIVERY_ENABLED",
                     "OPS_RESEND_API_KEY",
                     "OPS_ALERT_FROM",
+                    "OPS_EMAIL_QUOTA_VERIFIED_UNTIL",
                     "OPS_MONITOR_READ_TOKEN",
                 }:
                     return None
@@ -327,6 +328,17 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
             {
                 ".env.example",
                 ".github/workflows/test-h5.yml",
+                ".github/workflows/pre-commit.yml",
+                ".github/workflows/zizmor.yml",
+                ".github/workflows/playwright.yml",
+                ".github/workflows/test-docker-compose.yml",
+                ".github/workflows/test-backend.yml",
+                "backend/tests/services/test_alert_limits.py",
+                "tools/operations/backup_once.py",
+                "tools/operations/test_email_once.py",
+                "tools/operations/test_local_tools.py",
+                "tools/operations/README.md",
+                "docs/launch-local-closure.md",
                 "README.md",
                 "backend/app/api/routes/app_orders.py",
                 "backend/app/api/main.py",

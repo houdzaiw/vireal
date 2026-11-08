@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     APP_OPERATIONAL_ALERT_DELIVERY_ENABLED: bool = False
     OPS_RESEND_API_KEY: str | None = None
     OPS_ALERT_FROM: str | None = None
+    # Manual account-wide allowance review. No API key permission expansion.
+    OPS_EMAIL_QUOTA_VERIFIED_UNTIL: AwareDatetime | None = None
     OPS_MONITOR_READ_TOKEN: str | None = None
     # Separate pilot admission. Never enables payment, generation or regions.
     APP_PILOT_ENABLED: bool = False

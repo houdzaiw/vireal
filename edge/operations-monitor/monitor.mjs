@@ -29,7 +29,7 @@ export async function check(env, transport = fetch) {
   }
 }
 
-export async function scheduled(env, transport = fetch) {
+export async function scheduled(env, transport = fetch, now = new Date()) {
   const incident = await check(env, transport)
   if (!env.STATE) throw new Error('monitor_state_missing')
   if (!incident) {
@@ -38,11 +38,35 @@ export async function scheduled(env, transport = fetch) {
   }
   if (env.ALERTS_ENABLED !== 'true') return { incident, attempted: false }
   if (!env.RESEND_API_KEY || !env.ALERT_FROM || !env.ALERT_TO) throw new Error('sender_not_configured')
-  const previous = await env.STATE.get('active-incident')
-  if (previous === incident) return { incident, attempted: false }
+  const quotaUntil = Date.parse(env.QUOTA_VERIFIED_UNTIL)
+  const tomorrow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  if (!Number.isFinite(quotaUntil) || !(now.getTime() < quotaUntil && quotaUntil <= tomorrow)) return { incident, attempted: false }
+  // KV alone cannot atomically reserve a quota across concurrent dispatches.
+  // A single Durable Object owns this storage; never fall back to weak state.
+  if (typeof env.STATE.transaction !== 'function') throw new Error('atomic_monitor_state_required')
+  const claimed = await env.STATE.transaction(async state => {
+    const previous = await state.get('active-incident')
+    if (previous === incident) return false
+    const timestamp = now.getTime()
+    const day = now.toISOString().slice(0, 10)
+    const month = day.slice(0, 7)
+    const quota = await state.get('send-quota') || { day, month, daily: 0, monthly: 0, last: null }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(quota.day) || !/^\d{4}-\d{2}$/.test(quota.month)
+      || !Number.isInteger(quota.daily) || quota.daily < 0 || quota.daily > 20
+      || !Number.isInteger(quota.monthly) || quota.monthly < 0 || quota.monthly > 600
+      || (quota.last !== null && (!Number.isSafeInteger(quota.last) || quota.last < 0))
+      || quota.day > day || quota.month > month) throw new Error('monitor_quota_state_invalid')
+    if (quota.day !== day) { quota.day = day; quota.daily = 0 }
+    if (quota.month !== month) { quota.month = month; quota.monthly = 0 }
+    if (quota.daily >= 20 || quota.monthly >= 600
+      || (quota.last !== null && timestamp - quota.last < 600000)) return false
+    quota.daily++; quota.monthly++; quota.last = timestamp
+    await state.put('send-quota', quota)
+    await state.put('active-incident', incident)
+    return true
+  })
+  if (!claimed) return { incident, attempted: false }
   // Persist the claim first: unknown transport outcomes never auto-resend.
-  // The future cron must be single-dispatch (no overlapping monitor producers).
-  await env.STATE.put('active-incident', incident)
   try {
     const response = await transport('https://api.resend.com/emails', {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000),
@@ -58,5 +82,22 @@ export async function scheduled(env, transport = fetch) {
 
 export default {
   fetch() { return new Response(null, { status: 404 }) },
-  scheduled(_event, env, context) { context.waitUntil(scheduled(env)) },
+  scheduled(_event, env, context) {
+    if (env.ALERTS_ENABLED !== 'true') return
+    if (!env.MONITOR_COORDINATOR) throw new Error('atomic_monitor_state_required')
+    const id = env.MONITOR_COORDINATOR.idFromName('vireal-operations-alerts-v1')
+    context.waitUntil(env.MONITOR_COORDINATOR.get(id).fetch('https://monitor.internal/check', { method: 'POST' }))
+  },
+}
+
+// Not deployed by this package. New binding/migration and cost review are explicit
+// future release scope, separate from Railway's four PostgreSQL tables.
+export class MonitorCoordinator {
+  constructor(state, env) { this.state = state; this.env = env; this.queue = Promise.resolve() }
+  async fetch(request) {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/check') return new Response(null, { status: 404 })
+    const work = this.queue.then(() => scheduled({ ...this.env, STATE: this.state.storage }))
+    this.queue = work.catch(() => {})
+    return Response.json(await work)
+  }
 }
