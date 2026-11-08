@@ -508,11 +508,15 @@ class VirealH5ProductionTests(unittest.TestCase):
 
     def test_initial_launch_coin_policy_and_staffed_hours_are_disclosed(self) -> None:
         self.assertIn("首批购买的金币不设自动到期", self.app)
-        self.assertIn("not a promise of perpetual operation or permanent media storage", self.app)
+        self.assertIn(
+            "not a promise of perpetual operation or permanent media storage", self.app
+        )
         self.assertIn("全站同时最多1个任务", self.app)
         self.assertIn("1 concurrent task site-wide", self.app)
         self.assertIn("09:00–23:00", self.app)
-        self.assertIn("existing order queries, settlement and delivery continue", self.app)
+        self.assertIn(
+            "existing order queries, settlement and delivery continue", self.app
+        )
 
     def test_mobile_shell_has_no_horizontal_overflow(self) -> None:
         self.assertIn("overflow-x: hidden", PROTOTYPE.read_text(encoding="utf-8"))

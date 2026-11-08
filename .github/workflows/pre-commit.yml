@@ -7,15 +7,11 @@ on:
   workflow_dispatch:
 permissions: {}
 
-env:
-  CAN_PUSH: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
-
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,7 +53,6 @@ jobs:
           else
             uv run prek run --all-files --show-diff-on-failure
           fi
-        continue-on-error: true
       - name: Check for changes
         id: changes
         run: |
@@ -66,32 +61,13 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Get PR Push token
-        id: pr-push
-        if: github.event_name == 'pull_request' && env.CAN_PUSH == 'true' && steps.changes.outputs.changed == 'true'
-        uses: tiangolo/pr-push@ff4e51a433de4c22bbf90597e069e8247b9203d2 # 0.0.1
-      - name: Commit and push changes
-        if: github.event_name == 'pull_request' && env.CAN_PUSH == 'true' && steps.changes.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ steps.pr-push.outputs.token }}
+      - name: Reject generated or formatter changes
+        if: steps.changes.outputs.changed == 'true'
         run: |
-          git config user.name "pr-push[bot]"
-          git config user.email "pr-push[bot]@users.noreply.github.com"
-          gh auth setup-git
-          git add -A
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "🎨 Auto format and update with pre-commit"
-            git push
-          fi
-      - uses: pre-commit-ci/lite-action@5d6cc0eb514c891a40562a58a8e71576c5c7fb43 # v1.1.0
-        if: github.event_name == 'pull_request' && env.CAN_PUSH == 'false'
-        with:
-          msg: 🎨 Auto format and update with pre-commit
-      - name: Error out on pre-commit errors
-        if: steps.precommit.outcome == 'failure'
-        run: exit 1
+          git status --short
+          git diff --stat
+          echo "Commit the reviewed formatter or generated changes locally; CI never pushes." >&2
+          exit 1
 
   # https://github.com/marketplace/actions/alls-green#why
   pre-commit-alls-green:  # This job does nothing and is only used for the branch protection

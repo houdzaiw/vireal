@@ -112,7 +112,10 @@ class Tools(unittest.TestCase):
         precommit = (root / ".github/workflows/pre-commit.yml").read_text()
         self.assertIn("github.event.pull_request.head.sha || github.sha", precommit)
         self.assertIn("--all-files", precommit)
-        self.assertIn("if: github.event_name == 'pull_request' &&", precommit)
+        self.assertNotIn("git push", precommit)
+        self.assertNotIn("tiangolo/pr-push", precommit)
+        self.assertNotIn("id-token: write", precommit)
+        self.assertIn("Reject generated or formatter changes", precommit)
         self.assertIn("pre-commit-alls-green:", precommit)
 
     def test_cadence_uses_actual_opening_snapshot(self):
