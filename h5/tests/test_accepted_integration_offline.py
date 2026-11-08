@@ -326,6 +326,13 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
         self.assertLessEqual(
             changed,
             {
+                # Exact reviewed legacy-deployment protection scope.
+                ".github/workflows/deploy-docker-compose.yml",
+                ".github/workflows/deploy.yml",
+                ".pre-commit-config.yaml",
+                "tools/ci/README.md",
+                "tools/ci/legacy_deploy_policy.py",
+                "tools/ci/test_legacy_deploy_guards.py",
                 ".env.example",
                 ".github/workflows/test-h5.yml",
                 ".github/workflows/pre-commit.yml",
