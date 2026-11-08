@@ -248,7 +248,16 @@ def acceptance_request_allowed(request: Request) -> bool:
     return acceptance_subject_allowed(subject=claims.subject, issuer=claims.issuer)
 
 
-def require_new_commerce_user(request: Request) -> None:
+def require_new_commerce_user(
+    request: Request,
+    *,
+    session: Session | None = None,
+    user: AppUser | None = None,
+    verify_profile: bool = False,
+) -> None:
+    from app.services.pilot_access import require_pilot_commerce
+
+    require_pilot_commerce(request, session, user, verify_profile=verify_profile)
     # The raw mode stays a commerce kill switch even after its window expires.
     if settings.APP_GENERATION_ACCEPTANCE_ENABLED:
         raise HTTPException(

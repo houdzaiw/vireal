@@ -30,6 +30,12 @@ from app.services.commercial_access import (
     require_region,
 )
 from app.services.generation_acceptance import generation_acceptance_user
+from app.services.pilot_access import pilot_profile_allowed
+from app.services.staging_login_acceptance import (
+    STAGING_LOGIN_HEADER,
+    require_staging_sign_in_context,
+    require_staging_sign_in_identity,
+)
 
 router = APIRouter(prefix="/app/auth", tags=["app auth"])
 
@@ -87,8 +93,37 @@ def initialize_clerk_session(
 ) -> AppAuthSessionResponse:
     """Create or refresh the local App identity for a verified Clerk session."""
     cn_setup_request = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
+    staging_request = STAGING_LOGIN_HEADER in request.headers
+    pilot_requested = settings.APP_PILOT_ENABLED
+    pilot_admission = False
+    staging_identity: AppUserIdentity | None = None
+    staging_user: AppUser | None = None
+    if staging_request:
+        # Reject wrong subjects/contexts before even querying the provider profile.
+        require_staging_sign_in_context(request, clerk_session)
+        identities = session.exec(
+            select(AppUserIdentity).where(
+                AppUserIdentity.issuer == clerk_session.issuer,
+                AppUserIdentity.subject == clerk_session.subject,
+            )
+        ).all()
+        if len(identities) == 1:
+            staging_identity = identities[0]
+            staging_user = session.get(AppUser, staging_identity.app_user_id)
+        require_staging_sign_in_identity(
+            request, clerk_session, staging_identity, staging_user
+        )
 
     def require_current_setup_authorization() -> None:
+        if pilot_admission and not pilot_profile_allowed(
+            profile=profile, issuer=clerk_session.issuer
+        ):
+            raise HTTPException(403, "A verified pilot invitation is required")
+        if staging_request:
+            # Recheck after provider calls/locks and immediately before commit.
+            require_staging_sign_in_identity(
+                request, clerk_session, staging_identity, staging_user
+            )
         if cn_setup_request and not controlled_cn_account_setup_profile_allowed(
             request, profile=profile, issuer=clerk_session.issuer
         ):
@@ -111,10 +146,46 @@ def initialize_clerk_session(
         )
     ).first()
     is_new_user = identity is None
+    if staging_request and (
+        identity is None
+        or staging_identity is None
+        or identity.id != staging_identity.id
+    ):
+        raise HTTPException(403, "Staging sign-in requires the existing test identity")
     now = datetime.now(UTC)
     session_id_hash = hash_clerk_session_id(clerk_session.session_id)
 
     app_user: AppUser | None = None
+    # Existing users retain session/read access to their historical records.
+    # New business identities and invited-email rebinding are always serialized.
+    if (identity is None and (pilot_requested or settings.APP_PILOT_ENABLED)) or (
+        settings.APP_PILOT_ENABLED
+        and pilot_profile_allowed(profile=profile, issuer=clerk_session.issuer)
+    ):
+        pilot_admission = True
+        require_current_setup_authorization()
+        session.connection().execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {
+                "key": f"controlled-registration:{clerk_session.issuer}:{profile.primary_email.casefold()}"
+            },
+        )
+        require_current_setup_authorization()
+        matches = session.exec(
+            select(AppUserIdentity).where(
+                AppUserIdentity.issuer == clerk_session.issuer,
+                func.lower(AppUserIdentity.primary_email)
+                == profile.primary_email.casefold(),
+            )
+        ).all()
+        if len(matches) > 1 or (
+            matches and matches[0].subject != clerk_session.subject
+        ):
+            raise HTTPException(409, "Pilot email is already linked to an account")
+        if matches and identity is None:
+            identity = matches[0]
+            app_user = session.get(AppUser, identity.app_user_id)
+            is_new_user = False
     if identity is None:
         if (
             settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
@@ -135,6 +206,7 @@ def initialize_clerk_session(
                 subject=clerk_session.subject, issuer=clerk_session.issuer
             )
             and not controlled
+            and not pilot_admission
         ):
             raise HTTPException(403, "Registration is not yet open / 注册尚未开放")
         if controlled:
@@ -166,6 +238,14 @@ def initialize_clerk_session(
                 is_new_user = False
     if identity is None:
         require_current_setup_authorization()
+        from app.services.operational_budget import reserve_cost
+
+        reserve_cost(
+            session,
+            key=f"registration:{clerk_session.issuer}:{clerk_session.subject}",
+            source="clerk",
+            price_key="registration",
+        )
         email_name = profile.primary_email.split("@", 1)[0].strip()
         app_user = AppUser(
             account_type="clerk",

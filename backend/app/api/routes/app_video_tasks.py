@@ -51,7 +51,12 @@ from app.services.replicate_video import (
 )
 from app.services.storage import ImageStorageError, get_image_storage
 from app.services.video_generation import VideoTaskStatus
-from app.services.video_quota import build_video_quota, global_real_count, quota_counts
+from app.services.video_quota import (
+    build_video_quota,
+    global_active_real_count,
+    global_real_count,
+    quota_counts,
+)
 
 router = APIRouter(prefix="/app/video-tasks", tags=["app video tasks"])
 
@@ -431,6 +436,13 @@ async def create_video_task(
     elif active_count >= settings.APP_USER_MAX_CONCURRENT_VIDEO_TASKS:
         fallback_reason = "user_concurrent_quota"
     elif (
+        global_active_real_count(session=session)
+        >= settings.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS
+    ):
+        # The budget lock covers this read and the reservation commit below,
+        # including concurrent requests handled by different API processes.
+        fallback_reason = "global_concurrent_quota"
+    elif (
         planned_execution_type == "wan"
         and wan_count >= settings.APP_WAN_DAILY_GLOBAL_SUBMISSIONS
     ):
@@ -468,6 +480,14 @@ async def create_video_task(
         submission_attempted_at=None if is_demo else now,
         next_attempt_at=now if is_demo else None,
         expires_at=now + timedelta(hours=settings.APP_MEDIA_RETENTION_HOURS),
+    )
+    from app.services.operational_budget import reserve_cost
+
+    reserve_cost(
+        session,
+        key=f"video:{task.id}",
+        source="replicate" if not is_demo else "railway",
+        price_key=f"video:{model}:{resolved_duration}:720p:image-only",
     )
     session.add(task)
     session.flush()

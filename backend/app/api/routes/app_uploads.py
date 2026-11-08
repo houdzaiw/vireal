@@ -39,6 +39,9 @@ async def upload_app_image(
     require_generation_access(request, session, current_app_user, verify_profile=True)
     lock_commercial_user(session, current_app_user)
     require_new_generation(request, session, current_app_user)
+    from app.services.operational_budget import reserve_cost
+
+    reserve_cost(session, key=f"upload:{uuid.uuid4()}", source="r2", price_key="upload")
     # Do not retain the account lock during object storage network I/O.
     session.commit()
     content = await file.read(settings.MAX_UPLOAD_IMAGE_BYTES + 1)

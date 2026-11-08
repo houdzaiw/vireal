@@ -122,6 +122,16 @@ REPLICATE_POC_MAX_SUBMISSIONS=0
 
 效果变体只允许 `minimax/video-01`、`wan-video/wan-2.7-r2v` 和 `bytedance/seedance-2.0`。正式环境必须保持 `LOCAL_DEMO_ENABLED=False`，避免额度或服务商异常时返回模拟生成；`REPLICATE_POC_MAX_SUBMISSIONS=0` 表示关闭历史累计 PoC 上限。每日额度、单用户并发额度和 Wan 全站额度仍会生效。任何 `submission_unknown` 都不得自动退款或重提，必须先核对服务商状态。
 
+### 五人受邀试运行（需另行批准配置及发布）
+
+`APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS=1` 将所有用户、模型和日期的在途真实任务合计限制为一个。检查与预留共用数据库事务锁，可约束多个 API 进程；`submission_unknown` 和输出保存／交付中的任务继续占位，不能只按 Worker 数量或单用户并发判断。已有每日预算及幂等、扣费和退款规则继续生效。
+
+`APP_PILOT_ENABLED` 默认 `False`，`APP_PILOT_INVITED_EMAILS` 默认空列表。实际试运行须在 API／Worker 使用一致的已批准配置，设置最多五个不重复的 ASCII 受邀邮箱（JSON 数组，大小写不敏感），保留 `APP_PUBLIC_REGISTRATION_ENABLED=False`，并使用正确的 Clerk 实例、签名地区检查及全站并发一。此模式与旧特殊验收、免费模拟生成和管理员公开注册互斥；不会自动启用充值、上传或生成。
+
+`/?pilot=1#register` 仅显示受邀注册界面，链接本身不授予权限。后端按 Clerk 验证过的主邮箱绑定业务身份，序列化同邮箱的首次登录；非名单账号不能初始化新业务身份或提交新付款、上传、生成。新业务操作重新核对当前身份，名单移除后保留历史钱包／订单／交付访问，已付款后台处理继续运行。名单不会出现在公共配置响应中。
+
+这里限制的是应用业务准入，不代表已限制 Clerk 控制台外所有供应商账号的创建，也不代替邮件邀请发送。真实受邀邮箱、邀请投递方式、预算和值守安排须在开放前确认。代码整合、离线测试及本机构建均不表示线上配置或商业开放已经通过。
+
 部署前必须替换默认的 `SECRET_KEY`、PostgreSQL 密码和管理员密码。若 H5 与 API 不同源，把完整 H5 Origin 以 JSON 数组配置到 `BACKEND_CORS_ORIGINS`，例如 `["https://h5.example.com"]`。Webhook URL 不得发生 HTTP→HTTPS 或尾斜杠重定向。
 
 Compose 已包含 `video-worker` 服务。部署时先运行 migration，再启动 API 和 Worker：

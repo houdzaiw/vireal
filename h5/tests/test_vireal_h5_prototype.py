@@ -353,7 +353,9 @@ class VirealH5ProductionTests(unittest.TestCase):
     def test_clerk_is_bundled(self) -> None:
         self.assertIn('name="clerk-publishable-key"', self.html)
         self.assertIn('import { Clerk } from "@clerk/clerk-js"', self.auth_entry)
-        self.assertIn("await clerk.load({ ui })", self.auth_entry)
+        self.assertRegex(self.auth_entry, r"await clerk\.load\(\{\s*ui,")
+        self.assertIn("routerPush:", self.auth_entry)
+        self.assertIn("routerReplace:", self.auth_entry)
 
     def test_public_app_runs_before_the_larger_auth_bundle(self) -> None:
         self.assertLess(
@@ -467,8 +469,16 @@ class VirealH5ProductionTests(unittest.TestCase):
         self.assertIn("FormData", self.app)
 
     def test_auth_session_is_initialized(self) -> None:
-        self.assertIn("/api/v1/app/auth/session", self.app)
-        self.assertIn("clerk.session.id", self.app)
+        sync = self.app[
+            self.app.index("async function syncSession()") : self.app.index(
+                "function requireAuth("
+            )
+        ]
+        self.assertIn("/api/v1/app/auth/session", sync)
+        self.assertIn('method: "POST"', sync)
+        self.assertIn("version !== authSyncVersion", sync)
+        self.assertIn("currentAuth().session?.id !== sessionId", sync)
+        self.assertIn("state.authSyncedSessionId = sessionId", sync)
         self.assertNotIn("device-login", self.app)
 
     def test_logout_revokes_backend_before_clerk(self) -> None:
@@ -477,7 +487,12 @@ class VirealH5ProductionTests(unittest.TestCase):
         ]
         self.assertLess(
             logout.index("/api/v1/app/auth/logout"),
-            logout.index("VirealClerk?.signOut"),
+            logout.index("await clerk?.signOut()"),
+        )
+        self.assertIn("const clerk = window.VirealClerk", logout)
+        self.assertLess(
+            logout.index("await clerk?.signOut()"),
+            logout.index("clerkResources.set(clerk, { session: null, user: null })"),
         )
 
     def test_confirmed_operator_and_exact_media_retention_are_disclosed(self) -> None:
@@ -490,6 +505,18 @@ class VirealH5ProductionTests(unittest.TestCase):
             "Merchant identity and applicable terms must be confirmed", self.app
         )
         self.assertIn("受控验收不代表公众注册或充值已经开放", self.app)
+
+    def test_initial_launch_coin_policy_and_staffed_hours_are_disclosed(self) -> None:
+        self.assertIn("首批购买的金币不设自动到期", self.app)
+        self.assertIn(
+            "not a promise of perpetual operation or permanent media storage", self.app
+        )
+        self.assertIn("全站同时最多1个任务", self.app)
+        self.assertIn("1 concurrent task site-wide", self.app)
+        self.assertIn("09:00–23:00", self.app)
+        self.assertIn(
+            "existing order queries, settlement and delivery continue", self.app
+        )
 
     def test_mobile_shell_has_no_horizontal_overflow(self) -> None:
         self.assertIn("overflow-x: hidden", PROTOTYPE.read_text(encoding="utf-8"))

@@ -57,12 +57,15 @@
     .hidden { display: none !important; }
     .stage { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
     .phone-shell {
+      --nav-bottom-inset: max(8px, env(safe-area-inset-bottom));
+      --nav-height: calc(85px + var(--nav-bottom-inset));
       position: relative; width: min(100%, 430px); height: min(920px, calc(100vh - 40px)); min-height: 720px;
       overflow: hidden; border: 1px solid rgba(214, 244, 249, .17); border-radius: 34px; background: var(--ink);
       box-shadow: 0 30px 100px rgba(0, 0, 0, .75), 0 0 0 7px rgba(255, 255, 255, .025);
     }
     .phone-shell::after { content: ""; position: absolute; inset: 0; z-index: 20; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 90px rgba(0, 0, 0, .30); }
     .page { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(183,242,255,.26) transparent; background: var(--ink); }
+    .phone-shell.has-nav > .page { padding-bottom: calc(var(--nav-height) + 28px); scroll-padding-bottom: calc(var(--nav-height) + 28px); }
     .page::-webkit-scrollbar { width: 4px; }
     .page::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(183,242,255,.26); }
     .page-enter { animation: page-enter .42s var(--ease) both; }
@@ -86,8 +89,6 @@
     .section-head h1 { margin: 0; max-width: 270px; font-size: 25px; line-height: 1.08; letter-spacing: -.035em; font-weight: 650; }
     .section-head h1 span { color: var(--mist); }
     .category-meta { margin-bottom: 8px; color: #82969e; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
-    .live-hint { display: flex; align-items: center; gap: 7px; padding-bottom: 2px; color: #8ba0a7; font-size: 10px; white-space: nowrap; }
-    .live-hint i { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
     .effect-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
     .effect-card { position: relative; min-height: 245px; overflow: hidden; isolation: isolate; padding: 0; border: 1px solid rgba(235, 251, 255, .14); border-radius: 24px; background: #12171a; cursor: pointer; text-align: left; transition: transform .25s var(--ease), border-color .25s ease, box-shadow .25s ease; }
     .effect-card:first-child { grid-column: 1 / -1; min-height: 390px; }
@@ -112,7 +113,7 @@
     .catalog-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; background: rgba(255,255,255,.025); }
     .catalog-footer strong { display: block; font-size: 12px; font-weight: 650; }
     .catalog-footer span { display: block; margin-top: 3px; color: #85979e; font-size: 10px; }
-    .arrow-orb { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(183,242,255,.35); border-radius: 50%; color: var(--mist); }
+    .nav-dock { position: absolute; z-index: 30; inset: auto 0 0; height: var(--nav-height); padding: 8px 16px var(--nav-bottom-inset); border-top: 1px solid rgba(255,255,255,.08); background: rgba(9,11,13,.94); backdrop-filter: blur(18px); }
     .utility-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
     .utility-nav button { min-height: 48px; border: 0; border-radius: 12px; background: transparent; color: #82959c; font-size: 10px; cursor: pointer; }
     .utility-nav button svg { display: block; margin: 0 auto 4px; font-size: 16px; }
@@ -137,8 +138,8 @@
     .upload-tile[aria-pressed="true"]::after { content: ""; position: absolute; inset: auto 0 0; height: 48%; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
     .upload-center { position: relative; z-index: 2; text-align: center; }
     .plus-ring { display: grid; width: 46px; height: 46px; margin: 0 auto; place-items: center; border: 1px solid rgba(183,242,255,.65); border-radius: 50%; color: var(--mist); }
-    .upload-title { margin-top: 10px; color: #d9e6e9; font-size: 11px; font-weight: 650; }
-    .upload-hint { margin-top: 4px; color: #82949b; font-size: 9px; }
+    .upload-title { display: block; margin-top: 10px; color: #d9e6e9; font-size: 11px; font-weight: 650; }
+    .upload-hint { display: block; margin-top: 4px; color: #82949b; font-size: 9px; }
     .upload-done { display: none; }
     .upload-tile[aria-pressed="true"] .upload-empty { display: none; }
     .upload-tile[aria-pressed="true"] .upload-done { display: block; }
@@ -287,8 +288,8 @@
     @keyframes pulse { 0%, 100% { transform: scale(.94); opacity: .48; } 50% { transform: scale(1.05); opacity: .72; } }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 760px) {
-      .stage { padding: 0; }
-      .phone-shell { width: 100%; height: 100vh; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+      .stage { min-height: 100vh; min-height: 100dvh; padding: 0; }
+      .phone-shell { width: 100%; height: 100vh; height: 100dvh; min-height: 100vh; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
       .phone-shell::after { border-radius: 0; }
       .admin-stage { padding: 0; }
       .admin-shell { min-height: 100vh; grid-template-columns: 1fr; border: 0; border-radius: 0; }
@@ -429,9 +430,13 @@
     }
 
     function utilityNav(active) {
-      return `<nav class="utility-nav" aria-label="主要功能" data-focus-zone="navigation">
+      return `<div class="nav-dock"><nav class="utility-nav" aria-label="主要功能" data-focus-zone="navigation">
         ${[['home',icons.home,'发现'],['works',icons.works,'作品'],['account',icons.user,'我的']].map(([id,icon,label]) => `<button data-route="${id}" aria-current="${active === id ? 'page' : 'false'}">${icon}${label}</button>`).join('')}
-      </nav>`;
+      </nav></div>`;
+    }
+
+    function shell(content, activeNav) {
+      return `<main class="phone-shell has-nav">${content}${utilityNav(activeNav)}</main>`;
     }
 
     function segments(activeCategoryId) {
@@ -452,13 +457,11 @@
     function homePage(categoryId) {
       const category = categoryById(categoryId);
       const effects = enabledEffects(category.id);
-      return `<main class="phone-shell"><section class="page home-page page-enter" data-focus-zone="home">
+      return shell(`<section class="page home-page page-enter" data-focus-zone="home">
         ${publicHeader()}${segments(category.id)}
-        <div class="section-head"><div><div class="category-meta">${category.englishName} / ${effects.length} AI MOTIONS</div><h1>找到你的下一种<br><span>可能性</span></h1></div><div class="live-hint"><i></i>数据已同步</div></div>
+        <div class="section-head"><div><div class="category-meta">${category.englishName} / ${effects.length} AI MOTIONS</div><h1>找到你的下一种<br><span>可能性</span></h1></div></div>
         ${effects.length ? `<div class="effect-grid" data-focus-zone="home effects">${effects.map(effectCard).join('')}</div>` : `<div class="empty-panel">${icons.layers}<h2>该分类暂无效果</h2><p>后台启用效果后会自动显示在这里，不需要重新发布 H5。</p></div>`}
-        <div class="catalog-footer"><div><strong>上传照片，体验 AI 变身</strong><span>点击任意效果，开始你的下一幕</span></div><span class="arrow-orb">${icons.arrowRight}</span></div>
-        ${utilityNav('home')}
-      </section></main>`;
+      </section>`, 'home');
     }
 
     function uploadTile(effect, index) {
@@ -477,7 +480,7 @@
       state.selectedDuration = variant.seconds;
       const affordable = state.data.balance >= variant.coinCost;
       const recommendations = enabledEffects(effect.categoryId).filter(item => item.id !== effect.id).slice(0,2);
-      return `<main class="phone-shell"><section class="page page-enter" data-focus-zone="generate">
+      return shell(`<section class="page page-enter" data-focus-zone="generate">
         <div class="detail-hero" data-focus-zone="generate hero">${surface(effect)}<div class="detail-shade"></div>
           <div class="detail-bar"><button class="icon-button" data-route="home" data-route-category="${category.id}" aria-label="返回${category.name}">${icons.arrowLeft}</button><button class="energy-pill" data-route="wallet"><span>✦</span><span>${state.data.balance}</span></button></div>
           <div class="hero-copy"><div class="eyeline">${effect.englishName}</div><h1>${effect.title}</h1><p>${effect.requiredImages === 2 ? '上传两张清晰的人像照片，让这一刻成为你们的专属片段。' : '上传一张清晰的人像照片，把这一幕变成你的专属版本。'}</p></div>
@@ -489,8 +492,7 @@
           <button class="generate-button" data-generate ${complete && affordable ? '' : 'disabled'}>${!complete ? `请先上传 ${effect.requiredImages} 张照片` : (!affordable ? '金币余额不足' : '生成我的版本')}<small>${variant.coinCost} ✦</small></button>
         </section>
         <section class="subsection" data-focus-zone="generate recommendations"><div class="subsection-head"><h2>同类推荐</h2><span>${recommendations.length} 个效果</span></div><div class="recommend-grid">${recommendations.map(item => `<button class="recommend-card" data-effect="${item.id}">${surface(item)}<strong>${item.title}</strong></button>`).join('')}</div></section>
-        <div style="padding:0 16px 24px">${utilityNav('home')}</div>
-      </section></main>`;
+      </section>`, 'home');
     }
 
     function generationPage(effect) {
@@ -499,32 +501,31 @@
       const isSuccess = status === 'success';
       const title = isProcessing ? '正在生成你的专属视频' : (isSuccess ? '视频已经生成完成' : '本次生成未完成');
       const copy = isProcessing ? '任务已进入队列，可安全离开。完成后会自动出现在作品中。' : (isSuccess ? '结果已保存至作品，扣费与剩余额度均已按任务结果更新。' : '模型服务暂时不可用，本次金币已自动退回，可以稍后重试。');
-      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="generation">
+      return shell(`<section class="page screen-page page-enter" data-focus-zone="generation">
         <header><button class="icon-button" data-route="home" aria-label="返回发现">${icons.arrowLeft}</button><span class="data-badge">任务 VR-240927-018</span></header>
         <h1 class="screen-title">生成任务</h1><p class="screen-copy">状态、扣费和结果均来自同一个后端任务记录。</p>
         <div class="status-panel"><div class="status-visual">${surface(effect)}<div class="status-center">${isProcessing ? `<div><div class="status-spinner"></div><h2>${title}</h2><p>${copy}</p><div class="progress-track"><i></i></div></div>` : `<div>${isSuccess ? `<span style="display:grid;width:54px;height:54px;margin:auto;place-items:center;border:1px solid rgba(140,235,197,.45);border-radius:50%;color:var(--success);font-size:25px">${icons.check}</span>` : `<span style="display:grid;width:54px;height:54px;margin:auto;place-items:center;border:1px solid rgba(255,159,159,.35);border-radius:50%;color:var(--danger);font-size:24px">${icons.warning}</span>`}<h2>${title}</h2><p>${copy}</p></div>`}</div></div>
           <div class="status-actions"><button class="secondary-button" data-route="works">查看作品</button><button class="primary-button" data-route="${isProcessing ? 'home' : (isSuccess ? 'works' : 'generate')}" ${!isProcessing && !isSuccess ? `data-effect-route="${effect.id}"` : ''}>${isProcessing ? '继续浏览' : (isSuccess ? '打开结果' : '重新生成')}</button></div>
-        </div>${utilityNav('works')}
-      </section></main>`;
+        </div>
+      </section>`, 'works');
     }
 
     function worksPage() {
       const effect = effectById(state.selectedEffectId);
-      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="works">${publicHeader()}<h1 class="screen-title">我的作品</h1><p class="screen-copy">生成任务与结果统一保存在当前账户下。</p>
+      return shell(`<section class="page screen-page page-enter" data-focus-zone="works">${publicHeader()}<h1 class="screen-title">我的作品</h1><p class="screen-copy">生成任务与结果统一保存在当前账户下。</p>
         ${state.worksEmpty ? `<div class="empty-panel">${icons.works}<h2>还没有作品</h2><p>选择一个效果，上传照片生成你的第一条 AI 视频。</p><button class="primary-button" style="margin-top:18px;padding:0 20px" data-route="home">开始创作</button></div>` : `<div class="list-stack"><div class="list-item"><div class="list-thumb">${surface(effect)}</div><div class="list-content"><strong>${effect.title} · ${chosenVariant(effect).seconds} 秒</strong><span>处理中 · 刚刚创建 · ${effect.modelType}</span></div><button class="status-chip" data-route="generation">查看</button></div><div class="list-item"><div class="list-thumb">${surface(effectById('dance-1'))}</div><div class="list-content"><strong>节拍律动 · 10 秒</strong><span>已完成 · 昨天 · wan-video</span></div><span class="status-chip">完成</span></div></div>`}
-        ${utilityNav('works')}
-      </section></main>`;
+      </section>`, 'works');
     }
 
     function walletPage() {
-      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="wallet">${publicHeader()}<h1 class="screen-title">金币与额度</h1><p class="screen-copy">余额、消耗与可用额度均以服务端返回为准。</p>
+      return shell(`<section class="page screen-page page-enter" data-focus-zone="wallet">${publicHeader()}<h1 class="screen-title">金币与额度</h1><p class="screen-copy">余额、消耗与可用额度均以服务端返回为准。</p>
         <div class="wallet-card"><small>AVAILABLE BALANCE</small><strong>${state.data.balance} ✦</strong><p>今日剩余 ${state.data.quota.dailyRemaining} 次 · 当前可并发 ${state.data.quota.concurrentRemaining} 个任务</p></div>
-        <div class="pack-grid"><button class="pack-button" data-pack="120"><span><b>120 金币</b><span>适合轻量体验</span></span><em>去支付</em></button><button class="pack-button" data-pack="360"><span><b>360 金币</b><span>适合连续创作</span></span><em>去支付</em></button><button class="pack-button" data-pack="800"><span><b>800 金币</b><span>适合高频使用</span></span><em>去支付</em></button></div>${utilityNav('wallet')}
-      </section></main>`;
+        <div class="pack-grid"><button class="pack-button" data-pack="120"><span><b>120 金币</b><span>适合轻量体验</span></span><em>去支付</em></button><button class="pack-button" data-pack="360"><span><b>360 金币</b><span>适合连续创作</span></span><em>去支付</em></button><button class="pack-button" data-pack="800"><span><b>800 金币</b><span>适合高频使用</span></span><em>去支付</em></button></div>
+      </section>`, 'wallet');
     }
 
     function accountPage() {
-      return `<main class="phone-shell"><section class="page screen-page page-enter" data-focus-zone="account">${publicHeader()}<h1 class="screen-title">账户与偏好</h1><div class="profile-card"><div class="profile-row"><div class="profile-avatar">VI</div><div><strong style="font-size:13px">Vireal User</strong><span style="display:block;margin-top:5px;color:#84979e;font-size:10px">viewer@example.com</span></div></div><div class="settings-list"><button data-toast="界面语言已跟随浏览器设置"><span><b>界面语言</b><small>简体中文</small></span>${icons.arrowRight}</button><button data-toast="上传与生成结果遵循当前数据保留策略"><span><b>隐私与数据</b><small>查看数据保留与删除规则</small></span>${icons.arrowRight}</button><button data-route="admin-categories"><span><b>进入管理后台</b><small>维护分类、效果与媒体</small></span>${icons.arrowRight}</button></div></div><button class="danger-button" style="width:100%;margin-top:14px" data-logout>退出登录</button>${utilityNav('account')}</section></main>`;
+      return shell(`<section class="page screen-page page-enter" data-focus-zone="account">${publicHeader()}<h1 class="screen-title">账户与偏好</h1><div class="profile-card"><div class="profile-row"><div class="profile-avatar">VI</div><div><strong style="font-size:13px">Vireal User</strong><span style="display:block;margin-top:5px;color:#84979e;font-size:10px">viewer@example.com</span></div></div><div class="settings-list"><button data-toast="界面语言已跟随浏览器设置"><span><b>界面语言</b><small>简体中文</small></span>${icons.arrowRight}</button><button data-toast="上传与生成结果遵循当前数据保留策略"><span><b>隐私与数据</b><small>查看数据保留与删除规则</small></span>${icons.arrowRight}</button><button data-route="admin-categories"><span><b>进入管理后台</b><small>维护分类、效果与媒体</small></span>${icons.arrowRight}</button></div></div><button class="danger-button" style="width:100%;margin-top:14px" data-logout>退出登录</button></section>`, 'account');
     }
 
     function loginPage() {

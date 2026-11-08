@@ -17,6 +17,9 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+STAGING_LOGIN_ACCEPTANCE_ISSUER = "https://infinite-shark-285.clerk.accounts.dev"
+STAGING_LOGIN_ACCEPTANCE_ORIGIN = "https://staging-app.usevireal.com"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -91,9 +94,27 @@ class Settings(BaseSettings):
     REPLICATE_POC_MAX_SUBMISSIONS: int = 0
     APP_USER_DAILY_REAL_SUBMISSIONS: int = 5
     APP_USER_MAX_CONCURRENT_VIDEO_TASKS: int = 1
+    # Site-wide real generation admission, independent of per-user/day quotas.
+    APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS: int = 1
     APP_WAN_DAILY_GLOBAL_SUBMISSIONS: int = 30
     APP_GLOBAL_DAILY_REAL_SUBMISSIONS: int = 30
     APP_PUBLIC_REGISTRATION_ENABLED: bool = False
+    # Production always requires durable USD evidence; this also enables staged
+    # acceptance with synthetic budgets. It never opens existing business gates.
+    APP_BUDGET_GUARD_ENABLED: bool = False
+    APP_OPERATIONAL_ALERT_DELIVERY_ENABLED: bool = False
+    OPS_RESEND_API_KEY: str | None = None
+    OPS_ALERT_FROM: str | None = None
+    # Manual account-wide allowance review. No API key permission expansion.
+    OPS_EMAIL_QUOTA_VERIFIED_UNTIL: AwareDatetime | None = None
+    OPS_MONITOR_READ_TOKEN: str | None = None
+    # Separate pilot admission. Never enables payment, generation or regions.
+    APP_PILOT_ENABLED: bool = False
+    APP_PILOT_INVITED_EMAILS: list[EmailStr] = []
+    # Existing identity only; a separate, short-lived staging sign-in surface.
+    APP_STAGING_LOGIN_ACCEPTANCE_ENABLED: bool = False
+    APP_STAGING_LOGIN_ACCEPTANCE_SUBJECT: str | None = None
+    APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT: AwareDatetime | None = None
     # A single verified email may initialize an account without enabling commerce.
     APP_CONTROLLED_REGISTRATION_ENABLED: bool = False
     APP_CONTROLLED_REGISTRATION_EMAIL: EmailStr | None = None
@@ -267,6 +288,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_commerce_configuration(self) -> Self:
+        if self.APP_PILOT_ENABLED and not self.pilot_configuration_safe():
+            raise ValueError(
+                "Pilot admission requires staging/production Clerk, one to five "
+                "distinct verified-email invitations, signed regions, global "
+                "concurrency one, and closed public/legacy/acceptance modes"
+            )
+        if (
+            self.APP_STAGING_LOGIN_ACCEPTANCE_ENABLED
+            and not self.staging_login_acceptance_configuration_safe()
+        ):
+            raise ValueError(
+                "Staging sign-in acceptance requires the pinned staging Clerk "
+                "instance, one existing subject, signed regions, an aware expiry "
+                "within 30 minutes and all business/other acceptance gates closed"
+            )
         if (
             self.APP_GENERATION_ACCEPTANCE_ENABLED
             and not self.generation_acceptance_configuration_safe()
@@ -445,12 +481,106 @@ class Settings(BaseSettings):
                 )
         return self
 
+    @field_validator("APP_PILOT_INVITED_EMAILS")
+    @classmethod
+    def _validate_pilot_emails(cls, values: list[EmailStr]) -> list[EmailStr]:
+        # Match Python and PostgreSQL consistently: Unicode case folding may
+        # merge distinct mailboxes (for example ß/ss).
+        if any(not str(v).isascii() for v in values):
+            raise ValueError(
+                "Pilot invitations currently require ASCII email addresses"
+            )
+        if len(values) > 5 or len({str(v).casefold() for v in values}) != len(values):
+            raise ValueError("Pilot invitations require at most five distinct emails")
+        return values
+
+    def pilot_configuration_safe(self) -> bool:
+        emails = self.APP_PILOT_INVITED_EMAILS
+        return bool(
+            self.ENVIRONMENT in {"staging", "production"}
+            and self.APP_AUTH_MODE == "clerk"
+            and self.CLERK_ISSUER_URL
+            and self.APP_REGION_ENFORCEMENT_ENABLED
+            and self.APP_EDGE_SIGNING_SECRET
+            and len(self.APP_EDGE_SIGNING_SECRET) >= 32
+            and self.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS == 1
+            and isinstance(emails, list)
+            and 1 <= len(emails) <= 5
+            and all(
+                isinstance(v, str) and v.isascii() and v == v.strip() and "@" in v
+                for v in emails
+            )
+            and len({str(v).casefold() for v in emails}) == len(emails)
+            and not any(
+                (
+                    self.APP_PUBLIC_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED,
+                    self.APP_INTERNAL_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_SUBJECTS,
+                    self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED,
+                    self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED,
+                    self.APP_GENERATION_ACCEPTANCE_ENABLED,
+                    self.APP_STAGING_LOGIN_ACCEPTANCE_ENABLED,
+                    self.ADMIN_PUBLIC_SIGNUP_ENABLED,
+                    self.LOCAL_DEMO_ENABLED,
+                    self.APP_LEGACY_VIDEO_TASKS_ENABLED,
+                )
+            )
+        )
+
+    def staging_login_acceptance_configuration_safe(self) -> bool:
+        """Expired configuration can boot, but never grants a new sign-in."""
+        subject = self.APP_STAGING_LOGIN_ACCEPTANCE_SUBJECT
+        expiry = self.APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT
+        return bool(
+            self.APP_STAGING_LOGIN_ACCEPTANCE_ENABLED
+            and not self.APP_PILOT_ENABLED
+            and self.ENVIRONMENT == "staging"
+            and self.APP_AUTH_MODE == "clerk"
+            and str(self.CLERK_ISSUER_URL).rstrip("/")
+            == STAGING_LOGIN_ACCEPTANCE_ISSUER
+            and str(self.CLERK_JWKS_URL)
+            == STAGING_LOGIN_ACCEPTANCE_ISSUER + "/.well-known/jwks.json"
+            and STAGING_LOGIN_ACCEPTANCE_ORIGIN
+            in {str(origin).rstrip("/") for origin in self.CLERK_AUTHORIZED_PARTIES}
+            and subject
+            and re.fullmatch(r"user_[A-Za-z0-9_]+", subject)
+            and isinstance(expiry, datetime)
+            and expiry.tzinfo is not None
+            and expiry <= datetime.now(UTC) + timedelta(minutes=30)
+            and self.APP_REGION_ENFORCEMENT_ENABLED
+            and self.APP_EDGE_SIGNING_SECRET
+            and len(self.APP_EDGE_SIGNING_SECRET) >= 32
+            and not any(
+                (
+                    self.APP_PUBLIC_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_REGISTRATION_ENABLED,
+                    self.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED,
+                    self.APP_INTERNAL_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_ENABLED,
+                    self.APP_LIVE_ACCEPTANCE_SUBJECTS,
+                    self.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED,
+                    self.APP_PAYMENT_ONLY_REPLACEMENT_ENABLED,
+                    self.APP_GENERATION_ACCEPTANCE_ENABLED,
+                    self.APP_VIDEO_SUBMISSIONS_ENABLED,
+                    self.PAYPAL_ENABLED,
+                    self.APP_COMMERCE_TERMS_APPROVED,
+                    self.ADMIN_PUBLIC_SIGNUP_ENABLED,
+                    self.LOCAL_DEMO_ENABLED,
+                    self.APP_LEGACY_VIDEO_TASKS_ENABLED,
+                )
+            )
+        )
+
     def generation_acceptance_configuration_safe(self) -> bool:
         """Also used at request time; expired mode must boot but cannot submit."""
         subject = self.APP_GENERATION_ACCEPTANCE_SUBJECT
         expires = self.APP_GENERATION_ACCEPTANCE_EXPIRES_AT
         return bool(
-            self.ENVIRONMENT == "production"
+            not self.APP_PILOT_ENABLED
+            and self.ENVIRONMENT == "production"
             and self.APP_AUTH_MODE == "clerk"
             and self.CLERK_ISSUER_URL
             and subject
@@ -504,6 +634,8 @@ class Settings(BaseSettings):
             raise ValueError("APP_USER_DAILY_REAL_SUBMISSIONS must be positive")
         if self.APP_USER_MAX_CONCURRENT_VIDEO_TASKS < 1:
             raise ValueError("APP_USER_MAX_CONCURRENT_VIDEO_TASKS must be positive")
+        if self.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS < 1:
+            raise ValueError("APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS must be positive")
         if self.APP_WAN_DAILY_GLOBAL_SUBMISSIONS < 1:
             raise ValueError("APP_WAN_DAILY_GLOBAL_SUBMISSIONS must be positive")
         if self.MAX_CATALOG_IMAGE_BYTES < 1:
