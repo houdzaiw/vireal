@@ -1,0 +1,80 @@
+name: Pilot isolated acceptance
+
+on:
+  push:
+    branches:
+      - codex/pilot-cost-bounds-20261111
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-isolated-${{ github.ref }}
+  cancel-in-progress: false
+
+# Branch-only qualification. No PR, deploy, cloud credentials, uploaded
+# artifacts, persistent cache, or replacement for required release checks.
+jobs:
+  backend:
+    name: Isolated backend and TLS
+    runs-on: ubuntu-26.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.18"
+          enable-cache: false
+      - run: uv sync --frozen
+      - run: uv run --no-sync python -I -B ../tools/ci/test_pilot_ci_profile.py
+      - run: uv run --no-sync python -I -B ../tools/ci/check_tls_loopback.py --pg-bin /usr/lib/postgresql/18/bin --output-dir "$RUNNER_TEMP/pilot-tls"
+      - run: uv run --no-sync python -I -B ../tools/ci/run_backend_offline.py --pg-bin /usr/lib/postgresql/18/bin --output-dir "$RUNNER_TEMP/pilot-backend"
+      - run: uv run --no-sync python -I -B ../tools/operations/test_local_tools.py
+      - run: uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_pilot_cost_bound.py -v
+        working-directory: .
+      - run: uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_legacy_deploy_guards.py -v
+        working-directory: .
+
+  browser:
+    name: Isolated ${{ matrix.browser }} on ${{ matrix.os }}
+    needs: backend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            browser: chromium
+          - os: macos-15
+            browser: webkit
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: h5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.0
+      - run: bun ci
+      - run: bunx playwright install --with-deps "$BROWSER_PROJECT"
+        env:
+          BROWSER_PROJECT: ${{ matrix.browser }}
+      - run: python3 scripts/test-prelaunch-isolated.py --project "$BROWSER_PROJECT" --output-dir "$RUNNER_TEMP/pilot-browser"
+        env:
+          BROWSER_PROJECT: ${{ matrix.browser }}

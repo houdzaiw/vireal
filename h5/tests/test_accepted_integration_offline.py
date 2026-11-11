@@ -370,6 +370,15 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "docs/pilot-cost-acceptance.md",
                 "docs/neon-security-acceptance.md",
                 "docs/pilot-resource-release.md",
+                # Isolated qualification only; the dedicated CI policy suite
+                # separately rejects deploys, credentials and persistent storage.
+                ".github/workflows/pilot-offline-acceptance.yml",
+                ".github/workflows/detect-conflicts.yml",
+                "tools/ci/run_backend_offline.py",
+                "tools/ci/check_tls_loopback.py",
+                "tools/ci/offline-network-guard/sitecustomize.py",
+                "tools/ci/test_pilot_ci_profile.py",
+                "h5/scripts/test-prelaunch-isolated.py",
                 # Exact reviewed legacy-deployment protection scope.
                 ".github/workflows/deploy-docker-compose.yml",
                 ".github/workflows/deploy.yml",
