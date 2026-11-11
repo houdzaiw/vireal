@@ -142,7 +142,7 @@ def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]
 
 @pytest.fixture(autouse=True)
 def synthetic_operational_evidence(
-    db: Session, monkeypatch: pytest.MonkeyPatch
+    db: Session, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
 ) -> Generator[None]:
     """Legacy positive-production cases still satisfy the new, real USD gate.
 
@@ -155,6 +155,16 @@ def synthetic_operational_evidence(
     now = staffed_now()
     monkeypatch.setattr(operational_budget, "utc_now", lambda: now)
     seed_operations(db, now)
+    from tests.utils.resources import SCOPE, clear_resources, seed_resources
+
+    model = (
+        "wan-video/wan-2.7-r2v"
+        if request.path.name == "test_generation_acceptance.py"
+        else "minimax/video-01"
+    )
+    seed_resources(db, model)
+    monkeypatch.setattr(settings, "APP_RESOURCE_SCOPE", SCOPE)
     yield
     db.rollback()
     clear_operations(db)
+    clear_resources(db)

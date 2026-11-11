@@ -100,13 +100,37 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
         # default-off pilot and positive global cap, and rejecting mixed modes.
         path = "backend/app/core/config.py"
         old, new = ast.parse(accepted(path)), ast.parse(current(path))
+        pool_fields = {
+            "DATABASE_POOL_SIZE": "DATABASE_POOL_SIZE: int = Field(default=5, ge=1, le=20)",
+            "DATABASE_POOL_MAX_OVERFLOW": "DATABASE_POOL_MAX_OVERFLOW: int = Field(default=0, ge=0, le=20)",
+            "DATABASE_POOL_TIMEOUT_SECONDS": "DATABASE_POOL_TIMEOUT_SECONDS: float = Field(default=10.0, ge=0.1, le=30.0, allow_inf_nan=False)",
+        }
+        self.assertLessEqual(
+            pool_fields.keys(),
+            {
+                node.target.id
+                for node in ast.walk(new)
+                if isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+            },
+        )
+        checker = self
 
         class UndoPilot(ast.NodeTransformer):
             def visit_AnnAssign(self, node):
+                if isinstance(node.target, ast.Name) and node.target.id in pool_fields:
+                    checker.assertEqual(
+                        ast.dump(node),
+                        ast.dump(ast.parse(pool_fields[node.target.id]).body[0]),
+                    )
+                    return None
                 if isinstance(node.target, ast.Name) and node.target.id in {
                     "APP_PILOT_ENABLED",
                     "APP_PILOT_INVITED_EMAILS",
                     "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS",
+                    "APP_RESOURCE_GUARD_ENABLED",
+                    "APP_RESOURCE_SCOPE",
+                    "APP_MEDIA_READ_BASE_URL",
                     "APP_BUDGET_GUARD_ENABLED",
                     "APP_OPERATIONAL_ALERT_DELIVERY_ENABLED",
                     "OPS_RESEND_API_KEY",
@@ -326,6 +350,26 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
         self.assertLessEqual(
             changed,
             {
+                # Explicit local resource-accounting scope; positive/negative
+                # behavior is tested separately, not waived by this allowlist.
+                "backend/app/main.py",
+                "backend/app/models_resources.py",
+                "backend/app/services/resource_limits.py",
+                "backend/app/services/media_grants.py",
+                "backend/app/services/media_privacy.py",
+                "backend/app/services/storage.py",
+                "backend/app/api/routes/app_media.py",
+                "backend/app/alembic/versions/e7f8a9b0c1d2_resource_allocations.py",
+                "backend/tests/api/routes/test_resource_limits.py",
+                "backend/tests/utils/resources.py",
+                "backend/tests/services/test_media_privacy.py",
+                "backend/tests/core/test_db_pool.py",
+                "backend/app/core/db.py",
+                "tools/ci/pilot_cost_bound.py",
+                "tools/ci/test_pilot_cost_bound.py",
+                "docs/pilot-cost-acceptance.md",
+                "docs/neon-security-acceptance.md",
+                "docs/pilot-resource-release.md",
                 # Exact reviewed legacy-deployment protection scope.
                 ".github/workflows/deploy-docker-compose.yml",
                 ".github/workflows/deploy.yml",
@@ -342,6 +386,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 ".github/workflows/test-backend.yml",
                 "backend/tests/services/test_alert_limits.py",
                 "tools/operations/backup_once.py",
+                "tools/operations/restore_candidate_checks.py",
                 "tools/operations/test_email_once.py",
                 "tools/operations/test_local_tools.py",
                 "tools/operations/README.md",
@@ -398,12 +443,28 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
         )
         for path in (
             "h5/bun.lock",
-            "backend/app/core/db.py",
             "h5/src/vireal-production.css",
             "h5/src/vireal-v1.2.html",
         ):
             with self.subTest(path=path):
                 self.assertEqual(accepted(path), current(path))
+        # The reviewed finite-pool change replaces this one expression only.
+        # Preserve pre-ping, initialization, imports and the rest of the module.
+        path = "backend/app/core/db.py"
+        old, new = accepted(path), current(path)
+        prior = "return create_engine(database_url, pool_pre_ping=True)"
+        bounded = (
+            "return create_engine(\n"
+            "        database_url,\n"
+            "        pool_pre_ping=True,\n"
+            "        pool_size=settings.DATABASE_POOL_SIZE,\n"
+            "        max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,\n"
+            "        pool_timeout=settings.DATABASE_POOL_TIMEOUT_SECONDS,\n"
+            "    )"
+        )
+        self.assertEqual(old.count(prior), 1)
+        self.assertEqual(new.count(bounded), 1)
+        self.assertEqual(old, new.replace(bounded, prior, 1))
 
     def test_all_accepted_browser_cases_remain_and_prelaunch_script_is_unchanged(self):
         path = "h5/tests/browser/vireal-v1.2.spec.ts"

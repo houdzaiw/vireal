@@ -1367,3 +1367,8 @@ from app.models_operations import (  # noqa: E402, F401
     AppCostReservation,
     AppOperationalAlert,
 )
+from app.models_resources import (  # noqa: E402, F401
+    AppMediaReadGrant,
+    AppResourceAttempt,
+    AppResourcePolicy,
+)

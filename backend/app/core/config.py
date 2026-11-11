@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     R2_REPLICATE_URL_EXPIRE_SECONDS: int = 30 * 60
     R2_VIDEO_PLAYBACK_URL_EXPIRE_SECONDS: int = 5 * 60
     APP_MEDIA_RETENTION_HOURS: int = 24
+    APP_RESOURCE_GUARD_ENABLED: bool = False
+    APP_RESOURCE_SCOPE: str | None = None
+    APP_MEDIA_READ_BASE_URL: HttpUrl | None = None
     MAX_GENERATED_VIDEO_BYTES: int = 250 * 1024 * 1024
     VIDEO_WORKER_POLL_SECONDS: float = 2.0
     VIDEO_WORKER_MAX_ATTEMPTS: int = 5
@@ -171,6 +174,14 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     DATABASE_URL: PostgresDsn
+    # Each API/Worker process owns one pool. Deployment overlap and operator
+    # connections must be budgeted separately; zero/negative unlimited pools
+    # are not valid configuration.
+    DATABASE_POOL_SIZE: int = Field(default=5, ge=1, le=20)
+    DATABASE_POOL_MAX_OVERFLOW: int = Field(default=0, ge=0, le=20)
+    DATABASE_POOL_TIMEOUT_SECONDS: float = Field(
+        default=10.0, ge=0.1, le=30.0, allow_inf_nan=False
+    )
 
     @field_validator("APP_EFFECT_MAX_DURATION_SECONDS", mode="before")
     @classmethod

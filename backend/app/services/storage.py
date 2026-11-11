@@ -335,6 +335,21 @@ class R2ImageStorage:
             raise RuntimeError("R2_OBJECT_PREFIX must not be empty")
         self.client = client or _create_r2_client()
 
+    @staticmethod
+    def _meter(
+        operation: str, units: dict[str, int], *, admission: bool = False
+    ) -> None:
+        from fastapi import HTTPException
+
+        from app.services.resource_limits import consume, read_units
+
+        try:
+            if operation in {"media-get", "image-get"}:
+                units = read_units(units["read_bytes"])
+            consume(operation, units, admission=admission)
+        except HTTPException as exc:
+            raise ImageStorageError(str(exc.detail), exc.status_code) from exc
+
     def store_app_image(
         self,
         *,
@@ -348,6 +363,16 @@ class R2ImageStorage:
         )
         filename = f"{uuid.uuid4()}{extension}"
         object_key = self._object_key(app_user_id=app_user_id, filename=filename)
+        self._meter(
+            "image-put",
+            {
+                "uploads": 1,
+                "upload_bytes": len(content),
+                "storage_bytes": len(content),
+                "class_a_upload": 1,
+            },
+            admission=True,
+        )
         try:
             self.client.put_object(
                 Bucket=self.bucket_name,
@@ -384,10 +409,25 @@ class R2ImageStorage:
             raise ImageStorageError("Image URL is not managed by Cloudflare R2")
         app_user_id, filename = image_location
         object_key = self._object_key(app_user_id=app_user_id, filename=filename)
-        return self.create_object_read_url(object_key, expires_in=expires_in)
+        return self.create_object_read_url(
+            object_key, expires_in=expires_in, delivery=True
+        )
 
-    def create_object_read_url(self, object_key: str, *, expires_in: int) -> str:
+    def create_object_read_url(
+        self, object_key: str, *, expires_in: int, delivery: bool = False
+    ) -> str:
         self._validate_object_key(object_key)
+        from app.services.resource_limits import enabled
+
+        if enabled():
+            from fastapi import HTTPException
+
+            from app.services.media_grants import issue_read_url
+
+            try:
+                return issue_read_url(object_key, expires_in, delivery=delivery)
+            except HTTPException as exc:
+                raise ImageStorageError(str(exc.detail), exc.status_code) from exc
         try:
             return self.client.generate_presigned_url(
                 "get_object",
@@ -405,40 +445,94 @@ class R2ImageStorage:
             ) from exc
 
     def open_video(self, object_key: str) -> VideoStream:
+        return self.open_metered_object(object_key)[0]
+
+    def open_metered_object(
+        self, object_key: str, range_header: str | None = None
+    ) -> tuple[VideoStream, str, str | None]:
+        import re
+
         self._validate_object_key(object_key)
+        if range_header is not None and (
+            len(range_header) > 80
+            or re.fullmatch(r"bytes=(?:[0-9]+-[0-9]*|-[0-9]+)", range_header) is None
+        ):
+            raise ImageStorageError("Invalid media range", 416)
+        self._meter(
+            "media-get", {"reads": 1, "read_bytes": settings.MAX_GENERATED_VIDEO_BYTES}
+        )
+        params: dict[str, Any] = {"Bucket": self.bucket_name, "Key": object_key}
+        if range_header is not None:
+            params["Range"] = range_header
         try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=object_key)
-        except (BotoCoreError, ClientError) as exc:
+            response = self.client.get_object(**params)
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            raise ImageStorageError(
+                "Unable to read private video",
+                416 if code in {"InvalidRange", "416"} else 502,
+            ) from exc
+        except BotoCoreError as exc:
             raise ImageStorageError("Unable to read private video", 502) from exc
         body = response["Body"]
         try:
             size = int(response.get("ContentLength", -1))
-        except (TypeError, ValueError) as exc:
+            if not 0 < size <= settings.MAX_GENERATED_VIDEO_BYTES:
+                raise ValueError("size")
+            content_range = response.get("ContentRange")
+            if range_header is not None:
+                m = re.fullmatch(
+                    r"bytes ([0-9]+)-([0-9]+)/([0-9]+)", str(content_range)
+                )
+                if m is None:
+                    raise ValueError("range")
+                start, end, total = map(int, m.groups())
+                if not (
+                    0 <= start <= end < total <= settings.MAX_GENERATED_VIDEO_BYTES
+                    and end - start + 1 == size
+                ):
+                    raise ValueError("range")
+            elif content_range is not None:
+                raise ValueError("unexpected range")
+        except (ValueError, TypeError) as exc:
             body.close()
-            raise ImageStorageError("Stored video size is invalid", 502) from exc
-        if not 0 < size <= settings.MAX_GENERATED_VIDEO_BYTES:
-            body.close()
-            raise ImageStorageError("Stored video size is invalid", 502)
+            raise ImageStorageError("Stored media size is invalid", 502) from exc
+        content_type = response.get("ContentType", "application/octet-stream")
+        if content_type not in {
+            "video/mp4",
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+        }:
+            content_type = "application/octet-stream"
 
         def chunks() -> Iterator[bytes]:
             try:
                 remaining = size
                 while remaining > 0:
-                    chunk = body.read(min(64 * 1024, remaining))
-                    if not chunk:
+                    part = body.read(min(64 * 1024, remaining))
+                    if not part:
                         break
-                    remaining -= len(chunk)
-                    yield chunk
+                    remaining -= len(part)
+                    yield part
             finally:
                 body.close()
 
-        return VideoStream(chunks=chunks(), close=body.close, size=size)
+        return (
+            VideoStream(chunks=chunks(), close=body.close, size=size),
+            content_type,
+            content_range,
+        )
 
     def read_app_image(self, url: str) -> ReadImage:
         image_location = parse_r2_app_image_url(url)
         if image_location is None:
             raise ImageStorageError("Image URL is not managed by Cloudflare R2")
         app_user_id, filename = image_location
+        self._meter(
+            "image-get", {"reads": 1, "read_bytes": settings.MAX_UPLOAD_IMAGE_BYTES}
+        )
         try:
             response = self.client.get_object(
                 Bucket=self.bucket_name,
@@ -447,7 +541,13 @@ class R2ImageStorage:
                     filename=filename,
                 ),
             )
-            content = response["Body"].read()
+            body = response["Body"]
+            try:
+                content = body.read(settings.MAX_UPLOAD_IMAGE_BYTES + 1)
+            finally:
+                body.close()
+            if len(content) > settings.MAX_UPLOAD_IMAGE_BYTES:
+                raise ImageStorageError("Stored image is too large", 502)
             content_type = response.get("ContentType") or "application/octet-stream"
         except (BotoCoreError, ClientError, KeyError) as exc:
             logger.exception(
@@ -476,21 +576,45 @@ class R2ImageStorage:
     ) -> StoredVideo:
         object_key = f"{self.object_prefix}/videos/{app_user_id}/{task_id}.mp4"
         size = file_path.stat().st_size
+        if not 0 < size <= settings.MAX_GENERATED_VIDEO_BYTES:
+            raise ImageStorageError("Generated video is too large", 413)
+        self._meter(
+            "video-put",
+            {"delivery_bytes": size, "storage_bytes": size, "class_a_delivery": 1},
+        )
+        from app.services.resource_limits import enabled
+
         try:
             with file_path.open("rb") as video_file:
-                self.client.upload_fileobj(
-                    video_file,
-                    self.bucket_name,
-                    object_key,
-                    ExtraArgs={
-                        "ContentType": content_type,
-                        "CacheControl": "private, no-store",
-                        "Metadata": {
+                if enabled():
+                    # A single bounded PUT avoids SDK multipart expansion and
+                    # incomplete-part storage. Every worker retry is metered.
+                    self.client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=object_key,
+                        Body=video_file,
+                        ContentLength=size,
+                        ContentType=content_type,
+                        CacheControl="private, no-store",
+                        Metadata={
                             "app-user-id": str(app_user_id),
                             "video-task-id": str(task_id),
                         },
-                    },
-                )
+                    )
+                else:
+                    self.client.upload_fileobj(
+                        video_file,
+                        self.bucket_name,
+                        object_key,
+                        ExtraArgs={
+                            "ContentType": content_type,
+                            "CacheControl": "private, no-store",
+                            "Metadata": {
+                                "app-user-id": str(app_user_id),
+                                "video-task-id": str(task_id),
+                            },
+                        },
+                    )
         except (BotoCoreError, ClientError, OSError) as exc:
             logger.exception(
                 "Cloudflare R2 video upload failed",
@@ -533,6 +657,16 @@ class R2ImageStorage:
             uploaded_content_type=uploaded_content_type,
         )
         object_key = f"{self.object_prefix}/catalog/{kind}/{uuid.uuid4()}{extension}"
+        self._meter(
+            "catalog-put",
+            {
+                "uploads": 1,
+                "upload_bytes": len(content),
+                "storage_bytes": len(content),
+                "class_a_upload": 1,
+            },
+            admission=True,
+        )
         try:
             self.client.put_object(
                 Bucket=self.bucket_name,
@@ -580,7 +714,7 @@ def _create_r2_client() -> S3ObjectClient:
         region_name="auto",
         config=Config(
             signature_version="s3v4",
-            retries={"mode": "standard", "max_attempts": 4},
+            retries={"mode": "standard", "total_max_attempts": 1},
             connect_timeout=10,
             read_timeout=60,
             max_pool_connections=20,
@@ -652,5 +786,9 @@ def create_provider_read_url(url: str) -> str:
         )
 
     if parsed_url.scheme in {"http", "https"} and parsed_url.netloc:
+        from app.services.resource_limits import enabled
+
+        if enabled():
+            raise ValueError("Guarded provider inputs must use managed metered media")
         return url
     raise ValueError("Asset URL must be provider-readable or stored in Cloudflare R2")

@@ -489,6 +489,8 @@ async def create_video_task(
         source="replicate" if not is_demo else "railway",
         price_key=f"video:{model}:{resolved_duration}:720p:image-only",
     )
+    from app.services.resource_limits import reserve_generation
+
     session.add(task)
     session.flush()
     if charged_coin_cost:
@@ -507,6 +509,7 @@ async def create_video_task(
             raise HTTPException(
                 status_code=409, detail="Insufficient coin balance"
             ) from exc
+    reserve_generation(model, resolved_duration)
     session.commit()
     session.refresh(task)
 

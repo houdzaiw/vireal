@@ -7,10 +7,10 @@ No plaintext is written. Credentials remain in memory; no restore or activation.
 import hashlib
 import importlib.util
 import json
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
 import re
 import sys
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 OWNER = Path("/Users/huili/project/new-chat")
 ENGINE = OWNER / "output/production-operating-backup-20261107.py"
@@ -18,6 +18,7 @@ ENGINE_SHA = "757ea509b321447176b612057991c5990c16085cd88c042713b59cc7e33e8b8f"
 PROFILE_HEADS = {
     "production-26": ("6d3804e2c7cf6b8b1ad74091dde8ebaf9fc659c2", "c5d6e7f8a9b0", 26),
     "candidate-30": ("cb40c1c38c1ab4e9ea60063e8916dda083575417", "d6e7f8a9b0c1", 30),
+    "candidate-33": ("d0728f31eac325430e0107c44aad5fae1f3151a9", "e7f8a9b0c1d2", 33),
 }
 EXTRA_TABLES = (
     "app_budget_window",
@@ -25,6 +26,22 @@ EXTRA_TABLES = (
     "app_cost_reservation",
     "app_operational_alert",
 )
+
+
+RESOURCE_TABLES = (
+    "app_resource_policy",
+    "app_resource_attempt",
+    "app_media_read_grant",
+)
+
+
+def profile_extra_tables(mode):
+    need(mode in PROFILE_HEADS, "PROFILE")
+    if mode == "production-26":
+        return ()
+    if mode == "candidate-30":
+        return EXTRA_TABLES
+    return (*EXTRA_TABLES, *RESOURCE_TABLES)
 
 
 def need(value, code):
@@ -43,10 +60,48 @@ def due_time(first, index, at):
     return due
 
 
+def negotiated_tls_protocol(pgconn):
+    """Read the actual connection protocol; unsupported drivers fail closed.
+
+    psycopg-binary 3.3 exposes pgconn_ptr but not ssl_attribute. Load only its
+    own bundled libpq, never a guessed system library with a foreign pointer.
+    This function does not open a connection or change any TLS policy.
+    """
+    reader = getattr(pgconn, "ssl_attribute", None)
+    if callable(reader):
+        return reader(b"protocol")
+    import ctypes
+
+    from psycopg import pq
+
+    need(type(pgconn) is pq.PGconn and pq.__impl__ == "binary", "CLIENT_TLS_DRIVER")
+    import psycopg_binary
+
+    package = Path(psycopg_binary.__file__).resolve().parent
+    if sys.platform == "darwin":
+        libraries = list((package / ".dylibs").glob("libpq.*.dylib"))
+    elif sys.platform.startswith("linux"):
+        libraries = list((package.parent / "psycopg_binary.libs").glob("libpq-*.so.*"))
+    else:
+        libraries = []
+    need(len(libraries) == 1, "CLIENT_TLS_DRIVER")
+    native = ctypes.CDLL(str(libraries[0]))
+    native.PQlibVersion.restype = ctypes.c_int
+    need(native.PQlibVersion() == pq.version(), "CLIENT_TLS_DRIVER")
+    pointer = pgconn.pgconn_ptr
+    need(isinstance(pointer, int) and pointer > 0, "CLIENT_TLS_DRIVER")
+    native.PQsslAttribute.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+    native.PQsslAttribute.restype = ctypes.c_char_p
+    # Keep the native handle alive until the returned C string has been copied.
+    protocol = native.PQsslAttribute(pointer, b"protocol")
+    need(isinstance(protocol, bytes), "CLIENT_TLS_PROTOCOL")
+    return protocol
+
+
 def backend_tls(db):
     need(db.pgconn.ssl_in_use, "CLIENT_TLS")
     need(
-        db.pgconn.ssl_attribute(b"protocol") in (b"TLSv1.2", b"TLSv1.3"),
+        negotiated_tls_protocol(db.pgconn) in (b"TLSv1.2", b"TLSv1.3"),
         "CLIENT_TLS_PROTOCOL",
     )
     need(
@@ -63,7 +118,7 @@ def load_engine():
     need(sha(raw) == ENGINE_SHA, "ENGINE_PIN")
     spec = importlib.util.spec_from_file_location("sealed_operating_backup", ENGINE)
     engine = importlib.util.module_from_spec(spec)
-    exec(compile(raw, str(ENGINE), "exec"), engine.__dict__)
+    exec(compile(raw, str(ENGINE), "exec"), engine.__dict__)  # noqa: S102 - bytes verified against ENGINE_SHA
     module, prep = engine.load_sealed()
     return engine, module, prep
 
@@ -73,7 +128,7 @@ BUDGET_INDEX = "CREATE UNIQUE INDEX uq_budget_current ON public.app_budget_windo
 
 def hazard_sql(module):
     sql = module.HAZARD_SQL
-    if len(module.C.TABLES) == 30:
+    if len(module.C.TABLES) in (30, 33):
         exact = (
             "c.relname='app_budget_window' AND i.relname='uq_budget_current' AND x.indisunique AND pg_catalog.pg_get_expr(x.indpred,x.indrelid)='is_current' AND pg_catalog.pg_get_indexdef(i.oid)='"
             + BUDGET_INDEX
@@ -115,7 +170,7 @@ def comparison(module, db, check):
         and all(tuple(r[1:]) == ("r", "p", False, False) for r in schema["relations"]),
         "TABLE_INVENTORY",
     )
-    if len(module.C.TABLES) == 30:
+    if len(module.C.TABLES) in (30, 33):
         need(
             [
                 r
@@ -237,6 +292,7 @@ def execute(grant, profile):
     engine.load_sealed = lambda: (module, prep)
     old_safe_stop = engine.safe_stop
     categories = {
+        "CLIENT_TLS_DRIVER",
         "BACKEND_TLS",
         "CLIENT_TLS",
         "CLIENT_TLS_PROTOCOL",
@@ -257,8 +313,13 @@ def execute(grant, profile):
 
     engine.safe_stop = safe_stop
     module.C.HEAD = profile["migration_head"]
-    if profile["mode"] == "candidate-30":
-        module.C.TABLES = tuple(sorted((*module.C.TABLES, *EXTRA_TABLES)))
+    additions = profile_extra_tables(profile["mode"])
+    module.C.TABLES = tuple(sorted((*module.C.TABLES, *additions)))
+    need(
+        len(module.C.TABLES) == profile["table_count"]
+        and len(set(module.C.TABLES)) == len(module.C.TABLES),
+        "TABLE_INVENTORY",
+    )
     module.private_comparison = lambda db, check: comparison(module, db, check)
     original = engine.operating_snapshot
 
@@ -337,6 +398,6 @@ if __name__ == "__main__":
                 json.loads(Path(sys.argv[3]).read_text()),
             )
         )
-    except (Exception, KeyboardInterrupt):
+    except (Exception, KeyboardInterrupt):  # noqa: BLE001 - unknown outcome always stops without retry
         print("营业备份已停止 (SAFE_STOP_NO_RETRY)。", flush=True)
         raise SystemExit(2) from None

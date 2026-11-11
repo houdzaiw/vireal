@@ -17,3 +17,42 @@ A receipt is preparation/evidence for a future authorized operator update, not a
 ## One test email
 
 `test_email_once.py` is fixed to ops@alerts.usevireal.com → li522903183@gmail.com, one recipient, fixed nontransactional subject/body and one POST to the official Resend endpoint. Fresh authorization must record current whole-team remaining daily/monthly allowance and sending-only domain restriction. The owner enters only that key in the hidden terminal. The claim is durable before input/I/O; timeout, crash or uncertain result never causes a resend. Provider acceptance is not human receipt; a separate owner receipt confirmation is required. Neither tool is authorized by these docs to execute now.
+
+
+## Prepared resource-accounting profile
+
+The local `candidate-33` mode adds exactly `app_resource_policy`,
+`app_resource_attempt`, and `app_media_read_grant` to the 30-table profile and
+pins migration head `e7f8a9b0c1d2`, ancestry marker `d0728f3`, plus exact source
+file hashes and the new tool hash. It is not a live grant or deployed commit.
+The sealed engine and old 26/30 profiles remain unchanged. Unknown tables,
+changed partial indexes, more than 50,000 rows per table, 100,000 total row
+fingerprints or a 4 MiB manifest still stop. The ledger allocation must fit the
+remaining record budget across all retained scopes. Full 33-table encrypted
+backup/restore and deployment-platform validation remain pending. Do not remove
+the unresolved backend security gate to make this profile run on Neon.
+
+
+## Prepared exact candidate restore repair
+
+`restore_candidate_checks.py` is a pure plan builder, not an operating CLI. It
+opens no connections and has no grant or acceptance override. It is restricted
+to candidate-33 / e7f8a9b0c1d2, the exact 33-table inventory, four fixed CHECK
+identities/definitions and column types. All row fingerprints, extensions,
+locale and other schema categories must match before it returns eight fixed
+statements. No statement is taken from manifest SQL. Other profiles reject.
+
+The proposed operator procedure is only for an isolated restored copy: verify
+the authenticated archive and catalog first; if the raw manifests already match,
+repair nothing. For the exact recognized rendering difference, apply all eight
+statements in one transaction, with immediate CHECK validation, then recapture
+and require **raw full-manifest equality**, including after commit. Any failure
+rolls back; no NOT VALID, disabled triggers, cast normalization or new equality
+exception is permitted. This is not connected to the sealed live executor.
+
+The synthetic 33-table PostgreSQL 18 drill passed exact equality after repair,
+post-commit equality, interrupted-repair rollback and invalid-state rejection.
+The pure owner-tool suite has 20 passing tests. Production source permissions,
+Neon complete-path security, independent cloud retrieval and operating RTO are
+still unaccepted. A future operator grant must pin this new helper's SHA as well
+as the selected schema, source, tool and process plan before any real use.

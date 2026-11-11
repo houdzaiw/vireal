@@ -37,6 +37,13 @@ def test_database_url_is_normalized_and_email_defaults_are_computed() -> None:
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
+        ({"DATABASE_POOL_SIZE": 0}, "DATABASE_POOL_SIZE"),
+        ({"DATABASE_POOL_MAX_OVERFLOW": -1}, "DATABASE_POOL_MAX_OVERFLOW"),
+        ({"DATABASE_POOL_TIMEOUT_SECONDS": 0}, "DATABASE_POOL_TIMEOUT_SECONDS"),
+        (
+            {"DATABASE_POOL_TIMEOUT_SECONDS": float("inf")},
+            "DATABASE_POOL_TIMEOUT_SECONDS",
+        ),
         ({"REPLICATE_WEBHOOK_URL": "http://example.com/hook"}, "must use HTTPS"),
         (
             {"REPLICATE_WEBHOOK_SIGNING_SECRET": "invalid"},

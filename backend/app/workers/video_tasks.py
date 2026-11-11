@@ -293,7 +293,10 @@ def process_next_video_task(
                         raise VideoOutputError(
                             "Local demo source upload is unavailable"
                         )
-                    source_image = media_storage.read_app_image(upload.url)
+                    from app.services.resource_limits import delivery_reads
+
+                    with delivery_reads():
+                        source_image = media_storage.read_app_image(upload.url)
                     suffix = (
                         ".png" if source_image.content_type == "image/png" else ".jpg"
                     )

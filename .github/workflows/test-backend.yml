@@ -32,6 +32,8 @@ jobs:
       - name: Test owner tools using public synthetic inputs only
         run: uv run python -I -B ../tools/operations/test_local_tools.py
         working-directory: backend
+      - name: Test offline pilot cost arithmetic
+        run: python -m unittest discover -s tools/ci -p test_pilot_cost_bound.py -v
       - run: docker compose down -v --remove-orphans
       - run: docker compose up -d db mailpit
       - name: Migrate DB

@@ -1,5 +1,6 @@
 """Synthetic-only regression: no real grant, credentials, database or HTTP."""
 
+import copy
 import importlib.util
 import json
 from datetime import UTC, datetime, timedelta
@@ -22,6 +23,7 @@ def load(name):
 
 
 backup, email = load("backup_once"), load("test_email_once")
+repair = load("restore_candidate_checks")
 
 
 class Tools(unittest.TestCase):
@@ -239,6 +241,176 @@ class Tools(unittest.TestCase):
         self.assertEqual(backup.PROFILE_HEADS["candidate-30"][2], 30)
         self.assertEqual(len(backup.EXTRA_TABLES), 4)
         self.assertEqual(len(set(backup.EXTRA_TABLES)), 4)
+
+
+class ResourceProfileTests(unittest.TestCase):
+    def test_exact_additive_scope_preserves_old_profiles(self):
+        self.assertEqual(backup.profile_extra_tables("production-26"), ())
+        self.assertEqual(
+            backup.profile_extra_tables("candidate-30"), backup.EXTRA_TABLES
+        )
+        additions = backup.profile_extra_tables("candidate-33")
+        self.assertEqual(len(additions), 7)
+        self.assertEqual(len(set(additions)), 7)
+        self.assertEqual(
+            set(additions) - set(backup.EXTRA_TABLES),
+            {"app_resource_policy", "app_resource_attempt", "app_media_read_grant"},
+        )
+        self.assertEqual(backup.PROFILE_HEADS["candidate-33"][1:], ("e7f8a9b0c1d2", 33))
+
+    def test_unknown_profile_is_not_an_escape_hatch(self):
+        with self.assertRaises(ValueError):
+            backup.profile_extra_tables("accept-all-tables")
+
+    def test_new_profile_still_whitelists_only_exact_budget_partial_index(self):
+        module = SimpleNamespace(
+            C=SimpleNamespace(TABLES=tuple(str(i) for i in range(33))),
+            HAZARD_SQL="SELECT x.indpred IS NOT NULL",
+        )
+        sql = backup.hazard_sql(module)
+        self.assertIn(backup.BUDGET_INDEX, sql)
+        self.assertIn("c.relname='app_budget_window'", sql)
+        self.assertNotIn("app_resource_policy", sql)
+
+    def test_unknown_driver_stops_without_opening_connection(self):
+        with self.assertRaises(ValueError):
+            backup.negotiated_tls_protocol(SimpleNamespace(ssl_in_use=True))
+
+
+class CandidateRestorePlanTests(unittest.TestCase):
+    def fixture(self):
+        source = {
+            "schema": {
+                "database_locale": [["synthetic-local"]],
+                "relations": [
+                    [t, "r", "p", False, False] for t in sorted(repair.TABLES)
+                ],
+                "columns": [],
+                "constraints": [],
+                "indexes": [],
+                "collations": [],
+            },
+            "rows": {t: [] for t in repair.TABLES},
+            "extensions": [["plpgsql", "1.0"], ["uuid-ossp", "1.1"]],
+        }
+        for table, name, types, _, definition in repair.SPECS:
+            source["schema"]["constraints"].append([table, name, "c", True, definition])
+            for index, (column, kind) in enumerate(types.items(), 1):
+                source["schema"]["columns"].append(
+                    [table, index, column, kind, True, "", "", None]
+                )
+        target = copy.deepcopy(source)
+        for row in target["schema"]["constraints"]:
+            row[4] = repair.restored_definition(row[4])
+        return source, target
+
+    def plan(self, source, target, **kw):
+        return repair.repair_plan(
+            source, target, **({"profile": "candidate-33", "head": "e7f8a9b0c1d2"} | kw)
+        )
+
+    def test_fixed_statements_only_and_no_input_mutation(self):
+        source, target = self.fixture()
+        original = copy.deepcopy((source, target))
+        plan = self.plan(source, target)
+        self.assertEqual(len(plan), 8)
+        self.assertTrue(all("public." in statement for statement in plan))
+        self.assertFalse(
+            any(
+                "NOT VALID" in statement or "DISABLE" in statement for statement in plan
+            )
+        )
+        self.assertEqual((source, target), original)
+
+    def test_old_or_unknown_profile_and_head_refuse(self):
+        source, target = self.fixture()
+        for changed in (
+            {"profile": "production-26"},
+            {"profile": "candidate-30"},
+            {"profile": "unknown"},
+            {"head": "other"},
+        ):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                self.plan(source, target, **changed)
+
+    def test_any_unrelated_manifest_difference_refuses(self):
+        source, target = self.fixture()
+
+        def change_row(m):
+            m["rows"]["app_resource_attempt"] = [["synthetic-different-hash"]]
+
+        def change_type(m):
+            m["schema"]["columns"][0][3] = "text"
+
+        def change_locale(m):
+            m["schema"]["database_locale"] = []
+
+        def add_table(m):
+            m["rows"]["unreviewed"] = []
+
+        def change_index(m):
+            m["schema"]["indexes"] = [["different"]]
+
+        def change_extension(m):
+            m["extensions"] = []
+
+        for mutate in (
+            change_row,
+            change_type,
+            change_locale,
+            add_table,
+            change_index,
+            change_extension,
+        ):
+            item = copy.deepcopy(target)
+            mutate(item)
+            with self.subTest(mutation=mutate.__name__), self.assertRaises(ValueError):
+                self.plan(source, item)
+
+    def test_constraint_tampering_and_incomplete_diff_refuse(self):
+        source, target = self.fixture()
+        for field, value in (
+            (1, "changed_name"),
+            (2, "f"),
+            (3, False),
+            (3, 1),
+            (4, "CHECK (true)"),
+        ):
+            item = copy.deepcopy(target)
+            item["schema"]["constraints"][0][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                self.plan(source, item)
+        for action in ("duplicate", "missing", "already_equal"):
+            item = copy.deepcopy(target)
+            if action == "duplicate":
+                item["schema"]["constraints"].append(
+                    copy.deepcopy(item["schema"]["constraints"][0])
+                )
+            elif action == "missing":
+                item["schema"]["constraints"].pop()
+            else:
+                item["schema"]["constraints"][0] = copy.deepcopy(
+                    source["schema"]["constraints"][0]
+                )
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                self.plan(source, item)
+
+    def test_changed_source_rule_and_both_changed_types_refuse(self):
+        source, target = self.fixture()
+        source["schema"]["constraints"][0][4] = "CHECK (true)"
+        with self.assertRaises(ValueError):
+            self.plan(source, target)
+        source, target = self.fixture()
+        for item in (source, target):
+            item["schema"]["columns"][0][3] = "text"
+        with self.assertRaises(ValueError):
+            self.plan(source, target)
+
+    def test_malformed_input_refuses(self):
+        source, target = self.fixture()
+        for item in ({}, None, {"schema": None}, {"schema": {"constraints": [None]}}):
+            with self.subTest(item=item), self.assertRaises(ValueError):
+                self.plan(source, item)
 
 
 if __name__ == "__main__":
