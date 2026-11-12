@@ -24,9 +24,55 @@ def load(name):
 
 backup, email = load("backup_once"), load("test_email_once")
 repair = load("restore_candidate_checks")
+SYNTHETIC_TARGET = {
+    "project": "synthetic-project",
+    "host": "synthetic.invalid",
+    "database": "synthetic_database",
+    "role": "synthetic_reader",
+    "plan": "Free",
+    "region": "synthetic-region",
+}
+
+
+def fake_db(
+    *, backend=(False, None), client=True, protocol=b"TLSv1.3", params=None, target=None
+):
+    target = target or SYNTHETIC_TARGET
+    policy = {
+        "sslmode": "verify-full",
+        "channel_binding": "require",
+        "ssl_min_protocol_version": "TLSv1.2",
+        "sslrootcert": "/synthetic/ca.crt",
+    } | (params or {})
+    return SimpleNamespace(
+        pgconn=SimpleNamespace(
+            ssl_in_use=client,
+            ssl_attribute=lambda _: protocol,
+            info=[
+                SimpleNamespace(keyword=k.encode(), val=v.encode())
+                for k, v in policy.items()
+            ],
+        ),
+        info=SimpleNamespace(
+            host=target["host"],
+            dbname=target["database"],
+            user=target["role"],
+            get_parameters=lambda: policy,
+        ),
+        execute=lambda _: SimpleNamespace(fetchone=lambda: backend),
+    )
 
 
 class Tools(unittest.TestCase):
+    def setUp(self):
+        target = patch.object(
+            backup,
+            "PRODUCTION_TARGET_SHA256",
+            backup.sha(json.dumps(SYNTHETIC_TARGET, sort_keys=True).encode()),
+        )
+        target.start()
+        self.addCleanup(target.stop)
+
     def test_minimum_tls_is_injected_at_native_boundary(self):
         seen = []
 
@@ -146,13 +192,8 @@ class Tools(unittest.TestCase):
             (True, b"TLSv1", True, "TLSv1.3", False),
             (True, b"TLSv1.3", True, "TLSv1", False),
         ):
-            db = SimpleNamespace(
-                pgconn=SimpleNamespace(
-                    ssl_in_use=client, ssl_attribute=lambda _: protocol
-                ),
-                execute=lambda _: SimpleNamespace(
-                    fetchone=lambda: (backend_ok, backend_version)
-                ),
+            db = fake_db(
+                client=client, protocol=protocol, backend=(backend_ok, backend_version)
             )
             if allowed:
                 backup.backend_tls(db)
@@ -170,6 +211,8 @@ class Tools(unittest.TestCase):
             base, head, count = backup.PROFILE_HEADS["production-26"]
             profile = dict(
                 mode="production-26",
+                security_mode="native-postgres-tls",
+                target=SYNTHETIC_TARGET,
                 accepted_base=base,
                 migration_head=head,
                 table_count=count,
@@ -184,6 +227,9 @@ class Tools(unittest.TestCase):
                 expires_at=(now + timedelta(minutes=30)).isoformat(),
                 profile_sha256=backup.sha(json.dumps(profile, sort_keys=True).encode()),
                 tool_sha256=backup.sha(Path(backup.__file__).read_bytes()),
+                security_mode="native-postgres-tls",
+                target=SYNTHETIC_TARGET,
+                vendor_evidence_sha256=None,
             )
             self.assertEqual(
                 backup.validate_grant(grant, profile, now), now + timedelta(minutes=30)

@@ -34,6 +34,108 @@ RESOURCE_TABLES = (
     "app_media_read_grant",
 )
 
+SECURITY_MODES = ("native-postgres-tls", "neon-managed")
+# Exact reviewed target is in the private profile, not public source.
+PRODUCTION_TARGET_SHA256 = (
+    "6527b3fd0c4d6ae12f8d7c03f2e69509158837b80202252a2d9df7b1da4c1713"
+)
+VENDOR_SOURCES = {
+    "security.html": "https://neon.com/security",
+    "connect-securely.html": "https://neon.com/docs/connect/connect-securely",
+    "backup-pg-dump.html": "https://neon.com/docs/manage/backup-pg-dump",
+}
+
+
+def unique_json(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            need(key not in result, "DUPLICATE_JSON_KEY")
+            result[key] = value
+        return result
+
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def production_target(target):
+    return (
+        type(target) is dict
+        and set(target) == {"project", "host", "database", "role", "plan", "region"}
+        and all(type(value) is str for value in target.values())
+        and sha(json.dumps(target, sort_keys=True).encode()) == PRODUCTION_TARGET_SHA256
+    )
+
+
+def security_policy(grant, profile, at):
+    """Validate an explicit, owner-bound policy before any credential input.
+
+    Evidence hashes bind a human-reviewed vendor assertion, not a measurement
+    of managed internal links. There is no fallback from native to managed.
+    """
+    mode = profile.get("security_mode")
+    need(mode in SECURITY_MODES and grant.get("security_mode") == mode, "SECURITY_MODE")
+    need(
+        production_target(profile.get("target"))
+        and grant.get("target") == profile["target"],
+        "SECURITY_TARGET",
+    )
+    need("vendor_evidence_sha256" in grant, "SECURITY_EVIDENCE")
+    if mode == "native-postgres-tls":
+        need(
+            grant["vendor_evidence_sha256"] is None
+            and grant.get("vendor_evidence_path") is None,
+            "SECURITY_EVIDENCE",
+        )
+        return {"security_mode": mode, "vendor_evidence_sha256": None}
+    digest = grant["vendor_evidence_sha256"]
+    need(
+        isinstance(digest, str) and re.fullmatch("[0-9a-f]{64}", digest),
+        "SECURITY_EVIDENCE",
+    )
+    path = Path(grant["vendor_evidence_path"])
+    need(
+        path.is_file() and not path.is_symlink() and path.stat().st_size <= 32768,
+        "SECURITY_EVIDENCE",
+    )
+    raw = path.read_bytes()
+    need(sha(raw) == digest, "SECURITY_EVIDENCE_PIN")
+    evidence = unique_json(raw)
+    need(
+        evidence["schema"] == 1
+        and evidence["target"] == profile["target"]
+        and evidence["vendor_control_acceptance"] == "accepted-managed-trust-boundary"
+        and evidence["known_public_exclusions"] == []
+        and evidence["independently_verified_internal_hops"] is False
+        and evidence["project_specific_confirmation"] == "not_obtained",
+        "SECURITY_EVIDENCE_SCOPE",
+    )
+    start = datetime.fromisoformat(grant["starts_at"])
+    reviewed = datetime.fromisoformat(evidence["reviewed_at"])
+    need(
+        reviewed.tzinfo and start - timedelta(minutes=30) <= reviewed <= start <= at,
+        "SECURITY_REVIEW_WINDOW",
+    )
+    sources = evidence["sources"]
+    need(
+        type(sources) is dict and sources.keys() == VENDOR_SOURCES.keys(),
+        "SECURITY_SOURCES",
+    )
+    for name, url in VENDOR_SOURCES.items():
+        item = sources[name]
+        fetched = datetime.fromisoformat(item["retrieved_at"])
+        source = path.parent / name
+        need(
+            item["url"] == url
+            and fetched.tzinfo
+            and reviewed - timedelta(days=1) <= fetched <= reviewed
+            and source.is_file()
+            and not source.is_symlink()
+            and source.stat().st_size <= 2 * 1024 * 1024
+            and sha(source.read_bytes()) == item["sha256"],
+            "SECURITY_SOURCE_PIN",
+        )
+    return {"security_mode": mode, "vendor_evidence_sha256": digest}
+
 
 def profile_extra_tables(mode):
     need(mode in PROFILE_HEADS, "PROFILE")
@@ -98,19 +200,69 @@ def negotiated_tls_protocol(pgconn):
     return protocol
 
 
-def backend_tls(db):
+def backend_tls(db, *, security_mode="native-postgres-tls", target=None):
+    need(security_mode in SECURITY_MODES, "SECURITY_MODE")
+    if security_mode == "neon-managed":
+        need(production_target(target), "SECURITY_TARGET")
     need(db.pgconn.ssl_in_use, "CLIENT_TLS")
+    protocol = negotiated_tls_protocol(db.pgconn)
     need(
-        negotiated_tls_protocol(db.pgconn) in (b"TLSv1.2", b"TLSv1.3"),
+        protocol in (b"TLSv1.2", b"TLSv1.3"),
         "CLIENT_TLS_PROTOCOL",
     )
+    # get_parameters() omits values equal to libpq defaults, including TLS1.2.
+    # Read only these public options from effective conninfo; never passwords.
+    wanted = {
+        b"sslmode",
+        b"channel_binding",
+        b"ssl_min_protocol_version",
+        b"sslrootcert",
+    }
+    params = {
+        item.keyword.decode("ascii"): item.val.decode("utf-8")
+        for item in db.pgconn.info
+        if item.keyword in wanted and item.val is not None
+    }
     need(
-        db.execute(
-            "SELECT ssl, version FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid()"
-        ).fetchone()
-        in ((True, "TLSv1.2"), (True, "TLSv1.3")),
-        "BACKEND_TLS",
+        params.get("sslmode") == "verify-full"
+        and params.get("channel_binding") == "require"
+        and params.get("ssl_min_protocol_version") == "TLSv1.2"
+        and bool(params.get("sslrootcert")),
+        "CLIENT_TLS_POLICY",
     )
+    if target is not None:
+        need(
+            db.info.host == target["host"]
+            and db.info.dbname == target["database"]
+            and db.info.user == target["role"],
+            "SECURITY_TARGET",
+        )
+    row = db.execute(
+        "SELECT ssl, version FROM pg_catalog.pg_stat_ssl WHERE pid=pg_backend_pid()"
+    ).fetchone()
+    need(
+        isinstance(row, tuple)
+        and len(row) == 2
+        and type(row[0]) is bool
+        and (row[1] is None or type(row[1]) is str),
+        "BACKEND_OBSERVATION",
+    )
+    if security_mode == "native-postgres-tls":
+        need(row in ((True, "TLSv1.2"), (True, "TLSv1.3")), "BACKEND_TLS")
+    else:
+        # A positively observed obsolete backend TLS version needs review.
+        # ssl=false alone does not describe a provider's surrounding transport.
+        need(not row[0] or row[1] in ("TLSv1.2", "TLSv1.3"), "BACKEND_TLS")
+    return {
+        "client_tls_protocol": protocol.decode("ascii"),
+        "client_tls_policy_verified": True,
+        "pg_stat_ssl": {"ssl": row[0], "version": row[1]},
+        "internal_path_assurance": (
+            "vendor-assertion-not-independently-verified"
+            if security_mode == "neon-managed"
+            else "observed-postgres-connection-tls"
+        ),
+    }
 
 
 def load_engine():
@@ -237,6 +389,7 @@ def validate_grant(grant, profile, at):
         "PROFILE_PIN",
     )
     need(grant.get("tool_sha256") == sha(Path(__file__).read_bytes()), "TOOL_PIN")
+    security_policy(grant, profile, at)
     need(profile["mode"] in PROFILE_HEADS, "PROFILE")
     base, head, tables = PROFILE_HEADS[profile["mode"]]
     need(
@@ -296,6 +449,16 @@ def execute(grant, profile):
         "BACKEND_TLS",
         "CLIENT_TLS",
         "CLIENT_TLS_PROTOCOL",
+        "CLIENT_TLS_POLICY",
+        "BACKEND_OBSERVATION",
+        "SECURITY_MODE",
+        "SECURITY_TARGET",
+        "SECURITY_EVIDENCE",
+        "SECURITY_EVIDENCE_PIN",
+        "SECURITY_EVIDENCE_SCOPE",
+        "SECURITY_REVIEW_WINDOW",
+        "SECURITY_SOURCES",
+        "SECURITY_SOURCE_PIN",
         "BUDGET_INDEX_SCOPE",
         "CATALOG_SCOPE",
         "SOURCE_PIN",
@@ -322,12 +485,17 @@ def execute(grant, profile):
     )
     module.private_comparison = lambda db, check: comparison(module, db, check)
     original = engine.operating_snapshot
+    observation = {}
 
     def snapshot(m, db, check, email):
-        engine.ACTIVE_IO.event("SOURCE_AND_BACKEND_TLS_CHECK")
+        engine.ACTIVE_IO.event("SOURCE_CONNECTION_SECURITY_CHECK")
         need(datetime.now(UTC) < end, "WINDOW")
         validate_grant(grant, profile, datetime.now(UTC))
-        backend_tls(db)
+        observation.update(
+            backend_tls(
+                db, security_mode=profile["security_mode"], target=profile["target"]
+            )
+        )
         return original(m, db, check, email)
 
     engine.operating_snapshot = snapshot
@@ -357,7 +525,10 @@ def execute(grant, profile):
         prior = json.loads(raw_prior)
         need(
             prior["profile_sha256"] == grant["profile_sha256"]
-            and prior["sequence"] == grant["sequence"] - 1,
+            and prior["sequence"] == grant["sequence"] - 1
+            and prior["security_mode"] == grant["security_mode"]
+            and prior["target"] == grant["target"]
+            and prior["tool_sha256"] == grant["tool_sha256"],
             "PREVIOUS_PROFILE",
         )
         need(prior["icloud_uploaded"] and prior["cadence_passed"], "PREVIOUS_RECEIPT")
@@ -374,9 +545,19 @@ def execute(grant, profile):
 
     def encoded(value):
         if isinstance(value, dict) and "cadence_passed" in value:
+            need(
+                observation.get("client_tls_policy_verified") is True,
+                "CLIENT_TLS_POLICY",
+            )
             value = value | {
                 "profile_sha256": grant["profile_sha256"],
                 "sequence": grant.get("sequence", 0),
+                "capture_run_id": grant["run_id"],
+                "tool_sha256": grant["tool_sha256"],
+                "security_mode": grant["security_mode"],
+                "vendor_evidence_sha256": grant["vendor_evidence_sha256"],
+                "target": grant["target"],
+                **observation,
             }
         return encode(value)
 
@@ -394,8 +575,8 @@ if __name__ == "__main__":
         need(len(sys.argv) == 4 and sys.argv[1] == "--execute", "NOT_AUTHORIZED")
         raise SystemExit(
             execute(
-                json.loads(Path(sys.argv[2]).read_text()),
-                json.loads(Path(sys.argv[3]).read_text()),
+                unique_json(Path(sys.argv[2]).read_bytes()),
+                unique_json(Path(sys.argv[3]).read_bytes()),
             )
         )
     except (Exception, KeyboardInterrupt):  # noqa: BLE001 - unknown outcome always stops without retry
