@@ -18,7 +18,7 @@ OPTIONS = {
     CHECKOUT: {"fetch-depth": "0", "persist-credentials": "false"},
     PYTHON: {"python-version-file": ".python-version"},
     UV: {"version": "0.11.18", "enable-cache": "false"},
-    BUN: {"bun-version": "1.4.0"},
+    BUN: {"bun-version": "1.4.0", "no-cache": "true"},
 }
 RUNS = {
     "backend": [
@@ -165,6 +165,16 @@ class PilotCIProfile(unittest.TestCase):
 
     def test_write_token_refused(self):
         self.refused(lambda p: p["permissions"].update(contents="write"))
+
+    def test_bun_executable_cache_refused(self):
+        self.refused(
+            lambda p: p["jobs"]["browser"]["steps"][2]["with"].update(
+                {"no-cache": "false"}
+            )
+        )
+
+    def test_implicit_bun_cache_refused(self):
+        self.refused(lambda p: p["jobs"]["browser"]["steps"][2]["with"].pop("no-cache"))
 
     def test_deployment_command_refused(self):
         self.refused(
