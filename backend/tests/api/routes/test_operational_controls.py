@@ -14,7 +14,13 @@ from sqlmodel import Session, select
 
 from app.api.routes import replicate_webhooks
 from app.core.config import settings
-from app.models import AppOrderEvent, AppUser, AppVideoTask, AppVideoTaskWebhookEvent
+from app.models import (
+    AppAdminOperationLog,
+    AppOrderEvent,
+    AppUser,
+    AppVideoTask,
+    AppVideoTaskWebhookEvent,
+)
 from app.models_operations import AppBudgetWindow, AppOperationalAlert
 from app.services import operational_alerts, operational_budget
 from app.services.video_generation import VideoTaskResult, VideoTaskStatus
@@ -122,6 +128,11 @@ def test_ops_facts_do_not_reopen(
         "owner_present_until": (now + timedelta(minutes=10)).isoformat(),
         "alerts_verified_until": (now + timedelta(hours=1)).isoformat(),
         "backup_verified_until": (now + timedelta(minutes=59)).isoformat(),
+        "backup": {
+            "snapshot_at": (now - timedelta(minutes=1)).isoformat(),
+            "uploaded_at": (now - timedelta(seconds=30)).isoformat(),
+            "receipt_sha256": "a" * 64,
+        },
         "prices": window.prices,
     }
     client.post(PATH + "/pause", headers=superuser_token_headers)
@@ -135,6 +146,16 @@ def test_ops_facts_do_not_reopen(
         client.get(PATH + "/status", headers=superuser_token_headers).json()["state"]
         == "paused"
     )
+    entry = db.exec(
+        select(AppAdminOperationLog).where(
+            AppAdminOperationLog.target_id == window.id,
+            AppAdminOperationLog.action == "operations.evidence.update",
+        )
+    ).one()
+    assert json.loads(entry.details_json)["backup"] == {
+        **body["backup"],
+        "verified_until": body["backup_verified_until"],
+    }
     body["owner_present_until"] = (now + timedelta(minutes=16)).isoformat()
     assert (
         client.put(
@@ -142,6 +163,125 @@ def test_ops_facts_do_not_reopen(
         ).status_code
         == 422
     )
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "missing",
+        "sliding_deadline",
+        "old_snapshot",
+        "future_snapshot",
+        "future_upload",
+        "upload_before_snapshot",
+        "late_upload",
+        "naive_timestamp",
+        "invalid_digest",
+    ],
+)
+def test_backup_freshness_requires_the_original_snapshot(
+    case: str,
+    client: TestClient,
+    db: Session,
+    superuser_token_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = staffed_now()
+    monkeypatch.setattr("app.api.routes.operations.utc_now", lambda: now)
+    window = db.exec(select(AppBudgetWindow)).one()
+    before = window.backup_verified_until
+    body = {
+        "closing_bound_micros": 30_000_000,
+        "closing_evidence": "synthetic",
+        "owner_present_until": (now + timedelta(minutes=10)).isoformat(),
+        "alerts_verified_until": (now + timedelta(hours=1)).isoformat(),
+        "backup_verified_until": (now + timedelta(minutes=59)).isoformat(),
+        "backup": {
+            "snapshot_at": (now - timedelta(minutes=1)).isoformat(),
+            "uploaded_at": now.isoformat(),
+            "receipt_sha256": "a" * 64,
+        },
+        "prices": window.prices,
+    }
+    if case == "missing":
+        body.pop("backup")
+    elif case == "sliding_deadline":
+        body["backup_verified_until"] = (now + timedelta(hours=1)).isoformat()
+    elif case == "old_snapshot":
+        body["backup"]["snapshot_at"] = (now - timedelta(hours=1)).isoformat()
+        body["backup"]["uploaded_at"] = (now - timedelta(minutes=59)).isoformat()
+    elif case == "future_snapshot":
+        body["backup"]["snapshot_at"] = (now + timedelta(seconds=1)).isoformat()
+    elif case == "future_upload":
+        body["backup"]["uploaded_at"] = (now + timedelta(seconds=1)).isoformat()
+    elif case == "upload_before_snapshot":
+        body["backup"]["uploaded_at"] = (now - timedelta(minutes=2)).isoformat()
+    elif case == "late_upload":
+        body["backup"]["snapshot_at"] = (now - timedelta(minutes=16)).isoformat()
+    elif case == "naive_timestamp":
+        body["backup"]["snapshot_at"] = (
+            (now - timedelta(minutes=1)).replace(tzinfo=None).isoformat()
+        )
+    else:
+        body["backup"]["receipt_sha256"] = "unverified"
+    assert (
+        client.put(
+            PATH + "/facts", headers=superuser_token_headers, json=body
+        ).status_code
+        == 422
+    )
+    db.expire_all()
+    assert db.get(AppBudgetWindow, window.id).backup_verified_until == before
+
+
+def test_repeating_old_backup_evidence_cannot_extend_its_expiry(
+    client: TestClient,
+    db: Session,
+    superuser_token_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = staffed_now()
+    clock = [now]
+    monkeypatch.setattr("app.api.routes.operations.utc_now", lambda: clock[0])
+    window = db.exec(select(AppBudgetWindow)).one()
+    expiry = now + timedelta(minutes=59)
+    body = {
+        "closing_bound_micros": 30_000_000,
+        "closing_evidence": "synthetic",
+        "owner_present_until": (now + timedelta(minutes=10)).isoformat(),
+        "alerts_verified_until": (now + timedelta(hours=1)).isoformat(),
+        "backup_verified_until": expiry.isoformat(),
+        "backup": {
+            "snapshot_at": (now - timedelta(minutes=1)).isoformat(),
+            "uploaded_at": now.isoformat(),
+            "receipt_sha256": "a" * 64,
+        },
+        "prices": window.prices,
+    }
+    assert (
+        client.put(
+            PATH + "/facts", headers=superuser_token_headers, json=body
+        ).status_code
+        == 200
+    )
+    clock[0] += timedelta(minutes=10)
+    body["owner_present_until"] = (clock[0] + timedelta(minutes=10)).isoformat()
+    body["backup_verified_until"] = (expiry + timedelta(minutes=10)).isoformat()
+    assert (
+        client.put(
+            PATH + "/facts", headers=superuser_token_headers, json=body
+        ).status_code
+        == 422
+    )
+    body["backup_verified_until"] = expiry.isoformat()
+    assert (
+        client.put(
+            PATH + "/facts", headers=superuser_token_headers, json=body
+        ).status_code
+        == 200
+    )
+    db.expire_all()
+    assert db.get(AppBudgetWindow, window.id).backup_verified_until == expiry
 
 
 def test_monitor_token_has_no_write_authority(

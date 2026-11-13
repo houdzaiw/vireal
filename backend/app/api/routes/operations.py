@@ -1,6 +1,7 @@
 """Private, authenticated operator evidence. No customer financial permissions."""
 
 import hmac
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -47,7 +48,12 @@ Operator = Annotated[User, Depends(require_operator)]
 
 
 def audit(
-    session: SessionDep, operator: User, action: str, window_id: uuid.UUID
+    session: SessionDep,
+    operator: User,
+    action: str,
+    window_id: uuid.UUID,
+    *,
+    details: dict[str, Any] | None = None,
 ) -> None:
     session.add(
         AppAdminOperationLog(
@@ -57,6 +63,7 @@ def audit(
             target_type="app_budget_window",
             target_id=window_id,
             summary="Operator explicitly recorded operational evidence or state",
+            details_json=json.dumps(details or {}, sort_keys=True),
         )
     )
 
@@ -66,12 +73,19 @@ class Period(BaseModel):
     ends_at: AwareDatetime
 
 
+class BackupEvidence(BaseModel):
+    snapshot_at: AwareDatetime
+    uploaded_at: AwareDatetime
+    receipt_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class Facts(BaseModel):
     closing_bound_micros: int = Field(ge=0, le=30_000_000)
     closing_evidence: str = Field(min_length=1, max_length=500)
     owner_present_until: AwareDatetime
     alerts_verified_until: AwareDatetime
     backup_verified_until: AwareDatetime
+    backup: BackupEvidence
     prices: dict[str, dict[str, str | int]]
 
 
@@ -148,18 +162,42 @@ def record_facts(
         <= min(now + timedelta(minutes=15), row.ends_at)
     ):
         raise HTTPException(422, "Presence expires within 15 minutes")
-    if not now < body.alerts_verified_until <= min(
-        now + timedelta(hours=24), row.ends_at
-    ) or not now < body.backup_verified_until <= min(
-        now + timedelta(hours=1), row.ends_at
+    if (
+        not now
+        < body.alerts_verified_until
+        <= min(now + timedelta(hours=24), row.ends_at)
+    ):
+        raise HTTPException(422, "Fresh alert delivery evidence required")
+    snapshot, uploaded = body.backup.snapshot_at, body.backup.uploaded_at
+    if not (
+        snapshot <= uploaded <= now
+        and uploaded <= snapshot + timedelta(minutes=15)
+        and now
+        < body.backup_verified_until
+        <= min(snapshot + timedelta(hours=1), row.ends_at)
     ):
         raise HTTPException(
-            422, "Fresh alert delivery and hourly backup evidence required"
+            422, "Confirmed backup expires within 60 minutes of its snapshot"
         )
-    for name, value in body.model_dump().items():
+    for name, value in body.model_dump(exclude={"backup"}).items():
         setattr(row, name, value)
     session.add(row)
-    audit(session, _operator, "evidence.update", locked_window(session).id)
+    audit(
+        session,
+        _operator,
+        "evidence.update",
+        row.id,
+        details={
+            "backup": {
+                "snapshot_at": snapshot.astimezone(UTC).isoformat(),
+                "uploaded_at": uploaded.astimezone(UTC).isoformat(),
+                "receipt_sha256": body.backup.receipt_sha256,
+                "verified_until": body.backup_verified_until.astimezone(
+                    UTC
+                ).isoformat(),
+            }
+        },
+    )
     session.commit()
     return {"recorded": True, "automatically_opened": False}
 

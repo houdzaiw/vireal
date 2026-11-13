@@ -77,10 +77,35 @@ def r2_phase_costs(
     """
     if not cycles:
         raise Unproven("Billing-cycle coverage is missing")
-    admission = closing = Decimal(0)
+    cumulative = []
     for before, business, tail, free in cycles:
         during = before.plus(business)
         after = during.plus(tail)
+        cumulative.append((before, during, after, free))
+    return r2_cumulative_phase_costs(cumulative)
+
+
+def r2_cumulative_phase_costs(
+    cycles: list[tuple[R2Usage, R2Usage, R2Usage, bool]],
+) -> tuple[Decimal, Decimal]:
+    """Before/during/after cumulative totals for each distinct account cycle.
+
+    Storage checkpoints must already aggregate DAILY ACCOUNT peaks. A closing
+    phase sharing the same daily peak need not increase GB-months. Do not add
+    separately calculated per-bucket or per-phase peaks here. Standard only.
+    """
+    if not cycles:
+        raise Unproven("Billing-cycle coverage is missing")
+    admission = closing = Decimal(0)
+    for before, during, after, free in cycles:
+        if not (
+            quantity(before.storage_gb_month)
+            <= quantity(during.storage_gb_month)
+            <= quantity(after.storage_gb_month)
+            and before.class_a <= during.class_a <= after.class_a
+            and before.class_b <= during.class_b <= after.class_b
+        ):
+            raise Unproven("Cumulative account usage cannot move backwards")
         admission += r2_cycle_cost(during, free_tier=free) - r2_cycle_cost(
             before, free_tier=free
         )

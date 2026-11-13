@@ -27,7 +27,9 @@ RUNS = {
         'uv run --no-sync python -I -B ../tools/ci/check_tls_loopback.py --pg-bin /usr/lib/postgresql/18/bin --output-dir "$RUNNER_TEMP/pilot-tls"',
         'uv run --no-sync python -I -B ../tools/ci/run_backend_offline.py --pg-bin /usr/lib/postgresql/18/bin --output-dir "$RUNNER_TEMP/pilot-backend"',
         "uv run --no-sync python -I -B ../tools/operations/test_local_tools.py",
+        "uv run --no-sync python -I -B ../tools/operations/test_managed_security.py",
         "uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_pilot_cost_bound.py -v",
+        "uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_pilot_capacity_bound.py -v",
         "uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_legacy_deploy_guards.py -v",
     ],
     "browser": [

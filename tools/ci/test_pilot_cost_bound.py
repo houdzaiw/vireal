@@ -8,6 +8,7 @@ from pilot_cost_bound import (
     Unproven,
     assess,
     r2_cycle_cost,
+    r2_cumulative_phase_costs,
     r2_phase_costs,
 )
 
@@ -39,6 +40,27 @@ class PilotCostBounds(unittest.TestCase):
     def test_missing_cycles_rejected(self):
         with self.assertRaises(Unproven):
             r2_phase_costs([])
+
+    def test_shared_daily_storage_peak_and_rounding_only_count_once(self):
+        before = R2Usage("10", 1_000_000, 10_000_000)
+        during = R2Usage("10.1", 1_000_000, 10_000_000)
+        after = R2Usage("10.1", 1_000_000, 10_000_000)
+        self.assertEqual(
+            r2_cumulative_phase_costs([(before, during, after, True)]),
+            (Decimal(".015"), 0),
+        )
+        self.assertEqual(
+            r2_cumulative_phase_costs(
+                [(before, during, R2Usage("10.2", 1_000_000, 10_000_000), True)]
+            ),
+            (Decimal(".015"), 0),
+        )
+
+    def test_cumulative_counts_must_not_move_backwards(self):
+        before = R2Usage("1", 10, 10)
+        for after in (R2Usage(".9", 10, 10), R2Usage("1", 9, 10), R2Usage("1", 10, 9)):
+            with self.assertRaises(Unproven):
+                r2_cumulative_phase_costs([(before, before, after, True)])
 
     def test_invalid_quantities_rejected(self):
         for value in ["NaN", "Infinity", "-1", 0.1]:

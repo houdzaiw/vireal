@@ -45,3 +45,34 @@ The guard only applies to revisions containing it. It cannot cancel an existing
 run or change workflows at historical refs. Do not rerun old deployment runs or
 dispatch an old ref. Separately review disabling both legacy workflows in GitHub
 after this patch and CI are approved, alongside the online release protections.
+
+## Offline capacity and cost arithmetic
+
+`pilot_capacity_bound.py` counts opening/end captures conservatively, all
+streams, extra captures and bounded failed/unknown attempts, without deletion
+credit. It also sums explicitly bounded pool generations and non-application
+connections, and computes CU-hours separately for each project. Unknown closing
+duration, retry caps or other consumers raise `Unproven`; they are never zero.
+These functions do not establish deployed limits or authorize an operation.
+The actual provider quota, growth, memory/load and transfer evidence remain
+separate gates. Current free storage already excludes existing files: do not
+subtract them twice when deriving a per-file budget.
+
+`pilot_cost_bound.py` accepts Standard R2 usage aggregated across the account
+and separated by billing cycle. For storage, use cumulative daily account
+peaks; phases sharing a day must not independently add the same peak. Use
+`r2_cumulative_phase_costs` for the before/business-end/closing-end checkpoints.
+It subtracts rounded cumulative costs within each cycle, then adds cycles.
+Infrequent Access retrieval and minimum retention are outside this Standard
+calculator. Unknown provider spending or future paid-balance/service liability
+still blocks total-budget acceptance even when example arithmetic fits.
+
+Run the pure, credential-free scenarios from the repository root:
+
+```bash
+python -B -m unittest discover -s tools/ci -p 'test_pilot_*bound.py'
+```
+
+No provider requests, live grants, configuration changes or new spending are
+performed by these tests. Passing them is local arithmetic evidence, not
+deployment, continuous backup, real capacity or promotion acceptance.

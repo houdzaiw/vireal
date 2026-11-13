@@ -42,6 +42,8 @@ jobs:
       - run: uv run --no-sync python -I -B ../tools/operations/test_managed_security.py
       - run: uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_pilot_cost_bound.py -v
         working-directory: .
+      - run: uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_pilot_capacity_bound.py -v
+        working-directory: .
       - run: uv run --project backend --no-sync python -m unittest discover -s tools/ci -p test_legacy_deploy_guards.py -v
         working-directory: .
 

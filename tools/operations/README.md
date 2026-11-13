@@ -18,6 +18,31 @@ New on-disk receipts bind the capture run, exact tool/profile, target, security 
 
 A receipt is preparation/evidence for a future authorized operator update, not an API call that activates business or refreshes other facts. Preserve the original expiry of staff, sender, worker and cost evidence. Operator checks remain every10 minutes while staffed09:00–23:00 Beijing; backup every45 minutes does not substitute for presence. No restore is run by this CLI and no new full-service recovery time objective claim is made.
 
+The private operator facts API requires `backup.snapshot_at`,
+`backup.uploaded_at`, and `backup.receipt_sha256` as well as
+`backup_verified_until`. Timestamps must include a timezone. The operator must
+independently verify the pinned successful receipt and its target, source and
+upload confirmation before recording them. The API rejects a future snapshot
+or upload, an upload before the snapshot or over 15 minutes after it, and a
+deadline later than snapshot + 60 minutes or the operating period end. Reusing
+the original receipt cannot slide its deadline forward. The sanitized audit
+record retains the timestamps and receipt digest; it stores no archive,
+connection string or credential. The digest is an audit reference, not a server
+signature check. Old request bodies without this metadata reject. This local
+API change adds no database column, does not renew other evidence, and never
+opens or resumes business by itself.
+
+Successful single captures also do not prove continuous backup capacity.
+Before opening, bound the full capture horizon, every stream, closing and
+maintenance captures, all failed/unknown attempts, each ciphertext/manifest
+maximum, and other consumers of the same cloud account. Minimum 14-day
+retention is not a maximum or permission to delete; take no deletion credit
+without separately verified and authorized reclamation. Compressed archive
+size does not bound the source database's network transfer. Per-run no-retry
+guards do not impose a global limit on separately granted runs. Capacity or
+backup failures block new business; they do not permit stopping fulfillment of
+existing paid orders.
+
 ## One test email
 
 `test_email_once.py` is fixed to ops@alerts.usevireal.com → li522903183@gmail.com, one recipient, fixed nontransactional subject/body and one POST to the official Resend endpoint. Fresh authorization must record current whole-team remaining daily/monthly allowance and sending-only domain restriction. The owner enters only that key in the hidden terminal. The claim is durable before input/I/O; timeout, crash or uncertain result never causes a resend. Provider acceptance is not human receipt; a separate owner receipt confirmation is required. Neither tool is authorized by these docs to execute now.

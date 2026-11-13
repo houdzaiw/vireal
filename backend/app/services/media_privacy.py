@@ -1,8 +1,13 @@
 """Keep bearer media grants out of access logs and error/tracing telemetry."""
 
+from __future__ import annotations
+
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event
 
 TOKEN = re.compile(
     r"""(^|[?&])(?:t|%74)(?:o|%6f)(?:k|%6b)(?:e|%65)(?:n|%6e)=[^&\s"']*""",
@@ -32,8 +37,8 @@ class MediaTokenFilter(logging.Filter):
         return True
 
 
-def scrub_event(event: dict, _hint: dict) -> dict:
-    return scrub(event)
+def scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
+    return cast("Event", scrub(event))
 
 
 def install_log_filters() -> None:
