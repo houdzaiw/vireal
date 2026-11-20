@@ -11,6 +11,8 @@ from pathlib import Path
 
 import httpx
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import DisconnectionError, InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as DatabaseTimeoutError
 from sqlmodel import Session, col, select
 
 from app.core.config import settings
@@ -23,6 +25,8 @@ from app.services.video_task_reconciliation import lock_task, reconcile_video_ta
 logger = logging.getLogger(__name__)
 WORKER_LOCK_TIMEOUT = timedelta(minutes=10)
 DOWNLOAD_TIMEOUT = httpx.Timeout(120.0, connect=15.0)
+DATABASE_RETRY_INITIAL_SECONDS = 1.0
+DATABASE_RETRY_MAX_SECONDS = 60.0
 LocalDemoRenderer = Callable[[Path, Path, int], None]
 ProviderVideoNormalizer = Callable[[Path, Path, int], None]
 
@@ -464,12 +468,33 @@ def _reconciliation_loop(
         stop.wait(max(0.1, interval - (time.monotonic() - started)))
 
 
-def run_worker() -> None:
+def _retryable_database_error(
+    exc: DisconnectionError | InterfaceError | OperationalError | DatabaseTimeoutError,
+) -> bool:
+    if isinstance(exc, (InterfaceError, OperationalError)):
+        sqlstate = getattr(exc.orig, "sqlstate", None)
+        # Connection setup failures may have no server SQLSTATE. Never inspect
+        # or log their text: it can contain a DSN, query parameters or secrets.
+        return sqlstate is None or (
+            isinstance(sqlstate, str)
+            and (
+                sqlstate.startswith(("08", "53"))
+                or sqlstate
+                in {"40001", "40P01", "55P03", "57014", "57P01", "57P02", "57P03"}
+            )
+        )
+    return True
+
+
+def run_worker(*, stop: threading.Event | None = None) -> None:
     from app.services.operational_alerts import operational_tick, record_worker_progress
     from app.services.paypal_orders import reconcile_paypal_orders
 
+    if stop is None:
+        stop = threading.Event()
+    if stop.is_set():
+        return
     logger.info("Video task worker started")
-    stop = threading.Event()
     # Scheduling is independent of slow R2/FFmpeg work, not merely a future
     # dispatched after that work has finished. No new service/process is needed.
     for callback, interval, label in (
@@ -488,18 +513,51 @@ def run_worker() -> None:
             daemon=True,
         ).start()
     next_cleanup_at = 0.0
+    retry_seconds = DATABASE_RETRY_INITIAL_SECONDS
+    database_unavailable = False
     try:
-        while True:
-            processed = process_next_video_task()
-            monotonic_now = time.monotonic()
-            if monotonic_now >= next_cleanup_at:
-                cleanup_expired_media()
-                next_cleanup_at = (
-                    monotonic_now + settings.VIDEO_CLEANUP_INTERVAL_SECONDS
+        while not stop.is_set():
+            phase = "poll"
+            try:
+                processed = process_next_video_task()
+                if stop.is_set():
+                    break
+                monotonic_now = time.monotonic()
+                if monotonic_now >= next_cleanup_at:
+                    phase = "cleanup"
+                    cleanup_expired_media()
+                    next_cleanup_at = (
+                        monotonic_now + settings.VIDEO_CLEANUP_INTERVAL_SECONDS
+                    )
+                if stop.is_set():
+                    break
+                phase = "progress"
+                # Only a successful poll/cleanup pass may refresh the heartbeat.
+                record_worker_progress()
+            except (
+                DisconnectionError,
+                InterfaceError,
+                OperationalError,
+                DatabaseTimeoutError,
+            ) as exc:
+                if not _retryable_database_error(exc):
+                    raise
+                # Session contexts have unwound before waiting. Do not mark a
+                # task failed, refund it, or re-submit a provider request here.
+                logger.warning(
+                    "Worker database unavailable; waiting before retry",
+                    extra={"worker_phase": phase, "retry_seconds": retry_seconds},
                 )
+                database_unavailable = True
+                stop.wait(retry_seconds)
+                retry_seconds = min(retry_seconds * 2, DATABASE_RETRY_MAX_SECONDS)
+                continue
+            if database_unavailable:
+                logger.info("Worker database access recovered")
+                database_unavailable = False
+            retry_seconds = DATABASE_RETRY_INITIAL_SECONDS
             if not processed:
                 stop.wait(settings.VIDEO_WORKER_POLL_SECONDS)
-            record_worker_progress()
     finally:
         stop.set()
 

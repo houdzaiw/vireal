@@ -43,6 +43,88 @@ guards do not impose a global limit on separately granted runs. Capacity or
 backup failures block new business; they do not permit stopping fulfillment of
 existing paid orders.
 
+## Local capacity hardening (not live qualification)
+
+The new `backup_once.py` entry additionally requires `capacity_schema=1`, the
+exact `capacity_helper_sha256`, `capacity_policy`, `capacity_evidence`, an
+explicit boolean `initialize_capacity_ledger`, and `capture_id`,
+`capacity_stream`, `capture_kind`. Existing grants cannot run this modified
+entry. The new entry retains the requested `native-postgres-tls` backend gate;
+the existing managed-mode readers/tests remain intact, but they do not enable
+this path. No grant, operating policy or real evidence is supplied here.
+
+The candidate limits are **4 MiB for the entire final ciphertext envelope**
+and **4 KiB for its public sidecar**. A reviewed policy may choose smaller
+limits. The ciphertext bound includes the private comparison header, crypto
+and encoding overhead; the old 4 MiB private-header bound is a different limit.
+Oversized ciphertext is rejected before the archive write, and an oversized
+sidecar before the cloud write. The sealed R3 files and crypto are unchanged.
+These limits do not prove that future production data will fit, nor bound the
+database protocol traffic. The pinned production dump uses `--compress=none`.
+
+The policy has an immutable target/profile/host, finite start/end, explicitly
+listed streams, logical capture and per-capture/aggregate attempt caps,
+cipher/sidecar limits, additional local-output allowance, independent per-run
+wire allowance and aggregate cloud/local/wire allocations. It also declares
+maximum CU and a closing amount no larger than $30. There are no implicit
+12-hour/24-hour closing assumptions. Required fresh evidence binds that policy,
+all available/other/reserved capacities, integral CU-hours and actual exposure,
+with separate review references for space, other consumers, wire, backend exit,
+closing, continuing fulfillment and single-host operation. Missing/expired
+evidence refuses before the engine or hidden inputs. Entering a number or
+digest is not independent proof of it. The operator must review those facts
+before authorizing a future grant; presently the wire/cleanup/closing gaps
+remain open. The evidence window is at most 30 minutes.
+
+One fixed ledger lives under
+`~/Documents/vireal-backups/production-operating-capacity`. Explicit first-time
+initialization is permitted once; later grants must resume the same ledger.
+The root is 0700; files must be regular, owner-only 0600 and not symlinks or
+hardlinks. An exclusive nonblocking local file lock protects an append-only
+hash-chained journal and a separately fsynced high-water anchor. Journal and
+anchor disagreement, truncation, a missing file or interrupted initialization
+refuses; this tool never repairs or recreates existing state. Policy changes,
+new run IDs, new opening runs or another profile cannot reset counters. A
+future policy transfer/reconciliation is outside this tool and this batch.
+
+Before asking for credentials, every attempt durably reserves the full
+ciphertext+sidecar, **two** such local copies plus the independently bounded
+local metadata allowance, and its declared wire allowance. Aggregate
+allocations must cover every permitted attempt. Current available capacity is
+checked conservatively against the entire declared allocation, including
+previous reservations; this implementation gives no credit for already
+completed artifacts. A tight space budget may therefore stop early. It must
+not be worked around by resetting the ledger. Other host writes, iCloud sync
+and local logs still require separate evidence; this accounting module is not
+a disk/network meter or a real cloud-space reservation.
+
+Only one capture may be unresolved. A crash, failed/partial upload, stale
+evidence or any unknown outcome leaves its reservation charged and blocks
+further captures pending separately authorized reconciliation. Even confirmed
+uploads keep their complete attempt/byte charge. A confirmed outcome means
+only that the pinned archive/upload receipt passed its checks; it does not
+attest to backend exit or global operating readiness. Snapshot, upload,
+retention and receipt bindings retain their original deadlines. At least
+14-day retention never triggers deletion, counter reduction or fresh evidence.
+
+The hostname fingerprint and file lock bind an operational **single-host**
+workflow. They are not hardware attestation, cross-device serialization or
+iCloud distributed locks. Only independently bounded consumers on that one
+host are eligible. A copied ledger, another issuer/host or missing evidence
+cannot establish global capacity. Protecting this private state relies on the
+trusted owner/host; it is not tamper-proof against that owner rewriting both
+files. Do not add a server, shared cloud lock, credential or role silently.
+
+The new tests use public synthetic data, temporary private files and isolated
+Python child processes only. They cover real filesystem lock contention,
+crash-after-reservation, interrupted-anchor writes, corrupt/truncated state,
+full-envelope overflow, stale input-time evidence and synthetic wrapper
+integration. Existing tests/assertions are retained and existing CI entry
+points reused. No real DB, restore, backup, HTTP or cloud folder is needed.
+These local checks cannot establish production capacity or the $30 closing
+reserve. Capacity failures must preserve existing paid-order querying,
+settlement and delivery; this local module changes none of those routes.
+
 ## One test email
 
 `test_email_once.py` is fixed to ops@alerts.usevireal.com → li522903183@gmail.com, one recipient, fixed nontransactional subject/body and one POST to the official Resend endpoint. Fresh authorization must record current whole-team remaining daily/monthly allowance and sending-only domain restriction. The owner enters only that key in the hidden terminal. The claim is durable before input/I/O; timeout, crash or uncertain result never causes a resend. Provider acceptance is not human receipt; a separate owner receipt confirmation is required. Neither tool is authorized by these docs to execute now.

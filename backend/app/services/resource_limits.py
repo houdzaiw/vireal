@@ -5,6 +5,7 @@ cover every database/environment plus external account consumers. These counters
 cannot constrain a credential used by another service or an already issued URL.
 """
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
@@ -170,7 +171,7 @@ _delivery_reads: ContextVar[bool] = ContextVar("delivery_reads", default=False)
 
 
 @contextmanager
-def delivery_reads(delivery: bool = True):
+def delivery_reads(delivery: bool = True) -> Iterator[None]:
     token = _delivery_reads.set(delivery)
     try:
         yield

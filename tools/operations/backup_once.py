@@ -423,7 +423,43 @@ def strict_connector(base):
     return StrictConnector
 
 
+def capacity_admission(grant, profile, at):
+    """New grants bind the helper and reviewed bounds before engine/input I/O."""
+    need(
+        type(grant.get("capacity_schema")) is int and grant["capacity_schema"] == 1,
+        "CAPACITY_VERSION",
+    )
+    path = Path(__file__).with_name("backup_capacity.py")
+    need(
+        path.is_file() and not path.is_symlink() and path.stat().st_size <= 262144,
+        "CAPACITY_HELPER",
+    )
+    need(
+        sha(path.read_bytes()) == grant.get("capacity_helper_sha256"),
+        "CAPACITY_HELPER_PIN",
+    )
+    spec = importlib.util.spec_from_file_location("_backup_capacity", path)
+    capacity = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(capacity)
+    # The current authorization retains the original backend-TLS requirement.
+    # Existing mode readers remain available; this new executable path cannot
+    # substitute managed evidence for the required backend TLS observation.
+    need(profile.get("security_mode") == "native-postgres-tls", "BACKEND_TLS")
+    policy, evidence = grant.get("capacity_policy"), grant.get("capacity_evidence")
+    capacity.validate(
+        policy,
+        evidence,
+        at=at,
+        target_sha256=sha(json.dumps(profile["target"], sort_keys=True).encode()),
+        profile_sha256=grant["profile_sha256"],
+        host_sha256=capacity.host_identity(),
+    )
+    need(type(grant.get("initialize_capacity_ledger")) is bool, "CAPACITY_INITIALIZE")
+    return capacity, policy, evidence
+
+
 def execute(grant, profile):
+    capacity, policy, evidence = capacity_admission(grant, profile, datetime.now(UTC))
     engine, module, prep = load_engine()
     end = validate_grant(grant, profile, datetime.now(UTC))
     need(
@@ -436,6 +472,90 @@ def execute(grant, profile):
         Path.home() / "Documents/vireal-backups/production-operating" / grant["run_id"]
     )
     need(not root.exists(), "ATTEMPT_CONSUMED")
+    ledger = capacity.Ledger(
+        Path.home() / "Documents/vireal-backups/production-operating-capacity", policy
+    )
+    # This is deliberately shared across run IDs, profiles and opening runs.
+    # Initialization is explicit and possible once; no missing-ledger recovery.
+    capacity_admission(grant, profile, datetime.now(UTC))
+    reservation = ledger.reserve(
+        grant["run_id"],
+        grant.get("capture_id"),
+        grant.get("capacity_stream"),
+        grant.get("capture_kind"),
+        at=datetime.now(UTC),
+        initialize=grant["initialize_capacity_ledger"],
+    )
+    try:
+        return execute_reserved(
+            grant,
+            profile,
+            engine,
+            module,
+            prep,
+            end,
+            root,
+            capacity,
+            policy,
+            evidence,
+            ledger,
+            reservation,
+        )
+    except BaseException:
+        try:
+            ledger.finish(grant["run_id"])
+        except (ValueError, OSError):
+            # The durable reservation remains charged even if recording the
+            # unknown result fails. Never repair, retry or free it here.
+            pass
+        raise
+
+
+def capacity_receipt(capacity, policy, grant, report, at):
+    need(
+        report.get("icloud_uploaded") is True
+        and report.get("cadence_passed") is True
+        and report.get("capture_run_id") == grant["run_id"]
+        and report.get("capacity_policy_sha256") == capacity.digest(policy)
+        and report.get("profile_sha256") == grant["profile_sha256"]
+        and report.get("tool_sha256") == grant["tool_sha256"]
+        and report.get("target") == grant["target"],
+        "CAPACITY_RECEIPT",
+    )
+    capacity.count(report.get("ciphertext_bytes"), 1, policy["cipher_bytes"])
+    capacity.sha(report.get("ciphertext_sha256"))
+    capacity.sha(report.get("manifest_sha256"))
+    snapshot = capacity.instant(report.get("snapshot_at"))
+    uploaded = capacity.instant(report.get("icloud_uploaded_observed_at"))
+    latest = capacity.instant(report.get("latest_upload_confirmation_at"))
+    need(
+        capacity.instant(policy["starts_at"]) <= snapshot <= uploaded <= at
+        and uploaded <= latest <= snapshot + timedelta(minutes=15)
+        and uploaded < capacity.instant(policy["ends_at"])
+        and at < capacity.instant(grant["expires_at"]),
+        "CAPACITY_RECEIPT_TIME",
+    )
+    need(
+        capacity.instant(report.get("retain_at_least_until"))
+        >= snapshot + timedelta(days=14),
+        "CAPACITY_RETENTION",
+    )
+
+
+def execute_reserved(
+    grant,
+    profile,
+    engine,
+    module,
+    prep,
+    end,
+    root,
+    capacity,
+    policy,
+    evidence,
+    ledger,
+    reservation,
+):
     module.private_dir(root.parent.parent)
     root.parent.mkdir(mode=0o700, exist_ok=True)
     module.private_dir(root.parent)
@@ -491,6 +611,7 @@ def execute(grant, profile):
         engine.ACTIVE_IO.event("SOURCE_CONNECTION_SECURITY_CHECK")
         need(datetime.now(UTC) < end, "WINDOW")
         validate_grant(grant, profile, datetime.now(UTC))
+        capacity_admission(grant, profile, datetime.now(UTC))
         observation.update(
             backend_tls(
                 db, security_mode=profile["security_mode"], target=profile["target"]
@@ -500,11 +621,29 @@ def execute(grant, profile):
 
     engine.operating_snapshot = snapshot
     module.R.Connector = strict_connector(module.R.Connector)
+    connector = module.R.Connector
+
+    class CapacityConnector(connector):
+        def __call__(self, *args, **kwargs):
+            capacity_admission(grant, profile, datetime.now(UTC))
+            return super().__call__(*args, **kwargs)
+
+    module.R.Connector = CapacityConnector
     source_env = module.C.source_env
-    module.C.source_env = lambda params, address: {
-        **source_env(params, address),
-        "PGSSLMINPROTOCOLVERSION": "TLSv1.2",
-    }
+
+    def checked_source_env(params, address):
+        capacity_admission(grant, profile, datetime.now(UTC))
+        return {**source_env(params, address), "PGSSLMINPROTOCOLVERSION": "TLSv1.2"}
+
+    module.C.source_env = checked_source_env
+    seal = module.C.seal_archive
+
+    def bounded_seal(*args, **kwargs):
+        value = seal(*args, **kwargs)
+        capacity.check_cipher(value, policy)
+        return value
+
+    module.C.seal_archive = bounded_seal
 
     def slot_time(m, _slot):
         if grant.get("sequence", 0):
@@ -557,9 +696,19 @@ def execute(grant, profile):
                 "security_mode": grant["security_mode"],
                 "vendor_evidence_sha256": grant["vendor_evidence_sha256"],
                 "target": grant["target"],
+                "capacity_policy_sha256": reservation["policy_sha256"],
                 **observation,
             }
-        return encode(value)
+        result = encode(value)
+        if isinstance(value, dict) and set(value) == {
+            "archive",
+            "ciphertext_bytes",
+            "ciphertext_sha256",
+            "snapshot_at",
+            "retain_at_least_until",
+        }:
+            capacity.check_sidecar(result, policy)
+        return result
 
     engine.encoded = encoded
     # Native's immutable process deadline is the earlier of 16 min and grant end.
@@ -567,7 +716,23 @@ def execute(grant, profile):
     engine.native = lambda m, p, deadline, tag: old_native(
         m, p, min(deadline, end), tag
     )
-    return engine.run_cli(["--backup", "1" if grant.get("sequence", 0) else "0"])
+    slot = "1" if grant.get("sequence", 0) else "0"
+    result = engine.run_cli(["--backup", slot])
+    if result != 0:
+        ledger.finish(grant["run_id"])
+        return result
+    capacity_admission(grant, profile, datetime.now(UTC))
+    raw = module.read_safe(root / f"slot-{slot}.json")
+    report = unique_json(raw)
+    capacity_receipt(capacity, policy, grant, report, datetime.now(UTC))
+    ledger.finish(
+        grant["run_id"],
+        outcome="confirmed",
+        snapshot_at=report["snapshot_at"],
+        retain_until=report["retain_at_least_until"],
+        receipt_sha256=sha(raw),
+    )
+    return result
 
 
 if __name__ == "__main__":

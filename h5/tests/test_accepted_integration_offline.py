@@ -110,8 +110,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
             {
                 node.target.id
                 for node in ast.walk(new)
-                if isinstance(node, ast.AnnAssign)
-                and isinstance(node.target, ast.Name)
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
             },
         )
         checker = self
@@ -366,6 +365,8 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "backend/tests/core/test_db_pool.py",
                 "backend/app/core/db.py",
                 "tools/ci/pilot_cost_bound.py",
+                "tools/ci/pilot_capacity_bound.py",
+                "tools/ci/test_pilot_capacity_bound.py",
                 "tools/ci/test_pilot_cost_bound.py",
                 "docs/pilot-cost-acceptance.md",
                 "docs/neon-security-acceptance.md",
@@ -395,9 +396,11 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 ".github/workflows/test-backend.yml",
                 "backend/tests/services/test_alert_limits.py",
                 "tools/operations/backup_once.py",
+                "tools/operations/backup_capacity.py",
                 "tools/operations/restore_candidate_checks.py",
                 "tools/operations/test_email_once.py",
                 "tools/operations/test_local_tools.py",
+                "tools/operations/test_managed_security.py",
                 "tools/operations/README.md",
                 "docs/launch-local-closure.md",
                 "README.md",
@@ -414,6 +417,7 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "backend/app/services/operational_alerts.py",
                 "backend/app/services/paypal_replacement.py",
                 "backend/app/workers/video_tasks.py",
+                "backend/tests/workers/test_video_tasks.py",
                 "backend/tests/conftest.py",
                 "backend/tests/api/routes/test_operational_controls.py",
                 "backend/tests/api/routes/test_paypal_commerce.py",
