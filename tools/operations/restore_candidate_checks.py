@@ -1,6 +1,6 @@
 """Pure repair plan for an isolated candidate-33 restore, never a live executor.
 
-Recreate four fixed migration CHECKs, then require raw full-manifest equality.
+Recreate four fixed migration CHECK constraints, then require raw full-manifest equality.
 No generic SQL normalization, acceptance exception, connection, or grant bypass.
 The caller must first authenticate the archive and validate the complete catalog.
 """

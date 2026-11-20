@@ -165,7 +165,7 @@ The synthetic 33-table PostgreSQL 18 drill passed exact equality after repair,
 post-commit equality, interrupted-repair rollback and invalid-state rejection.
 The native and managed owner-tool suites are run separately in offline CI.
 Production source permissions, current independent cloud retrieval and operating
-RTO are still unaccepted. Neon internal controls use the expressly accepted
+recovery time objective are still unaccepted. Neon internal controls use the expressly accepted
 supplier trust boundary, with independent per-hop verification remaining unknown.
 A future operator grant must pin this new helper's SHA as well
 as the selected schema, source, tool and process plan before any real use.
