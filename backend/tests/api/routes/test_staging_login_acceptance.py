@@ -246,6 +246,7 @@ def test_public_hint_has_no_identity_and_changes_no_business_entitlement(
         "wrong_subject",
         "wrong_issuer",
         "wrong_origin",
+        "missing_browser_origin",
         "off",
         "expired",
         "future",
@@ -279,6 +280,8 @@ def test_denied_requests_do_not_write_or_query_provider(
         clerk.claims = replace(
             clerk.claims, authorized_party="https://app.usevireal.com"
         )
+    elif reason == "missing_browser_origin":
+        clerk.claims = replace(clerk.claims, authorized_party=None)
     elif reason == "off":
         monkeypatch.setattr(settings, "APP_STAGING_LOGIN_ACCEPTANCE_ENABLED", False)
     elif reason in {"expired", "future"}:
