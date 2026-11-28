@@ -428,6 +428,8 @@ class AcceptedIntegrationOfflineTests(unittest.TestCase):
                 "edge/operations-monitor/monitor.test.mjs",
                 "backend/app/api/routes/app_paypal.py",
                 "backend/app/api/routes/app_auth.py",
+                "backend/app/services/clerk_auth.py",
+                "backend/tests/services/test_clerk_auth.py",
                 "backend/app/core/config.py",
                 "backend/app/api/routes/app_video_tasks.py",
                 "backend/app/services/video_quota.py",
