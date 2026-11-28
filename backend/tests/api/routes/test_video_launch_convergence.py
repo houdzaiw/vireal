@@ -594,7 +594,11 @@ def test_reconciliation_threads_start_before_slow_persistence(monkeypatch):
             starts.append(self.name)
 
     def interrupt_persistence():
-        assert starts == ["payment-reconcile", "video-reconcile"]
+        assert starts == [
+            "payment-reconcile",
+            "video-reconcile",
+            "operations-reconcile",
+        ]
         raise KeyboardInterrupt
 
     monkeypatch.setattr(worker.threading, "Thread", Thread)

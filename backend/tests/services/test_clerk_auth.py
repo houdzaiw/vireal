@@ -4,7 +4,16 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from app.services.clerk_auth import ClerkAuthenticationError, ClerkAuthService
+from app.core.config import (
+    STAGING_LOGIN_ACCEPTANCE_ISSUER,
+    STAGING_LOGIN_ACCEPTANCE_ORIGIN,
+    settings,
+)
+from app.services.clerk_auth import (
+    ClerkAuthenticationError,
+    ClerkAuthService,
+    get_clerk_auth_service,
+)
 
 
 class StaticSigningKey:
@@ -14,6 +23,8 @@ class StaticSigningKey:
 
 def build_service(
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    allow_missing_authorized_party: bool = False,
 ) -> tuple[ClerkAuthService, object]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     service = ClerkAuthService(
@@ -22,6 +33,7 @@ def build_service(
         secret_key="sk_test_example",
         authorized_parties=("https://app.example.test",),
         audience="vireal-api",
+        allow_missing_authorized_party=allow_missing_authorized_party,
     )
     monkeypatch.setattr(
         service.jwks_client,
@@ -32,7 +44,11 @@ def build_service(
 
 
 def encode_token(
-    private_key: object, *, kid: str = "key-one", **overrides: object
+    private_key: object,
+    *,
+    kid: str = "key-one",
+    omit_authorized_party: bool = False,
+    **overrides: object,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, object] = {
@@ -46,6 +62,8 @@ def encode_token(
         "exp": now + timedelta(minutes=1),
     }
     payload.update(overrides)
+    if omit_authorized_party:
+        del payload["azp"]
     return jwt.encode(payload, private_key, algorithm="RS256", headers={"kid": kid})
 
 
@@ -108,6 +126,91 @@ def test_rejects_invalid_clerk_token(
     service, private_key = build_service(monkeypatch)
     with pytest.raises(ClerkAuthenticationError, match=message):
         service.verify_session_token(encode_token(private_key, **overrides))
+
+
+@pytest.mark.parametrize(
+    ("config_overrides", "allowed"),
+    [
+        pytest.param({}, True, id="staging"),
+        pytest.param({"environment": "production"}, False, id="production"),
+        pytest.param({"environment": "local"}, False, id="local"),
+        pytest.param(
+            {"issuer": "https://another-clerk.example.test"},
+            False,
+            id="different-issuer",
+        ),
+        pytest.param(
+            {"jwks_path": "/unexpected-jwks.json"}, False, id="different-jwks"
+        ),
+        pytest.param(
+            {"party": "https://app.example.test"}, False, id="different-origin"
+        ),
+    ],
+)
+def test_missing_authorized_party_is_limited_to_staging_clerk(
+    monkeypatch: pytest.MonkeyPatch,
+    config_overrides: dict[str, str],
+    allowed: bool,
+) -> None:
+    issuer = config_overrides.get("issuer", STAGING_LOGIN_ACCEPTANCE_ISSUER)
+    jwks_path = config_overrides.get("jwks_path", "/.well-known/jwks.json")
+    party = config_overrides.get("party", STAGING_LOGIN_ACCEPTANCE_ORIGIN)
+    monkeypatch.setattr(
+        settings, "ENVIRONMENT", config_overrides.get("environment", "staging")
+    )
+    monkeypatch.setattr(settings, "CLERK_ISSUER_URL", issuer)
+    monkeypatch.setattr(settings, "CLERK_JWKS_URL", issuer + jwks_path)
+    monkeypatch.setattr(settings, "CLERK_AUDIENCE", "vireal-api")
+    monkeypatch.setattr(settings, "CLERK_SECRET_KEY", "synthetic-test-secret")
+    monkeypatch.setattr(settings, "CLERK_AUTHORIZED_PARTIES", [party])
+    get_clerk_auth_service.cache_clear()
+    try:
+        service = get_clerk_auth_service()
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        monkeypatch.setattr(
+            service.jwks_client,
+            "get_signing_key_from_jwt",
+            lambda _token: StaticSigningKey(private_key.public_key()),
+        )
+        web_token = encode_token(private_key, iss=issuer, azp=party)
+        assert service.verify_session_token(web_token).authorized_party == party
+
+        native_token = encode_token(private_key, iss=issuer, omit_authorized_party=True)
+        if allowed:
+            assert service.verify_session_token(native_token).authorized_party is None
+        else:
+            with pytest.raises(ClerkAuthenticationError, match="Invalid or expired"):
+                service.verify_session_token(native_token)
+    finally:
+        get_clerk_auth_service.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("omit_authorized_party", "overrides"),
+    [
+        (False, {"azp": None}),
+        (False, {"azp": ""}),
+        (False, {"azp": ["https://app.example.test"]}),
+        (False, {"azp": "https://different.example.test"}),
+        (True, {"aud": "other-api"}),
+        (True, {"iss": "https://different.example.test"}),
+        (True, {"sts": "pending"}),
+        (True, {"exp": datetime.now(UTC) - timedelta(minutes=1)}),
+    ],
+)
+def test_staging_still_rejects_invalid_session_claims(
+    monkeypatch: pytest.MonkeyPatch,
+    omit_authorized_party: bool,
+    overrides: dict[str, object],
+) -> None:
+    service, private_key = build_service(
+        monkeypatch, allow_missing_authorized_party=True
+    )
+    token = encode_token(
+        private_key, omit_authorized_party=omit_authorized_party, **overrides
+    )
+    with pytest.raises(ClerkAuthenticationError):
+        service.verify_session_token(token)
 
 
 @pytest.mark.parametrize(

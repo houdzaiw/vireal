@@ -1,12 +1,22 @@
 import subprocess
+import threading
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy.exc import (
+    DisconnectionError,
+    InterfaceError,
+    OperationalError,
+    ProgrammingError,
+)
+from sqlalchemy.exc import TimeoutError as DatabaseTimeoutError
+from sqlalchemy.pool import QueuePool
 from sqlmodel import Session, delete
 
 from app.core.config import settings
@@ -538,3 +548,358 @@ def test_cleanup_skips_objects_that_storage_cannot_delete(db: Session) -> None:
     db.expire_all()
     assert db.get(AppUpload, upload.id).status == "active"  # type: ignore[union-attr]
     assert db.get(AppVideoTask, task.id).status == "succeeded"  # type: ignore[union-attr]
+
+
+class SyntheticDatabaseError(Exception):
+    def __init__(self, sqlstate: str | None = None) -> None:
+        super().__init__("SYNTHETIC-PRIVATE-CONNECTION-DETAILS")
+        self.sqlstate = sqlstate
+
+
+def _database_error(
+    sqlstate: str | None = None, *, interface: bool = False
+) -> OperationalError | InterfaceError:
+    error_class = InterfaceError if interface else OperationalError
+    return error_class(
+        "SYNTHETIC-PRIVATE-QUERY",
+        {"secret": "SYNTHETIC-PRIVATE-PARAMETER"},
+        SyntheticDatabaseError(sqlstate),
+    )
+
+
+class IsolatedWorkerLoop:
+    """Exercise the real loop without starting callbacks, HTTP or real sleeps."""
+
+    def __init__(
+        self, monkeypatch: pytest.MonkeyPatch, *, stop_after_waits: int = 1
+    ) -> None:
+        from app.services import operational_alerts
+
+        self.stop = threading.Event()
+        self.waits: list[float] = []
+        self.progress: list[float] = []
+        self.started_threads: list[str] = []
+        self.poll_calls = 0
+        self.cleanup_calls = 0
+        self.clock = 100.0
+        self.on_wait: Callable[[], None] | None = None
+
+        def wait(seconds: float) -> bool:
+            self.waits.append(seconds)
+            if self.on_wait is not None:
+                self.on_wait()
+            if len(self.waits) >= stop_after_waits:
+                self.stop.set()
+            return self.stop.is_set()
+
+        class DormantThread:
+            def __init__(inner_self, **kwargs: Any) -> None:
+                inner_self.name = str(kwargs["name"])
+                assert kwargs["args"][0] is self.stop
+
+            def start(inner_self) -> None:
+                self.started_threads.append(inner_self.name)
+
+        monkeypatch.setattr(self.stop, "wait", wait)
+        monkeypatch.setattr(
+            worker_module,
+            "threading",
+            SimpleNamespace(Thread=DormantThread, Event=threading.Event),
+        )
+        monkeypatch.setattr(
+            worker_module, "time", SimpleNamespace(monotonic=lambda: self.clock)
+        )
+        monkeypatch.setattr(worker_module, "process_next_video_task", self.poll)
+        monkeypatch.setattr(worker_module, "cleanup_expired_media", self.cleanup)
+        monkeypatch.setattr(operational_alerts, "record_worker_progress", self.record)
+
+    def poll(self) -> bool:
+        self.poll_calls += 1
+        return False
+
+    def cleanup(self) -> int:
+        self.cleanup_calls += 1
+        return 0
+
+    def record(self) -> None:
+        self.progress.append(self.clock)
+
+    def run(self) -> None:
+        worker_module.run_worker(stop=self.stop)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(_database_error(), id="connection-without-server-state"),
+        pytest.param(_database_error("08006", interface=True), id="connection-lost"),
+        pytest.param(_database_error("53000"), id="resources-or-quota"),
+        pytest.param(_database_error("53300"), id="connection-capacity"),
+        pytest.param(_database_error("57P01"), id="server-shutdown"),
+        pytest.param(_database_error("57P02"), id="server-crash"),
+        pytest.param(_database_error("57P03"), id="server-unavailable"),
+        pytest.param(_database_error("40001"), id="serialization-conflict"),
+        pytest.param(_database_error("40P01"), id="deadlock"),
+        pytest.param(_database_error("55P03"), id="lock-unavailable"),
+        pytest.param(_database_error("57014"), id="query-timeout-or-cancel"),
+        pytest.param(
+            DisconnectionError("SYNTHETIC-PRIVATE-POOL"), id="pool-disconnect"
+        ),
+        pytest.param(DatabaseTimeoutError("SYNTHETIC-PRIVATE-POOL"), id="pool-timeout"),
+    ],
+)
+def test_worker_waits_after_database_unavailability_without_false_progress(
+    error: Exception, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+
+    def unavailable() -> bool:
+        loop.poll_calls += 1
+        raise error
+
+    monkeypatch.setattr(worker_module, "process_next_video_task", unavailable)
+    loop.run()
+
+    assert loop.poll_calls == 1
+    assert loop.waits == [1.0]
+    assert loop.cleanup_calls == 0 and not loop.progress
+    assert loop.stop.is_set()
+    records = [r for r in caplog.records if hasattr(r, "worker_phase")]
+    assert len(records) == 1 and records[0].worker_phase == "poll"
+    assert records[0].retry_seconds == 1.0 and records[0].exc_info is None
+    assert "SYNTHETIC-PRIVATE" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(_database_error("28P01"), id="bad-password"),
+        pytest.param(_database_error("42501"), id="permission-denied"),
+        pytest.param(_database_error("42P01"), id="missing-schema"),
+        pytest.param(
+            ProgrammingError("SYNTHETIC", {}, SyntheticDatabaseError("42P01")),
+            id="programming-error",
+        ),
+        pytest.param(RuntimeError("application defect"), id="application-error"),
+        pytest.param(KeyboardInterrupt(), id="operator-interrupt"),
+    ],
+)
+def test_worker_does_not_hide_permanent_errors_or_interrupts(
+    error: BaseException, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+
+    def fail() -> bool:
+        raise error
+
+    monkeypatch.setattr(worker_module, "process_next_video_task", fail)
+    with pytest.raises(type(error)) as caught:
+        loop.run()
+    assert caught.value is error
+    assert loop.stop.is_set() and not loop.waits and not loop.progress
+
+
+def test_worker_database_backoff_is_capped_and_interruptible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch, stop_after_waits=9)
+
+    def unavailable() -> bool:
+        loop.poll_calls += 1
+        raise _database_error("53000")
+
+    monkeypatch.setattr(worker_module, "process_next_video_task", unavailable)
+    loop.run()
+    assert loop.waits == [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 60.0, 60.0, 60.0]
+    assert loop.poll_calls == 9 and loop.stop.is_set()
+    assert not loop.progress and not loop.cleanup_calls
+
+
+def test_worker_resets_backoff_only_after_a_successful_pass(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    loop = IsolatedWorkerLoop(monkeypatch, stop_after_waits=5)
+    results = iter(
+        [_database_error(), _database_error(), False, _database_error(), False]
+    )
+
+    def poll() -> bool:
+        result = next(results)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(worker_module, "process_next_video_task", poll)
+    with caplog.at_level(logging.INFO, logger=worker_module.__name__):
+        loop.run()
+    assert loop.waits == [
+        1.0,
+        2.0,
+        settings.VIDEO_WORKER_POLL_SECONDS,
+        1.0,
+        settings.VIDEO_WORKER_POLL_SECONDS,
+    ]
+    assert len(loop.progress) == 2 and loop.cleanup_calls == 1
+    assert caplog.text.count("Worker database access recovered") == 2
+
+
+def test_worker_retries_cleanup_without_postponing_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch, stop_after_waits=3)
+
+    def cleanup() -> int:
+        loop.cleanup_calls += 1
+        if loop.cleanup_calls < 3:
+            raise _database_error()
+        return 0
+
+    monkeypatch.setattr(worker_module, "cleanup_expired_media", cleanup)
+    loop.run()
+    assert loop.cleanup_calls == 3 and loop.poll_calls == 3
+    assert loop.waits == [1.0, 2.0, settings.VIDEO_WORKER_POLL_SECONDS]
+    assert len(loop.progress) == 1
+
+
+def test_worker_progress_database_failure_does_not_exit_or_fake_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import operational_alerts
+
+    loop = IsolatedWorkerLoop(monkeypatch, stop_after_waits=2)
+    attempted = 0
+
+    def progress() -> None:
+        nonlocal attempted
+        attempted += 1
+        if attempted == 1:
+            raise _database_error("08006", interface=True)
+        loop.record()
+
+    monkeypatch.setattr(operational_alerts, "record_worker_progress", progress)
+    loop.run()
+    assert attempted == 2 and len(loop.progress) == 1
+    assert loop.waits == [1.0, settings.VIDEO_WORKER_POLL_SECONDS]
+    assert loop.cleanup_calls == 1
+
+
+def test_worker_can_be_stopped_before_starting_callbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+    loop.stop.set()
+    loop.run()
+    assert not loop.started_threads and not loop.waits and not loop.progress
+    assert not loop.poll_calls and not loop.cleanup_calls
+
+
+def test_worker_success_keeps_background_callbacks_and_idle_polling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+    loop.run()
+    assert loop.started_threads == [
+        "payment-reconcile",
+        "video-reconcile",
+        "operations-reconcile",
+    ]
+    assert loop.poll_calls == loop.cleanup_calls == len(loop.progress) == 1
+    assert loop.waits == [settings.VIDEO_WORKER_POLL_SECONDS]
+
+
+def test_worker_default_entry_uses_its_own_stop_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+    monkeypatch.setattr(worker_module.threading, "Event", lambda: loop.stop)
+    worker_module.run_worker()
+    assert loop.stop.is_set()
+    assert loop.poll_calls == len(loop.progress) == 1
+
+
+@pytest.mark.parametrize("phase", ["poll", "cleanup"])
+def test_worker_stop_between_phases_does_not_start_more_database_work(
+    phase: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loop = IsolatedWorkerLoop(monkeypatch)
+
+    def poll() -> bool:
+        loop.poll_calls += 1
+        if phase == "poll":
+            loop.stop.set()
+        return False
+
+    def cleanup() -> int:
+        loop.cleanup_calls += 1
+        loop.stop.set()
+        return 0
+
+    monkeypatch.setattr(worker_module, "process_next_video_task", poll)
+    monkeypatch.setattr(worker_module, "cleanup_expired_media", cleanup)
+    loop.run()
+    assert loop.poll_calls == 1
+    assert loop.cleanup_calls == (phase == "cleanup")
+    assert not loop.waits and not loop.progress and loop.stop.is_set()
+
+
+@pytest.mark.parametrize("phase", ["poll", "cleanup"])
+def test_worker_closes_failed_transactions_before_waiting_without_task_mutations(
+    phase: str, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task = _create_saving_task(db)
+    loop = IsolatedWorkerLoop(monkeypatch)
+    pool = worker_module.engine.pool
+    assert isinstance(pool, QueuePool)
+    checked_out_before = pool.checkedout()
+    events: list[str] = []
+
+    class FailingSession:
+        def __init__(self, bind: Any) -> None:
+            self.inner = Session(bind)
+
+        def __enter__(self) -> FailingSession:
+            self.inner.__enter__()
+            return self
+
+        def exec(self, *_args: Any, **_kwargs: Any) -> Any:
+            self.inner.connection()
+            assert self.inner.in_transaction()
+            events.append("transaction-open")
+            raise _database_error("08006")
+
+        def __exit__(self, *args: Any) -> None:
+            self.inner.__exit__(*args)
+            assert not self.inner.in_transaction()
+            events.append("session-closed")
+
+    def check_closed_before_wait() -> None:
+        assert events == ["transaction-open", "session-closed"]
+        assert pool.checkedout() == checked_out_before
+
+    def forbidden_task_mutation(*_args: Any, **_kwargs: Any) -> None:
+        pytest.fail("Infrastructure outage must not refund or fail a task")
+
+    storage = CleanupStorage()
+    monkeypatch.setattr(worker_module, "Session", FailingSession)
+    monkeypatch.setattr(
+        worker_module, "_record_worker_failure", forbidden_task_mutation
+    )
+    monkeypatch.setattr(worker_module, "refund_video_task", forbidden_task_mutation)
+    loop.on_wait = check_closed_before_wait
+    if phase == "poll":
+        monkeypatch.setattr(
+            worker_module, "process_next_video_task", process_next_video_task
+        )
+    else:
+        monkeypatch.setattr(
+            worker_module,
+            "cleanup_expired_media",
+            lambda: cleanup_expired_media(storage=storage),
+        )
+    loop.run()
+    db.refresh(task)
+    assert task.status == "saving" and task.worker_attempts == 0
+    assert task.coin_refunded_at is None and not storage.deleted
+    assert not loop.progress and loop.waits == [1.0]

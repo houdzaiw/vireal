@@ -841,3 +841,38 @@ def test_rest_signature_preserves_raw_body_and_fixed_host():
         )
     finally:
         client.close()
+
+
+def test_usd_pause_blocks_new_orders_but_preserves_existing_capture_and_reads(
+    client, commerce_setup, db, monkeypatch
+):
+    from app.models_operations import AppBudgetWindow
+
+    monkeypatch.setattr(settings, "APP_BUDGET_GUARD_ENABLED", True)
+    headers, order = create(client)
+    approve(commerce_setup, order)
+    window = db.exec(select(AppBudgetWindow)).one()
+    window.state = "paused"
+    window.pause_reason = "operator_pause"
+    db.add(window)
+    db.commit()
+    denied = client.post(
+        "/api/v1/app/paypal/orders",
+        headers={**headers, "Idempotency-Key": uuid.uuid4().hex},
+        json={"product_id": "coins_100"},
+    )
+    assert denied.status_code == 503
+    assert commerce_setup.create_calls == 1
+    path = "/api/v1/app/paypal/orders/" + order["id"] + "/capture"
+    first = client.post(path, headers=headers)
+    second = client.post(path, headers=headers)
+    assert first.status_code == second.status_code == 200
+    assert first.json()["status"] == second.json()["status"] == "paid"
+    assert (
+        client.get("/api/v1/app/orders/" + order["id"], headers=headers).status_code
+        == 200
+    )
+    entries = db.exec(
+        select(AppCoinLedger).where(AppCoinLedger.order_id == uuid.UUID(order["id"]))
+    ).all()
+    assert len(entries) == 1

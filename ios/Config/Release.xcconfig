@@ -1,0 +1,5 @@
+// Supply matching production values through an untracked local or CI configuration.
+VIREAL_API_ORIGIN =
+VIREAL_CLERK_PUBLISHABLE_KEY =
+VIREAL_CLERK_TOKEN_TEMPLATE =
+#include? "Local.xcconfig"

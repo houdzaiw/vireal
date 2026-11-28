@@ -125,6 +125,9 @@ def generation_acceptance_task(session: Session, user: AppUser) -> AppVideoTask 
 def require_generation_access(
     request: Request, session: Session, user: AppUser, *, verify_profile: bool = False
 ) -> None:
+    from app.services.pilot_access import require_pilot_commerce
+
+    require_pilot_commerce(request, session, user, verify_profile=verify_profile)
     from app.services.commercial_access import (
         require_generation_region,
         require_new_commerce_user,
@@ -140,7 +143,9 @@ def require_generation_access(
             )
     else:
         require_generation_region(request, session, user)
-        require_new_commerce_user(request)
+        require_new_commerce_user(
+            request, session=session, user=user, verify_profile=verify_profile
+        )
 
 
 def require_new_generation(request: Request, session: Session, user: AppUser) -> None:
@@ -157,6 +162,9 @@ def require_new_generation(request: Request, session: Session, user: AppUser) ->
         raise HTTPException(
             503, "New uploads and video submissions are temporarily paused"
         )
+    from app.services.operational_budget import require_budget
+
+    require_budget(session)
 
 
 def require_acceptance_variant(

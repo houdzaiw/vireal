@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app import crud
 from app.api.deps import SessionDep
+from app.core.config import settings
 from app.models import (
     AppOrderEventPublic,
     AppOrderPublic,
@@ -25,6 +26,10 @@ def _handle_payment_callback(
     callback: PaymentCallbackRequest,
     request: Request,
 ) -> PaymentCallbackResponse:
+    # These are development simulations, not Apple/Google receipt verification.
+    # Reject before any event, order or wallet write, regardless of signature mode.
+    if settings.ENVIRONMENT != "local":
+        raise HTTPException(410, "Mobile payment simulations are unavailable")
     try:
         verify_payment_webhook(provider=provider, headers=request.headers)
     except PaymentWebhookVerificationError as exc:

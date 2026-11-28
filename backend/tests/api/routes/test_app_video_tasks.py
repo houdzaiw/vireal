@@ -955,6 +955,8 @@ def test_wan_daily_global_quota_applies_across_users(
     _enable_mock_replicate(monkeypatch, provider)
     monkeypatch.setattr(settings, "APP_USER_DAILY_REAL_SUBMISSIONS", 5)
     monkeypatch.setattr(settings, "APP_WAN_DAILY_GLOBAL_SUBMISSIONS", 1)
+    # Isolate the daily cap; simultaneous admission has its own dedicated suite.
+    monkeypatch.setattr(settings, "APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS", 100)
     first_headers, _login = app_authentication_headers(client=client)
     second_headers, _other_login = app_authentication_headers(client=client)
     first_upload = _upload_image(client, first_headers)

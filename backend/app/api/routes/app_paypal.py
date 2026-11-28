@@ -35,6 +35,11 @@ from app.services.generation_acceptance import (
     generation_acceptance_user,
     generation_acceptance_window_open,
 )
+from app.services.operational_budget import (
+    new_business_available,
+    require_budget,
+    reserve_cost,
+)
 from app.services.paypal_client import (
     PRODUCTS,
     PayPalError,
@@ -50,6 +55,8 @@ from app.services.paypal_replacement import (
     valid_grant,
     verify_voided,
 )
+from app.services.pilot_access import pilot_enabled, pilot_user, require_pilot_commerce
+from app.services.staging_login_acceptance import staging_sign_in_enabled
 from app.services.video_quota import global_real_count, utc_day_bounds
 
 router = APIRouter(prefix="/app/paypal", tags=["app paypal"])
@@ -67,6 +74,8 @@ def payment_config(
         0,
     )
     allowed = region_allowed(request)
+    budget_open = new_business_available(session)
+    staging_sign_in = staging_sign_in_enabled(request)
     cn_setup = controlled_cn_account_setup_enabled() and edge_country(request) == "CN"
     cn_setup_mode = settings.APP_CONTROLLED_CN_ACCOUNT_SETUP_ENABLED
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
@@ -88,12 +97,37 @@ def payment_config(
         if settings.APP_LIVE_ACCEPTANCE_ENABLED
         else False
     )
-    identity_allowed = not settings.APP_LIVE_ACCEPTANCE_ENABLED or acceptance_allowed
+    pilot_member = pilot_user(request, session) if settings.APP_PILOT_ENABLED else None
+    identity_allowed = (
+        not settings.APP_LIVE_ACCEPTANCE_ENABLED or acceptance_allowed
+    ) and (not settings.APP_PILOT_ENABLED or pilot_member is not None)
+    # Ordinary availability hints, never an entitlement or quota grant. Raw
+    # private-mode switches still restrict commerce after expiry or invalidity.
+    submissions_enabled = bool(
+        budget_open
+        and settings.APP_VIDEO_SUBMISSIONS_ENABLED
+        and allowed
+        and identity_allowed
+        and not generation_mode
+        and not payment_only
+        and not cn_setup_mode
+    )
     return {
         "environment": settings.PAYPAL_ENVIRONMENT,
         "client_id": settings.PAYPAL_CLIENT_ID if paypal_configured() else None,
         "country": edge_country(request),
         "region_allowed": allowed,
+        # A form hint only: subject/identity are checked by the session endpoint.
+        "staging_sign_in_enabled": staging_sign_in,
+        "staging_sign_in_expires_at": settings.APP_STAGING_LOGIN_ACCEPTANCE_EXPIRES_AT
+        if staging_sign_in
+        else None,
+        "uploads_enabled": submissions_enabled,
+        "generation_enabled": submissions_enabled,
+        "pilot_mode": settings.APP_PILOT_ENABLED,
+        "pilot_registration_enabled": pilot_enabled() and allowed,
+        "pilot_access_allowed": pilot_member is not None,
+        "global_concurrent_limit": settings.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS,
         "generation_acceptance_mode": generation_mode,
         "generation_acceptance_sign_in_enabled": generation_acceptance_mode_safe()
         and edge_country(request) == "CN",
@@ -138,10 +172,12 @@ def payment_config(
         "registration_enabled": (
             settings.APP_PUBLIC_REGISTRATION_ENABLED or acceptance_allowed
         )
+        and budget_open
         and allowed
         and not payment_only
         and not cn_setup_mode
-        and not generation_mode,
+        and not generation_mode
+        and not settings.APP_PILOT_ENABLED,
         # The raw generation mode is a kill switch even when expired/invalid.
         # This advertises only a private invitation landing page, not signup.
         # The verified primary email is checked again by the session endpoint.
@@ -149,7 +185,8 @@ def payment_config(
         and (cn_setup if cn_setup_mode else allowed)
         and not payment_only
         and not generation_mode,
-        "recharge_enabled": settings.PAYPAL_ENABLED
+        "recharge_enabled": budget_open
+        and settings.PAYPAL_ENABLED
         and not cn_setup_mode
         and not generation_mode
         and paypal_configured()
@@ -176,6 +213,7 @@ def create_paypal_order(
     body: AppPayPalOrderCreate,
     idempotency_key: Annotated[str, Header(min_length=8, max_length=120)],
 ) -> AppOrderPublic:
+    require_pilot_commerce(request, session, current_app_user, verify_profile=True)
     payment_only = settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED
     if payment_only:
         permitted = payment_only_user(request, session, verify_profile=True)
@@ -189,7 +227,9 @@ def create_paypal_order(
             )
     else:
         require_region(request)
-        require_new_commerce_user(request)
+        require_new_commerce_user(
+            request, session=session, user=current_app_user, verify_profile=True
+        )
     if body.product_id not in PRODUCTS:
         raise HTTPException(422, "Unknown recharge package")
     session.connection().execute(
@@ -238,7 +278,7 @@ def create_paypal_order(
                     409, "Original order has a replacement grant; do not pay it"
                 )
             return AppOrderPublic.model_validate(order)
-        if payment_only:
+        if order.provider_order_id is None:
             # A committed reservation with no provider ID may already have
             # created an order. Never rely on an unbounded provider dedup window
             # or resubmit it, even under the same application idempotency key.
@@ -260,6 +300,7 @@ def create_paypal_order(
             text("SELECT pg_advisory_xact_lock(:id)"), {"id": POC_BUDGET_LOCK_ID}
         )
         lock_commercial_user(session, current_app_user)
+        require_pilot_commerce(request, session, current_app_user)
         if payment_only and not payment_only_acceptance_enabled():
             raise HTTPException(403, "Payment-only acceptance has expired")
         now = datetime.now(UTC)
@@ -292,11 +333,15 @@ def create_paypal_order(
             coin_quantity=coins,
             next_reconcile_at=now,
         )
+        reserve_cost(
+            session, key=f"payment:{order.id}", source="other", price_key="payment"
+        )
         session.add(order)
         session.commit()
         session.refresh(order)
     client = None
     try:
+        require_pilot_commerce(request, session, current_app_user)
         client = get_paypal_client()
         result = client.create_order(order)
         provider_id = result.get("id")
@@ -374,6 +419,7 @@ def resume_paypal_checkout(
             503, "Payment service is unavailable; check the original order"
         )
     _require_resumable_acceptance_order(session, order)
+    require_budget(session)
     client = get_paypal_client()
     try:
         grant = grant_for_user(session, order.app_user_id)
@@ -405,6 +451,7 @@ def resume_paypal_checkout(
         if order.app_user_id != current_app_user.id or order.provider != "paypal":
             raise HTTPException(404, "Payment order not found")
         _require_resumable_acceptance_order(session, order)
+        require_budget(session)
         validate_order(order, data)
         return AppOrderPublic.model_validate(order)
     except PayPalError as exc:
@@ -533,8 +580,14 @@ def inspect_paypal_order_recovery(
 
 @router.post("/orders/{order_id}/capture", response_model=AppOrderPublic)
 def capture_paypal_order(
-    order_id: uuid.UUID, session: SessionDep, current_app_user: CurrentAppUser
+    order_id: uuid.UUID,
+    request: Request,
+    session: SessionDep,
+    current_app_user: CurrentAppUser,
 ) -> AppOrderPublic:
+    # Admission is checked for customer-initiated captures too. Provider callbacks
+    # and reconciliation remain independent so already-paid deliveries can finish.
+    require_pilot_commerce(request, session, current_app_user, verify_profile=True)
     # Existing approved payments must finish even after capacity/feature gates close.
     order = session.exec(
         select(AppOrder).where(

@@ -8,7 +8,11 @@ import jwt
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError, PyJWKClientError
 
-from app.core.config import settings
+from app.core.config import (
+    STAGING_LOGIN_ACCEPTANCE_ISSUER,
+    STAGING_LOGIN_ACCEPTANCE_ORIGIN,
+    settings,
+)
 
 AuthProvider = Literal["email", "google", "apple"]
 
@@ -26,7 +30,7 @@ class ClerkSessionClaims:
     issuer: str
     subject: str
     session_id: str
-    authorized_party: str
+    authorized_party: str | None
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,7 @@ class ClerkAuthService:
         authorized_parties: tuple[str, ...],
         audience: str,
         api_base_url: str = "https://api.clerk.com/v1",
+        allow_missing_authorized_party: bool = False,
     ) -> None:
         self.issuer_url = issuer_url.rstrip("/")
         self.jwks_client = PyJWKClient(jwks_url)
@@ -58,8 +63,12 @@ class ClerkAuthService:
         )
         self.audience = audience
         self.api_base_url = api_base_url.rstrip("/")
+        self.allow_missing_authorized_party = allow_missing_authorized_party
 
     def verify_session_token(self, token: str) -> ClerkSessionClaims:
+        required_claims = ["iss", "sub", "sid", "aud", "exp", "nbf"]
+        if not self.allow_missing_authorized_party:
+            required_claims.append("azp")
         try:
             signing_key = self.jwks_client.get_signing_key_from_jwt(token)
             payload = jwt.decode(
@@ -68,9 +77,7 @@ class ClerkAuthService:
                 algorithms=["RS256"],
                 audience=self.audience,
                 issuer=self.issuer_url,
-                options={
-                    "require": ["iss", "sub", "sid", "aud", "azp", "exp", "nbf"],
-                },
+                options={"require": required_claims},
             )
         except (InvalidTokenError, PyJWKClientError, ValueError) as exc:
             raise ClerkAuthenticationError("Invalid or expired Clerk session") from exc
@@ -82,12 +89,15 @@ class ClerkAuthService:
             raise ClerkAuthenticationError("Clerk session is missing a subject")
         if not isinstance(session_id, str) or not session_id:
             raise ClerkAuthenticationError("Clerk session is missing a session id")
-        if not isinstance(authorized_party, str) or not authorized_party:
-            raise ClerkAuthenticationError(
-                "Clerk session is missing an authorized party"
-            )
-        if authorized_party.rstrip("/") not in self.authorized_parties:
-            raise ClerkAuthenticationError("Clerk session has an unauthorized party")
+        if "azp" in payload:
+            if not isinstance(authorized_party, str) or not authorized_party:
+                raise ClerkAuthenticationError(
+                    "Clerk session is missing an authorized party"
+                )
+            if authorized_party.rstrip("/") not in self.authorized_parties:
+                raise ClerkAuthenticationError(
+                    "Clerk session has an unauthorized party"
+                )
         if payload.get("sts") == "pending":
             raise ClerkAuthenticationError("Clerk session setup is incomplete")
         return ClerkSessionClaims(
@@ -211,13 +221,23 @@ def get_clerk_auth_service() -> ClerkAuthService:
         or settings.CLERK_SECRET_KEY is None
     ):
         raise ClerkAuthenticationError("Clerk authentication is not configured")
+    issuer_url = str(settings.CLERK_ISSUER_URL).rstrip("/")
+    jwks_url = str(settings.CLERK_JWKS_URL)
+    authorized_parties = tuple(
+        str(origin).rstrip("/") for origin in settings.CLERK_AUTHORIZED_PARTIES
+    )
     return ClerkAuthService(
-        issuer_url=str(settings.CLERK_ISSUER_URL),
-        jwks_url=str(settings.CLERK_JWKS_URL),
+        issuer_url=issuer_url,
+        jwks_url=jwks_url,
         secret_key=settings.CLERK_SECRET_KEY,
-        authorized_parties=tuple(
-            str(origin).rstrip("/") for origin in settings.CLERK_AUTHORIZED_PARTIES
-        ),
+        authorized_parties=authorized_parties,
         audience=settings.CLERK_AUDIENCE,
         api_base_url=str(settings.CLERK_API_BASE_URL),
+        # The existing native staging client can receive a Clerk token without azp.
+        allow_missing_authorized_party=(
+            settings.ENVIRONMENT == "staging"
+            and issuer_url == STAGING_LOGIN_ACCEPTANCE_ISSUER
+            and jwks_url == f"{issuer_url}/.well-known/jwks.json"
+            and STAGING_LOGIN_ACCEPTANCE_ORIGIN in authorized_parties
+        ),
     )

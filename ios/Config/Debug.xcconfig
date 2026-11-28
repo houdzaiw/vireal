@@ -1,0 +1,3 @@
+// Debug builds use the verified staging environment; Local.xcconfig can override it.
+#include "Staging.xcconfig"
+#include? "Local.xcconfig"

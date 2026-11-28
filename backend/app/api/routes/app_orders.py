@@ -25,6 +25,10 @@ def create_order(
         raise HTTPException(403, "Account setup does not permit new commerce")
     if settings.APP_PAYMENT_ONLY_ACCEPTANCE_ENABLED:
         raise HTTPException(403, "Payment-only acceptance permits only PayPal orders")
+    # Apple/Google payment creation belongs to the local mobile prototype.
+    # Hosted H5 commerce uses the separately gated PayPal order flow.
+    if settings.ENVIRONMENT != "local":
+        raise HTTPException(403, "Legacy mobile payment orders are unavailable")
     return crud.create_app_order(
         session=session,
         app_user=current_app_user,

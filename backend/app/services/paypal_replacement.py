@@ -367,6 +367,9 @@ def reserve_replacement(
         coin_quantity=100,
         next_reconcile_at=datetime.now(UTC),
     )
+    from app.services.operational_budget import reserve_cost
+
+    reserve_cost(session, key=f"payment:{new.id}", source="other", price_key="payment")
     session.add(new)
     session.flush()
     grant.replacement_order_id = new.id

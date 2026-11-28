@@ -24,6 +24,14 @@ repos:
         args: [--force-exclude]
   - repo: local
     hooks:
+      - id: legacy-deploy-guards
+        name: legacy deployment guards
+        entry: uv run python -I -B -m unittest discover -s tools/ci -p test_legacy_deploy_guards.py
+        language: unsupported
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+
       - id: local-biome-check
         name: biome check
         entry: npm run lint

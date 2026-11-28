@@ -9,7 +9,13 @@ from app.models import User, UserCreate
 def create_database_engine(database_url: str) -> Engine:
     # A managed database may terminate an idle pooled connection. Validate it
     # before checkout; do not retry a failed transaction or external payment.
-    return create_engine(database_url, pool_pre_ping=True)
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,
+        pool_timeout=settings.DATABASE_POOL_TIMEOUT_SECONDS,
+    )
 
 
 engine = create_database_engine(str(settings.DATABASE_URL))

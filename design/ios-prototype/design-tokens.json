@@ -1,0 +1,24 @@
+{
+  "product": "Vireal iPhone",
+  "baseline": "H5 prototype v1.2",
+  "appearance": "dark",
+  "colors": {
+    "background": "#090b0d",
+    "surface": "#151a1d",
+    "surfaceRaised": "#20272b",
+    "brand": "#71d8ed",
+    "primaryAction": "#b7f2ff",
+    "primaryActionText": "#10242a",
+    "textPrimary": "#f7fbfc",
+    "textSecondary": "#9caeb5",
+    "error": "#ff9f9f",
+    "success": "#8cebc5",
+    "warning": "#ffd58f"
+  },
+  "layout": {"referenceWidth":393,"referenceHeight":852,"contentInset":20,"minimumTapTarget":44,"primaryActionHeight":52,"spacing":[4,8,12,16,20,24,32]},
+  "radii": {"card":20,"control":13,"primaryAction":15,"sheet":24},
+  "typography": {"family":"system","nativeSizing":"Dynamic Type text styles","largeTitle":"largeTitle","pageTitle":"title","sectionTitle":"headline","body":"body","secondary":"subheadline","metadata":"caption"},
+  "motion": {"navigationMs":200,"respectsReduceMotion":true},
+  "mediaFallback": {"style":"numbered gradient","showAsRealPreview":false},
+  "notes": "原生实现将品牌色建为 Asset Catalog Color Set，并配置高对比变体；不按原型 CSS 像素逐项移植。"
+}

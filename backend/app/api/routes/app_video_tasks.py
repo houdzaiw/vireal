@@ -51,7 +51,12 @@ from app.services.replicate_video import (
 )
 from app.services.storage import ImageStorageError, get_image_storage
 from app.services.video_generation import VideoTaskStatus
-from app.services.video_quota import build_video_quota, global_real_count, quota_counts
+from app.services.video_quota import (
+    build_video_quota,
+    global_active_real_count,
+    global_real_count,
+    quota_counts,
+)
 
 router = APIRouter(prefix="/app/video-tasks", tags=["app video tasks"])
 
@@ -431,6 +436,13 @@ async def create_video_task(
     elif active_count >= settings.APP_USER_MAX_CONCURRENT_VIDEO_TASKS:
         fallback_reason = "user_concurrent_quota"
     elif (
+        global_active_real_count(session=session)
+        >= settings.APP_GLOBAL_MAX_CONCURRENT_VIDEO_TASKS
+    ):
+        # The budget lock covers this read and the reservation commit below,
+        # including concurrent requests handled by different API processes.
+        fallback_reason = "global_concurrent_quota"
+    elif (
         planned_execution_type == "wan"
         and wan_count >= settings.APP_WAN_DAILY_GLOBAL_SUBMISSIONS
     ):
@@ -469,6 +481,16 @@ async def create_video_task(
         next_attempt_at=now if is_demo else None,
         expires_at=now + timedelta(hours=settings.APP_MEDIA_RETENTION_HOURS),
     )
+    from app.services.operational_budget import reserve_cost
+
+    reserve_cost(
+        session,
+        key=f"video:{task.id}",
+        source="replicate" if not is_demo else "railway",
+        price_key=f"video:{model}:{resolved_duration}:720p:image-only",
+    )
+    from app.services.resource_limits import reserve_generation
+
     session.add(task)
     session.flush()
     if charged_coin_cost:
@@ -487,6 +509,7 @@ async def create_video_task(
             raise HTTPException(
                 status_code=409, detail="Insufficient coin balance"
             ) from exc
+    reserve_generation(model, resolved_duration)
     session.commit()
     session.refresh(task)
 

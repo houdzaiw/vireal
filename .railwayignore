@@ -1,0 +1,6 @@
+# Local skill links are not deployment inputs.
+.agents/
+.claude/
+# The server image does not require native or prototype build inputs.
+ios/
+design/

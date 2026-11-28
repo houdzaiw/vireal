@@ -8,7 +8,10 @@ from starlette.staticfiles import StaticFiles
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.services.media_privacy import install_log_filters, scrub_event
 from app.services.storage import get_local_upload_root
+
+install_log_filters()
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
@@ -18,7 +21,12 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 
 
 if settings.SENTRY_DSN and settings.FASTAPI_ENV != "development":
-    sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
+    sentry_sdk.init(
+        dsn=str(settings.SENTRY_DSN),
+        enable_tracing=True,
+        before_send=scrub_event,
+        before_send_transaction=scrub_event,
+    )
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

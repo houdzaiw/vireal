@@ -3,17 +3,31 @@ name: Deploy with Docker Compose
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: deploy-docker-compose
   cancel-in-progress: false
 
 jobs:
+  legacy-deployment-blocked:
+    name: Legacy deployment blocked
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Reject legacy deployment
+        shell: bash
+        run: |
+          echo "::error::Legacy deployment disabled. Use the reviewed fixed-version release procedure."
+          exit 1
+
   deploy:
-    # Do not deploy the template repository, only projects created from it
-    if: github.repository != 'fastapi/full-stack-fastapi-template'
+    # Retained for reference only. No input, repository or variable can enable it.
+    if: false
+    needs: legacy-deployment-blocked
+    permissions:
+      contents: read
     runs-on: self-hosted
     timeout-minutes: 30
     env:

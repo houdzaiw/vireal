@@ -174,6 +174,34 @@ def test_clerk_session_creates_one_app_user_and_updates_login_summary(
     assert len(app_sessions) == 2
 
 
+def test_native_and_web_sessions_share_user_but_logout_is_isolated(
+    client: TestClient,
+    clerk_mode: FakeClerkService,
+) -> None:
+    subject = "native-" + str(uuid.uuid4())
+    web = replace(clerk_mode.claims, subject=subject, session_id="web-" + subject)
+    native = replace(web, session_id="ios-" + subject, authorized_party=None)
+    headers = {"Authorization": "Bearer clerk-token"}
+    clerk_mode.claims = web
+    web_response = client.post("/api/v1/app/auth/session", headers=headers)
+    assert web_response.status_code == 200
+    clerk_mode.claims = native
+    native_response = client.post("/api/v1/app/auth/session", headers=headers)
+    assert native_response.status_code == 200
+    assert (
+        native_response.json()["app_user"]["id"]
+        == web_response.json()["app_user"]["id"]
+    )
+    assert native_response.json()["is_new_user"] is False
+    assert client.get("/api/v1/app/wallet", headers=headers).status_code == 200
+    assert client.post("/api/v1/app/auth/logout", headers=headers).status_code == 200
+    assert client.get("/api/v1/app/users/me", headers=headers).status_code == 403
+    assert client.post("/api/v1/app/auth/session", headers=headers).status_code == 403
+    clerk_mode.claims = web
+    assert client.get("/api/v1/app/users/me", headers=headers).status_code == 200
+    assert clerk_mode.revoked_session_ids == [native.session_id]
+
+
 def test_clerk_logout_immediately_revokes_local_session(
     client: TestClient,
     db: Session,
