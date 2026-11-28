@@ -1,0 +1,8 @@
+// Never put a Clerk secret key, password, JWT or provider credentials here.
+// xcconfig treats // as a comment, so use the slash escape below for URLs.
+VIREAL_API_ORIGIN = https:/$()/your-staging-api.example.com
+VIREAL_CLERK_PUBLISHABLE_KEY = pk_test_REPLACE_WITH_MATCHING_INSTANCE
+// Normally empty: customize the default session's aud to match CLERK_AUDIENCE.
+// Use a template only if it also preserves the required session claims including sid.
+VIREAL_CLERK_TOKEN_TEMPLATE =
+// DEVELOPMENT_TEAM = YOUR_APPLE_TEAM
